@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Explore RallyCoach codebase structure",
+    "status": "completed",
+    "activeForm": "Exploring codebase structure"
+  },
+  {
+    "content": "Add client-side pose detection for Analytics video uploads",
+    "status": "completed",
+    "activeForm": "Adding client-side pose detection"
+  },
+  {
+    "content": "Improve skeleton overlay sync in Analytics mode",
+    "status": "completed",
+    "activeForm": "Improving skeleton overlay sync"
+  },
+  {
+    "content": "Enhance Practice mode skeleton with show toggle and rule indicator",
+    "status": "completed",
+    "activeForm": "Enhancing Practice skeleton"
+  },
+  {
+    "content": "Wire Dashboard to real session data with top issues",
+    "status": "in_progress",
+    "activeForm": "Wiring Dashboard to real data"
+  },
+  {
+    "content": "Test and verify all features work",
+    "status": "pending",
+    "activeForm": "Testing all features"
+  }
+]

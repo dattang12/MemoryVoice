@@ -1,0 +1,41 @@
+# RallyCoach Project Memory
+
+## Project Overview
+- Next.js 14.2.5 + React 18 + Tailwind CSS badminton coaching app
+- Located at `C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach`
+- Uses: Supabase (auth/db), MediaPipe (pose), Three.js (3D), Recharts (charts), Google Gemini AI
+
+## UI Redesign (Completed)
+- Dark theme for auth pages (login/signup) and landing page
+- Premium light theme (`app-page` class) for dashboard/app pages
+- Dark sidebar nav (`nav-dark` class)
+- Custom Tailwind tokens: `dark-50` to `dark-950`, `primary-*`, `accent-green/red`
+- CSS classes added: `hero-grid`, `glass-card`, `stat-card-premium`, `app-page`, `nav-dark`
+- Charts (Recharts) were NOT touched per user instruction
+
+## Key Patterns
+- `coach-card` class replaced with `stat-card-premium` or `bg-white rounded-2xl border border-gray-100 shadow-sm`
+- Auth pages use `bg-dark-950` + `hero-grid` + `bg-dark-800/80 backdrop-blur-xl`
+- Form inputs on dark: `bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-dark-500`
+- Header cards on app pages: `bg-gradient-to-r from-dark-900 to-dark-800` with white text
+
+## Gemini 3 Upgrade (Completed)
+- Models: gemini-3-flash-preview, gemini-3-pro-preview, gemini-3-pro-image-preview
+- Extended tick schema: added commentary, reason, latency_ms fields
+- Practice UI: AI Insights sidebar card + commentary overlay on video
+- Analysis route: removed mock data, uses real pose data or Gemini 3 direct analysis
+- Backend gemini_client.py: updated to gemini-3-flash-preview
+- Docs: added "Why Gemini 3" sections to both READMEs
+
+## Critical: Gemini 3 Thinking Tokens
+- Gemini 3 uses "thinking tokens" that count against maxOutputTokens
+- maxOutputTokens must be >=2000 for structured JSON (thinking uses ~700 tokens)
+- Use `thinkingConfig: { thinkingBudget: 200 }` to limit overhead
+- Use `safeParseJSON()` to handle markdown-wrapped responses
+- Video overlays need `z-10` class (canvas has zIndex:2 which covers them)
+
+## Files Modified
+- tailwind.config.ts, globals.css, page.tsx (landing), DashboardNav.tsx
+- All page files: dashboard, analytics, practice, strategy, history, history/[sessionId], racket, login, signup
+- gemini.ts, types.ts, practice/page.tsx, api/practice/tick/route.ts, api/analysis/start/route.ts
+- backend/gemini_client.py, README.md, rallycoach/README.md

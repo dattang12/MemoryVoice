@@ -1,0 +1,126 @@
+You are Claude inside my VSCode. Act like a senior engineer doing “vibe coding” but with real discipline: small steps, visible progress, frequent running, and tight feedback loops.
+
+NON-NEGOTIABLES
+1) Use multi-agent workflow. Split work into 4 roles (you can simulate them): 
+   - Tech Lead (plans, acceptance criteria, reviews)
+   - Frontend Engineer (UI/UX, overlay, loading states)
+   - Pose/MediaPipe Engineer (timestamp bug, frame loop, performance)
+   - Gemini/Prompt Engineer (auto skill-level classification + guidance JSON)
+2) Use all usable MCP tools available in my VSCode (filesystem, git, search/ripgrep, browser/devtools integration, etc.). First list what MCP tools you detect and then use them.
+3) BEFORE changing code: read the relevant files end-to-end, then summarize current behavior + root cause hypothesis.
+4) You MUST do web research via any MCP browsing/search tool available (or your best available equivalent). Use it specifically to confirm:
+   - MediaPipe PoseLandmarker detectForVideo timestamp rules (monotonic timestamps)
+   - Best practice: requestVideoFrameCallback for frame-accurate processing
+   - Typical fixes for “Packet timestamp mismatch” in MediaPipe graphs / Tasks Vision
+
+PROJECT CONTEXT (what to fix)
+A) Analytics mode: skeleton overlay does NOT show on uploaded video.
+B) The “Beginner / Intermediate / Advanced” selector is useless (always shows “Great form/perfect”). Remove that selector.
+C) Instead: Gemini should automatically judge the player’s level from the video + pose features.
+D) While Gemini is analyzing, show a loading animation. When done, show results.
+E) “Explain how to change position/movement” with minimal text: animation is best. Implement an animated guidance UI (ghost skeleton + arrows / keyframe mini-animation). Words should be minimal.
+
+REPRO ASSETS
+- demo.mp4 is my test upload video.
+- Another mp4 shows the current broken behavior (use any provided sample video in repo / uploads).
+- In my screenshot console, errors reference something like processVideoWithPose() and page.tsx lines ~271 and ~515. Find and inspect those exact spots.
+
+DELIVERABLES
+1) Skeleton overlay works reliably for uploaded videos (toggle on/off), and stays aligned as video resizes.
+2) No more MediaPipe/WASM timestamp mismatch errors in console.
+3) Remove the manual skill level dropdown from the UI.
+4) Add auto-level detection:
+   - Output: { level: "Beginner|Intermediate|Advanced", confidence: 0-1, rationaleBullets: string[] (max 3) }
+5) Add guidance animation:
+   - Show 2–3 “keyframes” (Setup / Contact / Follow-through or Footwork / Split-step / Recovery)
+   - Each keyframe should animate (simple stick-figure skeleton tween + arrows) based on either:
+       (i) the user’s own landmarks from selected frames, plus corrections OR
+       (ii) a lightweight “ideal template” skeleton normalized to the user, then tween
+6) Loading state:
+   - When analysis starts: show spinner/skeleton shimmer + “Analyzing…” text
+   - When pose extraction is running vs Gemini call is running: show progress steps (2-step is enough).
+
+IMPLEMENTATION PLAN (follow in order)
+PHASE 0 — Inventory + Understanding
+- Use MCP to:
+  - search for “analytics”, “PoseLandmarker”, “mediapipe/tasks-vision”, “processVideoWithPose”, “drawLandmarks”, “canvas overlay”, “level”, “Beginner”, “Intermediate”, “Advanced”.
+  - open the analytics page component (likely page.tsx / analytics route) and any pose utilities.
+- Summarize current pipeline in 10 lines: where video is loaded, how frames are processed, where timestamps come from, how overlay is drawn (or why not).
+
+PHASE 1 — Fix the root cause: timestamps + frame loop
+Goal: Guarantee strictly monotonically increasing timestamps passed into PoseLandmarker detectForVideo (or equivalent graph stream).
+- Replace any timestamp source that can repeat/go backwards:
+  - DON’T use video.currentTime * 1000 rounded to int if it can repeat due to frame timing.
+  - DON’T use Date.now() if you pause/seek and feed older timestamps.
+- Use requestVideoFrameCallback if available:
+  - In callback, use metadata.mediaTime * 1000 (high precision) but STILL enforce monotonic:
+    - keep lastTimestampMs; timestampMs = max(lastTimestampMs + 1, floor(metadata.mediaTime*1000))
+- If video seeks backwards:
+  - stop processing, reset lastTimestampMs, and (recommended) re-create PoseLandmarker instance OR maintain an offset so timestamps keep increasing (e.g., baseOffset += lastTimestampMs; timestampMs = baseOffset + floor(mediaTime*1000)).
+- Ensure only ONE processing loop runs at a time (avoid double-calls that can repeat timestamp).
+- Add a small debug overlay/log (dev only) showing timestampMs, frame index, and whether it increased.
+
+PHASE 2 — Skeleton overlay that always renders
+- Implement a canvas overlay positioned absolutely over the video element.
+- On each processed frame:
+  - store pose landmarks result in state/ref
+  - draw skeleton on canvas:
+    - clear canvas
+    - scale landmarks from normalized coords to canvas pixels
+    - draw connections + joints
+- Handle resizing:
+  - on video metadata loaded + on window resize, set canvas width/height to match rendered video rect.
+- Respect “Show Skeleton” toggle.
+
+PHASE 3 — Remove manual level selector, add auto-level
+- Delete the Beginner/Intermediate/Advanced dropdown UI and any related state.
+- Instead compute features from pose over time (lightweight, no ML training):
+  Example features:
+    - movement intensity: avg hip velocity, ankle velocity
+    - balance/stability: torso angle variance, COM sway proxy
+    - footwork: split-step frequency proxy, recovery time between lunges
+    - stroke mechanics proxy: shoulder-elbow-wrist angles at “contact-like” moments
+- Summarize features into a compact JSON.
+- Call Gemini with a strict JSON schema and guardrails:
+  - Ask for level + confidence + max 3 bullet rationales + guidance plan (2–3 keyframes).
+- If Gemini fails/timeouts: fallback rule-based level estimation so UI still works.
+
+PHASE 4 — Guidance animation (minimal text, maximal “show”)
+- Produce 2–3 keyframes from the video:
+  - Select frames based on events (peak arm extension, lowest lunge, fastest direction change) OR simple heuristics.
+- For each keyframe:
+  - render a mini canvas card that shows:
+     - user skeleton (solid)
+     - target skeleton (ghost) OR arrow vectors on key joints
+     - animate tween between them (0.8–1.2s loop)
+- Keep text to:
+  - a short title (“Split-step earlier”, “Lower stance”, “Recover faster”)
+  - optional single-line hint (<= 8 words)
+
+PHASE 5 — Loading/progress UX
+- Add analysis state machine:
+  - IDLE → EXTRACTING_POSE → GEMINI_SCORING → DONE (or ERROR)
+- Display:
+  - progress indicator + animation
+  - disable “Next Mistake” while running
+
+QUALITY BAR / ACCEPTANCE TESTS
+- Upload demo.mp4:
+  - No console “timestamp mismatch” errors
+  - Skeleton overlay appears and tracks the player
+  - UI shows “Analyzing…” then a computed level
+  - Guidance animation cards appear and animate
+- Seek backward in the video:
+  - processing does not crash; timestamps remain valid; overlay resumes
+
+OUTPUT REQUIREMENTS
+- Make atomic commits (or at least clearly separated patch sections).
+- After code changes:
+  - run the app, reproduce fix, and note exact console output
+  - provide a short “what changed + where” list with file paths
+
+Now start:
+1) List MCP tools available
+2) Search + open the analytics page + pose pipeline files
+3) Identify the exact timestamp source and overlay drawing logic
+4) Implement fixes following PHASE 1 → 5

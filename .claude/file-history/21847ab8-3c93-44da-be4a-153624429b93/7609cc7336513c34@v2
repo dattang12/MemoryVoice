@@ -1,0 +1,103 @@
+---
+name: growthops-founder-finder
+description: >
+  Automatically find potential startup founders across multiple sources. Use when asked to
+  "find founders", "build lead list", "search for startups", "find potential founders",
+  "做名单", "找创始人", or any founder discovery request. Searches Product Hunt, Crunchbase,
+  GitHub, Hacker News, Indie Hackers, Twitter, Reddit, BetaList, and Apollo.io.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"🔍","requires":{"env":["APOLLO_API_KEY"]}}}
+---
+
+# Founder Finder Skill
+
+## What You Do
+Search the internet to find early-stage US-based startup founders for PitchTok.
+
+## Sources (Search in this priority order)
+
+### 1. Product Hunt (Highest Quality)
+- Open browser → go to producthunt.com
+- Browse today's launches and recent launches (last 7 days)
+- Look for makers with US-based products
+- Extract: founder name, company, product URL, maker profile
+- Focus on products with 50-500 upvotes (hungry for funding but showing traction)
+
+### 2. Apollo.io API (Highest Volume)
+```bash
+curl -X POST 'https://api.apollo.io/v1/mixed_people/search' \
+  -H 'Content-Type: application/json' \
+  -H "X-Api-Key: $APOLLO_API_KEY" \
+  -d '{
+    "q_person_title": ["founder", "co-founder", "ceo"],
+    "person_locations": ["United States"],
+    "q_organization_num_employees_ranges": ["1,10"],
+    "q_organization_industry_tag_ids": ["5567cd4c7369647775790000"],
+    "page": 1,
+    "per_page": 25
+  }'
+```
+
+### 3. Hacker News
+- Browse news.ycombinator.com
+- Search for "Show HN" and "Launch HN" posts from last 7 days
+- Extract founder usernames → check profiles for email/website
+
+### 4. GitHub Trending
+- Browse github.com/trending
+- Look for repos that appear to be products (not libraries)
+- Check repo owner's profile for "founder", "CEO", "building"
+- Cross-reference with company website
+
+### 5. Indie Hackers
+- Browse indiehackers.com/products
+- Filter by recently launched, revenue-sharing founders
+- Extract founder name, product, contact info
+
+### 6. Twitter/X
+- Search for: #buildinpublic, #startup, "just launched", "we're raising"
+- Filter by US-based accounts
+- Extract profiles of founders tweeting about their startups
+
+### 7. Reddit
+- Browse r/startups, r/SaaS, r/Entrepreneur
+- Look for posts tagged "Feedback", "Launch", "Show r/startups"
+- Extract OP's product and contact info
+
+### 8. BetaList
+- Browse betalist.com for recently listed startups
+- Extract founder and company info
+
+### 9. Crunchbase
+- Search for recently funded pre-seed/seed companies
+- Filter: US, founded 2024-2026, raised < $2M
+
+## Output Format
+
+For each founder found, save to `workspace/leads/YYYY-MM-DD-new-leads.md`:
+
+```markdown
+## Lead: {Founder Name}
+- **Company**: {company name}
+- **Email**: {email if found}
+- **LinkedIn**: {linkedin URL}
+- **Source**: {where you found them}
+- **Stage**: {idea/mvp/seed}
+- **Vertical**: {AI/SaaS/etc}
+- **Location**: {city, state}
+- **Score**: {0-100, use scoring rules from lead-scorer skill}
+- **Notes**: {why they're a good fit}
+- **Found**: {date}
+- **Status**: new
+```
+
+## Volume Target
+- Find 20-50 new founders per run
+- Prioritize quality over quantity
+- De-duplicate against existing leads in workspace/leads/
+
+## Important
+- Only collect publicly available information
+- Do not scrape LinkedIn profiles (use Apollo.io for LinkedIn data)
+- Respect robots.txt on all sites
+- If Apollo API key is not set, skip Apollo and use browser-based sources only

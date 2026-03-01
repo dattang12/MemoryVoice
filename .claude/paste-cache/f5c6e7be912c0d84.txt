@@ -1,0 +1,44 @@
+# Role: Senior Full-Stack Vibe Coder & Multi-Agent Orchestrator
+
+**Objective:** We are performing a critical refinement phase on the **Analytics Mode** of the RallyCoach application. The previous iteration implemented features that are directionally correct but functionally incomplete or buggy.
+
+**Meta-Instruction: The Multi-Agent Workflow**
+You must operate as a self-contained multi-agent system to ensure rigor and creativity. You will autonomously sequence these roles for each task:
+
+1.  **🤖 The Planner Agent:** Before coding, scan the codebase to identify existing tools, libraries, state reservoirs, and MCP skills available in the project. Formulate a technical plan for *how* to solve the problem using existing architecture.
+2.  **🛠️ The Builder Agent:** Execute the Planner's blueprint. Write clean, "vibe-coded" React/TypeScript code. Focus on smooth animations and intuitive UI.
+3.  **🧐 The Supervisor Agent:** After the Builder submits code, review it against the specific constraints listed below to ensure no "illusions" occurred (e.g., claiming an animation is fixed when it's still static).
+
+---
+
+## Mission Briefing: Refining Analytics Mode
+
+We have 5 specific issues remaining in the Analytics mode based on user testing. We need to squash bugs and significantly improve the clarity of the coaching visualizations.
+
+### Task 1: Implement User-Initiated Subject Locking (Fixes P5)
+**Problem:** The automatic skeleton detection still jumps randomly to spectators or background players.
+**Planner/Builder Instructions:**
+* Abandoned automatic locking.
+* Implement an initial UI state in Analytics mode: "Select Player(s) to Analyze."
+* Allow the user to click on one (for singles) or two (for doubles) skeletons in the video frame.
+* Store these selected subject IDs in the state and force the skeleton overlay *only* to render for these IDs for the duration of the session.
+
+### Task 2: Context-Aware "Ghost" (Best Rep) (Fixes P4)
+**Problem:** The "Ghost" feature works, but it loops the same generic "best rep" regardless of the mistake being viewed.
+**Planner/Builder Instructions:**
+* The Ghost overlay needs to be reactive to the *currently selected mistake* in the timeline/sidebar.
+* If the user clicks a "Late Forehand" mistake, the Ghost should fetch and display the coordinate data for a "Perfect Forehand" timing, not a generic movement.
+* Ensure the state management links the selected mistake index to the data source for the Ghost visualization.
+
+### Task 3: High-Fidelity Corrective Animations (Fixes P1, P2, P3)
+**Problem:** The "Movement Guidance" (red line), the "Detected Issues" sidebar, and the "Fix this mistake" panel all suffer from the same issue: the animations showing the *correct* form are either broken (static), too subtle, or unclear. They don't effectively teach the right big-picture movement.
+**Planner/Builder Instructions:**
+* This is a unified visualization problem. We need a robust way to show "Correct vs. Incorrect" movement.
+* **Sidebar & Bottom Panel (P2 & P3):** Instead of small twitches, create exaggerated, continuous loop animations focusing on the specific body part in error. If the error is "elbow too low," show a clear, large upward sweep of the elbow into the correct position.
+* **Movement Guidance Overlay (P1):** Ensure the red trajectory line is animated smoothly. It must clearly visualize the *ideal* path the player *should* have taken for that specific mistake frame.
+
+---
+
+## Execution Protocol
+
+Start now by activating your **Planner Agent**. Read the current state of the Analytics component files to understand how the Ghost data is currently piped in and how subject IDs are currently tracked. Present your plan before building.

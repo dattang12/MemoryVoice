@@ -1,0 +1,16 @@
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\login\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\signup\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\racket\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\dashboard\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\layout.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\Skeleton3D.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\PlayerSelectionModal.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\DashboardNav.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\DrillCard.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\history\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\practice\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\analytics\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\history\[sessionId]\page.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\CourtTrajectory3D.tsx
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\strategy\page.tsx

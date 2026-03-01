@@ -1,0 +1,213 @@
+     1→import cv2
+     2→import numpy as np
+     3→import mediapipe as mp
+     4→
+     5→class VideoAnnotator:
+     6→    def __init__(self):
+     7→        self.mp_pose = mp.solutions.pose
+     8→        self.mp_drawing = mp.solutions.drawing_utils
+     9→        self.mp_drawing_styles = mp.solutions.drawing_styles
+    10→        
+    11→        # Colors (BGR)
+    12→        self.COLOR_GOOD = (0, 255, 0)    # Green
+    13→        self.COLOR_BAD = (0, 0, 255)     # Red
+    14→        self.COLOR_TEXT = (255, 255, 255) # White
+    15→        self.COLOR_GHOST = (255, 200, 100) # Light Blue for ghost
+    16→
+    17→    def draw_text_with_background(self, img, text, pos, font_scale=0.6, thickness=1, color=(255, 255, 255), bg_color=(0, 0, 0)):
+    18→        """Helper to draw text with a contrasting background"""
+    19→        font = cv2.FONT_HERSHEY_SIMPLEX
+    20→        (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+    21→        x, y = pos
+    22→        cv2.rectangle(img, (x - 5, y - text_h - 5), (x + text_w + 5, y + 5), bg_color, -1)
+    23→        cv2.putText(img, text, (x, y), font, font_scale, color, thickness)
+    24→
+    25→    def add_ideal_pose_ghost(self, frame, current_pose_landmarks):
+    26→        """
+    27→        Draws a semi-transparent 'Ghost' pose. 
+    28→        In a real app, 'ideal_pose' would come from a database of pro shots.
+    29→        For now, we visualize the current pose as a ghost for style.
+    30→        """
+    31→        overlay = frame.copy()
+    32→        if current_pose_landmarks:
+    33→            self.mp_drawing.draw_landmarks(
+    34→                overlay,
+    35→                current_pose_landmarks,
+    36→                self.mp_pose.POSE_CONNECTIONS,
+    37→                landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=self.COLOR_GHOST, thickness=2, circle_radius=2),
+    38→                connection_drawing_spec=self.mp_drawing.DrawingSpec(color=self.COLOR_GHOST, thickness=2)
+    39→            )
+    40→        return cv2.addWeighted(frame, 1.0, overlay, 0.3, 0)
+    41→
+    42→    def create_annotated_video(self, input_path, output_path, analysis_result):
+    43→        """
+    44→        Generates the final video with Iron-Man style overlays.
+    45→        """
+    46→        cap = cv2.VideoCapture(input_path)
+    47→        if not cap.isOpened():
+    48→            return None
+    49→
+    50→        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    51→        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    52→        fps = int(cap.get(cv2.CAP_PROP_FPS))
+    53→        
+    54→        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    55→        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    56→
+    57→        # Data lookups
+    58→        shots = analysis_result.get('shots', [])
+    59→        # Map frame number to specific shot data for O(1) lookup
+    60→        shot_map = {shot['frame']: shot for shot in shots}
+    61→        
+    62→        frame_idx = 0
+    63→        
+    64→        with self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+    65→            while cap.isOpened():
+    66→                ret, frame = cap.read()
+    67→                if not ret:
+    68→                    break
+    69→
+    70→                # 1. Process Pose
+    71→                image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    72→                results = pose.process(image_rgb)
+    73→
+    74→                # 2. Check for Shot Event
+    75→                current_shot = None
+    76→                # Check within a small window (e.g., 5 frames) to keep text on screen longer
+    77→                for f_key in shot_map:
+    78→                    if 0 <= frame_idx - f_key < 30: # Show shot info for 1 second (30 frames)
+    79→                        current_shot = shot_map[f_key]
+    80→                        break
+    81→
+    82→                # 3. Draw Overlays
+    83→                if results.pose_landmarks:
+    84→                    # Draw Ghost (Optional - nice visual touch)
+    85→                    # frame = self.add_ideal_pose_ghost(frame, results.pose_landmarks)
+    86→
+    87→                    # Draw Main Skeleton
+    88→                    # Color based on quality if inside a shot event
+    89→                    connection_color = self.COLOR_GOOD
+    90→                    if current_shot and current_shot.get('pose_errors'):
+    91→                        connection_color = self.COLOR_BAD
+    92→
+    93→                    self.mp_drawing.draw_landmarks(
+    94→                        frame,
+    95→                        results.pose_landmarks,
+    96→                        self.mp_pose.POSE_CONNECTIONS,
+    97→                        landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=connection_color, thickness=2, circle_radius=2),
+    98→                        connection_drawing_spec=self.mp_drawing.DrawingSpec(color=connection_color, thickness=2)
+    99→                    )
+   100→
+   101→                # 4. Draw HUD / Text Info
+   102→                if current_shot:
+   103→                    # Top Left: Shot Type
+   104→                    self.draw_text_with_background(frame, f"SHOT: {current_shot['shot_type']}", (20, 50), 1.2, 2)
+   105→                    
+   106→                    # Bottom Left: Errors or Good Form
+   107→                    if current_shot.get('pose_errors'):
+   108→                        y_pos = 100
+   109→                        for err in current_shot['pose_errors']:
+   110→                            self.draw_text_with_background(frame, f"FIX: {err}", (20, y_pos), 0.7, 1, self.COLOR_BAD)
+   111→                            y_pos += 30
+   112→                    else:
+   113→                        self.draw_text_with_background(frame, "PERFECT FORM", (20, 100), 0.8, 2, self.COLOR_GOOD)
+   114→
+   115→                    # Top Right: Tactical Suggestion (from CoachAI logic)
+   116→                    if 'suggestion' in current_shot:
+   117→                        self.draw_text_with_background(frame, f"COACH: {current_shot['suggestion']}", (width - 400, 50), 0.7, 1, (0, 255, 255))
+   118→
+   119→                # Frame Counter
+   120→                cv2.putText(frame, f"Frame: {frame_idx}", (width - 150, height - 30), 
+   121→                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+   122→
+   123→                out.write(frame)
+   124→                frame_idx += 1
+   125→
+   126→        cap.release()
+   127→        out.release()
+   128→        return output_path
+   129→
+   130→
+   131→# Standalone function for compatibility with main.py
+   132→def create_annotated_video_with_analysis(input_path, output_path, pose_data, shot_events):
+   133→    """
+   134→    Wrapper function that creates annotated video using pose_data and shot_events.
+   135→    This matches the interface expected by main.py
+   136→    """
+   137→    from video_processing import draw_skeleton_on_frame
+   138→
+   139→    cap = cv2.VideoCapture(input_path)
+   140→    if not cap.isOpened():
+   141→        print(f"Error: Could not open video {input_path}")
+   142→        return None
+   143→
+   144→    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+   145→    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+   146→    fps = int(cap.get(cv2.CAP_PROP_FPS))
+   147→    if fps == 0:
+   148→        fps = 30  # Default fallback
+   149→
+   150→    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+   151→    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+   152→
+   153→    # Map frame numbers to shots for quick lookup
+   154→    shot_map = {shot['frame']: shot for shot in shot_events}
+   155→
+   156→    frame_idx = 0
+   157→
+   158→    while True:
+   159→        ret, frame = cap.read()
+   160→        if not ret:
+   161→            break
+   162→
+   163→        # Get pose for this frame
+   164→        pose = pose_data[frame_idx] if frame_idx < len(pose_data) else None
+   165→
+   166→        # Check if this frame has a shot event (with 30 frame window)
+   167→        current_shot = None
+   168→        for shot_frame in shot_map:
+   169→            if 0 <= frame_idx - shot_frame < 30:
+   170→                current_shot = shot_map[shot_frame]
+   171→                break
+   172→
+   173→        # Draw skeleton if pose data exists
+   174→        if pose:
+   175→            is_good_form = True
+   176→            if current_shot and current_shot.get('pose_errors'):
+   177→                is_good_form = False
+   178→
+   179→            frame = draw_skeleton_on_frame(frame, pose, None, is_good_form)
+   180→
+   181→        # Add shot information overlay
+   182→        if current_shot:
+   183→            shot_type = current_shot.get('shot_type', 'SHOT')
+   184→            cv2.putText(frame, f"SHOT: {shot_type}", (20, 50),
+   185→                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
+   186→
+   187→            # Show errors or good form message
+   188→            if current_shot.get('pose_errors'):
+   189→                y_pos = 100
+   190→                for error in current_shot['pose_errors'][:3]:  # Max 3 errors
+   191→                    cv2.putText(frame, f"FIX: {error}", (20, y_pos),
+   192→                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+   193→                    y_pos += 30
+   194→            else:
+   195→                cv2.putText(frame, "GOOD FORM", (20, 100),
+   196→                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+   197→
+   198→        # Frame counter
+   199→        cv2.putText(frame, f"Frame: {frame_idx}", (width - 150, height - 30),
+   200→                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+   201→
+   202→        out.write(frame)
+   203→        frame_idx += 1
+   204→
+   205→    cap.release()
+   206→    out.release()
+   207→    print(f"Annotated video created: {output_path}")
+   208→    return output_path
+   209→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

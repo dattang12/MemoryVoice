@@ -1,0 +1,313 @@
+---
+name: growthops-visibility-booster
+description: >
+  Maximize organic reach and visibility of PitchTok content across all platforms. Use when
+  asked to "boost visibility", "increase reach", "提高曝光", "algorithm optimization",
+  "get more views", "grow audience", or any visibility/reach optimization task. Implements
+  cross-platform amplification, algorithm hacking, engagement optimization, and viral mechanics.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"🚀"}}
+---
+
+# Visibility Booster Skill
+
+## What You Do
+Maximize the number of founders who SEE PitchTok content across every platform. Optimize for algorithms, cross-platform amplification, engagement loops, and organic discovery. Your job is distribution — getting eyes on content.
+
+## ALGORITHM OPTIMIZATION (Per Platform)
+
+### 小红书 Algorithm Hacks
+1. **First 30 minutes are critical** — post when audience is active (8-10am US = 8-10pm China)
+2. **Self-comment immediately** after posting (within 30 seconds) — adds value, triggers algorithm
+3. **Reply to every comment within 5 minutes** — XHS rewards active creators
+4. **Hashtag strategy**: 8-12 tags, mix popular (>1M posts) and niche (<100K posts)
+5. **Cover image text**: Bold, readable, 3-6 words — determines click-through rate
+6. **Save rate is king** — content that gets saved ranks higher; include actionable tips people want to reference
+7. **Post at consistent times** — algorithm rewards consistency
+8. **Carousel format** performs 2-3x better than single image for educational content
+9. **Video length sweet spot**: 15-45 seconds for highest completion rate
+
+### LinkedIn Algorithm Hacks
+1. **First hour engagement** determines reach — post when network is active (Tue-Thu 8-10am)
+2. **Dwell time matters** — longer posts that people read fully get boosted
+3. **Comments > Likes** — algorithm weights comments 10x more than likes
+4. **Reply to every comment** — each reply is a new engagement signal
+5. **No external links in post** — put links in first comment (LinkedIn suppresses external links by 50%)
+6. **Tag people** (only relevant ones, max 3) — triggers their network's feed
+7. **Use line breaks** — wall of text gets scrolled past
+8. **Post format ranking**: Text > Document/Carousel > Image > Video > Link posts
+9. **Engagement pods**: Notify team members to engage within first 15 minutes
+
+### Twitter/X Algorithm Hacks
+1. **Threads outperform single tweets** by 3-5x for impressions
+2. **First tweet is the hook** — must be scroll-stopping
+3. **Reply to your own tweet** within 2 hours with additional context
+4. **Quote-tweet** high-performing tweets with added value
+5. **Post timing**: 8-10am and 5-7pm EST for US founders
+6. **Use 1-2 hashtags max** (Twitter penalizes hashtag stuffing)
+7. **Media tweets** get 2x engagement but slightly less algorithmic reach
+8. **Engage before posting** — spend 15 min liking/replying before publishing
+
+### Reddit Algorithm Hacks
+1. **Title is everything** — 70% of Reddit success is the title
+2. **Post timing**: Tue-Thu, 6-9am EST (US morning = front page window)
+3. **Self-post vs link**: Self-posts do better in startup subreddits
+4. **Comment early on own post** with additional context
+5. **NEVER be promotional** — Reddit users will downvote and report
+6. **Cross-post to 2-3 relevant subreddits** (not more, looks spammy)
+7. **Flair correctly** — unfaired posts get auto-removed in many subs
+
+## CROSS-PLATFORM AMPLIFICATION
+
+### The Amplification Flywheel
+```
+Create original content on PRIMARY platform
+    ↓
+Repurpose for SECONDARY platforms (adapted, not copy-pasted)
+    ↓
+Best-performing content on secondaries → recycled on primary
+    ↓
+Cross-reference ("as I shared on LinkedIn..." → drives cross-follow)
+    ↓
+Repeat with variations
+```
+
+### Platform Cascading Strategy
+
+| Original Platform | Day 1 | Day 2 | Day 3 | Day 4 |
+|-------------------|-------|-------|-------|-------|
+| LinkedIn post | Publish | Twitter thread | XHS adapted | Reddit discussion |
+| XHS post | Publish | LinkedIn translated | Twitter condensed | WeChat article |
+| Twitter thread | Publish | LinkedIn expanded | XHS translated | Blog post |
+| Blog article | Publish | LinkedIn excerpt | Twitter thread | XHS summary |
+
+### Cross-Platform Hooks
+- LinkedIn: "I wrote about this on my blog (link in comments)..."
+- Twitter: "Expanded thread from my LinkedIn post..."
+- XHS: "在LinkedIn上分享了这个观点，中文版在这里..."
+- Reddit: "Wrote about this in detail, sharing the key takeaways here..."
+
+## ENGAGEMENT OPTIMIZATION
+
+### Content Formats That Get Maximum Reach
+
+**Ranked by organic reach potential**:
+
+1. **Contrarian takes** ("Unpopular opinion: pitch decks are dead") — highest engagement
+2. **Data/stats posts** ("We analyzed 1,000 pitches. Here's what works") — high save rate
+3. **Story posts** ("A founder told me they got 5 investor meetings from a 60-sec video") — emotional engagement
+4. **How-to threads/carousels** ("How to pitch investors in 60 seconds: step by step") — high save + share
+5. **Before/after** ("Before: 50 cold emails, 0 replies. After: 1 video pitch, 5 meetings") — dramatic contrast
+6. **Question posts** ("What's the hardest part of fundraising?") — comment generation
+7. **Listicles** ("7 things VCs look for in a pitch video") — scannable, shareable
+8. **Behind-the-scenes** ("Here's what investors actually see when they use PitchTok") — curiosity
+9. **Founder shoutouts** ("Congrats to @founder for raising $X after posting on PitchTok!") — social proof + tag engagement
+
+### Hook Templates (First Line)
+
+Must stop the scroll. Test these patterns:
+```
+"Most founders are doing [thing] wrong. Here's why:"
+"I talked to [X] VCs this week. They all said the same thing:"
+"[Specific number] founders uploaded pitch videos last month. [Y] got meetings. Here's what worked:"
+"Unpopular opinion: [controversial but defensible take]"
+"The biggest mistake I see founders make when pitching:"
+"This took me [time] to learn about fundraising:"
+"[Founder name] raised $[X] with a 60-second video. Here's how:"
+"Stop [common behavior]. Do [alternative] instead."
+"Everything I know about pitching investors in one thread:"
+```
+
+### Engagement Bait (Ethical)
+- Ask questions that founders WANT to answer ("What's your biggest fundraising challenge?")
+- Create polls that segment your audience ("Are you: pre-seed / seed / series A?")
+- Use "comment [keyword] and I'll send you [resource]" (especially effective on XHS)
+- Invite debate ("Do investors care more about traction or team?")
+- Share incomplete frameworks and ask audience to add ("What am I missing?")
+
+## DISCOVERY OPTIMIZATION
+
+### Hashtag Strategy
+
+**小红书 (8-12 per post)**:
+- 3 popular tags (>1M): #创业 #融资 #投资人
+- 3 medium tags (100K-1M): #美国创业 #pitchdeck #种子轮
+- 3 niche tags (<100K): #PitchTok #视频pitch #创始人日常
+- 2-3 trend tags: {whatever is trending that day}
+
+**LinkedIn (3-5 per post)**:
+- #startups #fundraising #venturecapital #founders #seedfunding
+
+**Twitter (1-2 per post, in the thread not main tweet)**:
+- #startups #buildinpublic
+
+**Reddit (tags/flair)**:
+- Use subreddit-appropriate flair only
+
+### SEO for Social Platforms
+- Include searchable keywords in post text (not just hashtags)
+- XHS: include keywords in cover text AND caption
+- LinkedIn: SEO in headline and first paragraph
+- Twitter: keywords in first tweet of thread
+- YouTube: keywords in title, description, tags
+
+## VIRAL MECHANICS
+
+### Shareability Checklist
+Before publishing any content, verify:
+- [ ] Would a founder screenshot this and share it?
+- [ ] Is there a specific, actionable takeaway?
+- [ ] Does it make the sharer look smart/helpful by sharing?
+- [ ] Is it easy to consume (scannable, short paragraphs)?
+- [ ] Does it provoke an emotion (surprise, agreement, curiosity)?
+
+### Viral Loop Integration
+Every piece of content should have ONE of these loops:
+1. **Comment loop**: "Comment [keyword] for [resource]" → DM them → convert
+2. **Share loop**: "Tag a founder who needs this" → new audience → new followers
+3. **Save loop**: "Save this for when you're raising" → algorithm boost
+4. **DM loop**: "DM me [keyword] for the full template" → direct conversation
+5. **Follow loop**: "Follow for daily fundraising tips" → grow audience
+
+## COMMUNITY SEEDING
+
+### Day 1 of any post:
+1. Share in team Slack/WhatsApp for initial engagement (ask 5 people to engage)
+2. Cross-post link to 2-3 relevant communities
+3. Send to 5 founders who would genuinely find it useful
+4. Comment on 5 related posts by others (reciprocity drives profile visits)
+
+### Ongoing Community Presence:
+- Be the "fundraising expert" in 10+ communities
+- Answer questions BEFORE promoting content
+- Build reputation through helpfulness, not promotion
+- Track which communities drive the most traffic/signups
+
+## CONTENT CALENDAR OPTIMIZATION
+
+### Posting Frequency
+| Platform | Posts/Week | Best Days | Best Times (EST) |
+|----------|-----------|-----------|------------------|
+| LinkedIn | 3-4 | Tue, Wed, Thu | 8-10am |
+| Twitter | 5-7 | Mon-Fri | 8-10am, 5-7pm |
+| XHS | 3 | Mon, Wed, Fri | 8-10am (= 8-10pm China) |
+| Reddit | 2-3 | Tue-Thu | 6-9am |
+| Product Hunt | As needed | Tue-Thu | 12:01am PT |
+
+### Content Mix (Weekly)
+- 40% Educational (how-tos, tips, frameworks)
+- 25% Social proof (founder stories, metrics, testimonials)
+- 20% Engagement (questions, polls, debates)
+- 15% Product (PitchTok features, updates, behind-the-scenes)
+
+## STRATEGIC COMMENT INSERTION ON INFLUENCER POSTS
+
+**One of the highest-ROI activities for visibility with zero ad spend.**
+
+### How It Works
+Monitor high-traffic posts by VCs, startup media, and founder influencers. Leave insightful comments EARLY (before the comment section gets crowded). This gets PitchTok's brand in front of thousands of founders.
+
+### Execution
+1. Maintain a watchlist of 100-200 high-influence accounts (top VCs, TechCrunch writers, founder influencers)
+2. When they post, draft a substantive comment within 15-30 minutes
+3. Comment must ADD GENUINE VALUE — a data point, counterpoint, or useful insight
+4. DO NOT mention PitchTok directly (except once per week when contextually perfect)
+5. Goal: build PitchTok's account as a knowledgeable voice → people click through to profile
+
+### Comment Formats That Work
+```
+"This matches what we're seeing — [specific insight with data]"
+"Counterpoint: [thoughtful alternative perspective]"
+"Adding to this — [relevant resource or framework]"
+"The one thing I'd add: [unique angle the post missed]"
+```
+
+### Approval
+- Value-adding comments with NO PitchTok mention: auto-approved
+- Comments mentioning PitchTok: REQUIRES approval
+
+### Impact
+A well-timed comment on a viral VC post → 50-200 likes → thousands of profile visits → followers → warm leads.
+
+## REPLY-TO-COMMENT CONTENT CREATION
+
+When a comment on our post asks a great question, create an ENTIRELY NEW POST responding to it. This is a proven algorithmic hack — platforms reward content that generates conversation chains.
+
+### How It Works
+```
+Our post → Founder comments with interesting question
+    → OpenClaw drafts new post: "Someone asked [paraphrase] — here's what the data shows..."
+    → Tag original commenter (they almost always engage, seeding the new post)
+    → New post drives new comments → more new posts
+    → Content flywheel
+```
+
+### Templates
+```
+"Got a question on my last post that I can't stop thinking about..."
+"@[commenter] raised a point that deserves its own post..."
+"You all had STRONG opinions about my last post. Let me address the top 3..."
+```
+
+### Impact
+Reply-to-comment posts get 20-50% higher engagement than standalone posts (built-in social proof).
+
+## MUTUAL SUPPORT NETWORK (Ethical Pod)
+
+Build a curated community of 30-50 founder accounts who support each other's content GENUINELY. NOT a like-for-like pod — a group of people who find each other's content useful.
+
+### How to Build
+1. Identify founders who consistently engage with PitchTok content
+2. Invite to private Slack/WhatsApp group (REQUIRES human approval for invitations)
+3. Share new content in group (making it easy to find, NOT demanding engagement)
+4. Encourage members to share their own content too (genuine reciprocity)
+5. The group becomes a content distribution channel AND community asset
+
+### Rules
+- Members engage only with content they genuinely find useful
+- No automated engagement — real humans making real choices
+- Varied engagement timing (5-45 min after posting, not all at once)
+- OpenClaw coordinates and reminds; humans choose to engage
+
+### Impact
+15-25 organic engagements per post within first 30 minutes → triggers algorithmic distribution without looking artificial.
+
+## CROSS-PLATFORM SUCCESS AMPLIFICATION
+
+When content performs well on one platform, use that success as social proof on other platforms.
+
+### Patterns
+```
+Twitter success → LinkedIn: "This tweet got 50K impressions. Here's the full story..."
+LinkedIn success → Twitter thread: "Posted about X on LinkedIn. The founder community had strong opinions. Top responses:"
+Reddit success → LinkedIn/Twitter: "Asked r/startups about their biggest mistake. 200 founders responded. Here are the patterns..."
+```
+
+### Also
+- Screenshot high engagement (like counts, great comments) → use as visual content elsewhere
+- Extends the life of best content by 3-5x
+- Creates coherent multi-platform presence without cross-posting penalty
+
+## MEASUREMENT
+
+Track weekly in `workspace/visibility/YYYY-WW.md`:
+```markdown
+# Visibility Report — Week {WW}
+
+## Reach
+| Platform | Impressions | Reach | Engagement Rate | New Followers |
+|----------|-------------|-------|-----------------|---------------|
+
+## Top Performing Content
+1. {post} — {impressions} impressions, {engagement_rate}% engagement
+2. {post}
+3. {post}
+
+## What Worked / What Didn't
+- Worked: {pattern}
+- Didn't work: {pattern}
+
+## Next Week Experiments
+1. {experiment}
+2. {experiment}
+```

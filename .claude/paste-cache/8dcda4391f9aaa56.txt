@@ -1,0 +1,96 @@
+You are Claude acting as a real, production-grade full-stack developer doing vibe coding with a multi-agent workflow. You must use MCP tools available in this workspace: Pencil, Figma, and Supabase. MCP is the tool-connection standard; you can connect and call these tools through Claude Code’s MCP integration. 
+Figma provides an MCP server to bring design context into coding workflows. 
+Supabase provides MCP connectivity so agents can query project config/schema safely. 
+Pencil is an IDE/canvas design tool with AI/MCP integration. 
+Absolute constraints (non-negotiable)
+1.    DO NOT change any function, feature, business logic, APIs, prompts, or product behavior.
+o    No changes to how analytics works, how practice works, how strategy recommendations work, how uploads work, how models are called, how Supabase is used, etc.
+2.    Only redesign UI/UX and fix route wiring/navigation so every UI element routes to the correct existing screen, using the existing route structure.
+3.    You must read and understand the entire repository first (structure, routes, components, state management, API boundaries). Then decide where it must improve.
+4.    All visual/UX changes must be badminton / coaching themed (court, shuttle, motion, training, performance), but must not alter meaning or outputs of any feature.
+5.    Work in small, verifiable steps. If a change risks behavior change, rollback and choose a safer UI-only approach.
+________________________________________
+Multi-Agent Operating Mode (run sequentially, but collaborate by leaving notes to each role)
+Agent 1 — PLANNER (Repository comprehension + UI redesign plan)
+Goal: produce a concrete redesign plan and a file-level execution plan.
+Actions:
+1.    Inventory the repo:
+o    Identify framework (React/Next/etc.), routing entry, layout shells, component library, styling approach.
+o    Build a route map: route → screen component → key UI entrypoints → navigation dependencies.
+2.    Identify UI issues:
+o    Broken/inconsistent navigation, spacing, typography, responsiveness, accessibility, branding inconsistency, clutter.
+3.    Propose a badminton-coach design direction:
+o    Define tokens (spacing scale, typography, icon style, court-line motif, accent usage, motion guidelines).
+o    Define IA: top nav, side nav (if any), mode switcher, page headers, “coach card” patterns.
+4.    Decide which MCP tool helps where:
+o    Use Figma MCP to pull any existing designs/components/tokens if they exist. 
+o    Use Pencil MCP to iterate UI concepts quickly and keep artifacts in repo if applicable. 
+o    Use Supabase MCP only to verify schemas/fields used by UI forms; do not modify DB. 
+5.    Output a plan with:
+o    Page-by-page redesign checklist
+o    Component refactor list (UI-only)
+o    Navigation fixes list (links, route names, guards, breadcrumbs)
+o    Verification steps and “do-not-touch” boundaries
+Planner Deliverable: A short “Implementation Spec” plus a TODO list with file paths.
+________________________________________
+Agent 2 — BUILDER (Implement UI redesign + correct routing)
+Goal: implement the plan with minimal risk and maximum polish.
+Rules:
+•    UI-only edits: layout, styling, components, animations, icons, copy tweaks ONLY if copy doesn’t change meaning.
+•    Route fixes allowed: update Link targets, nav config, route tables—but do not change the screens’ functional code.
+•    Keep state/API calls intact; if you must move code, preserve behavior exactly.
+Actions:
+1.    Create/upgrade a layout shell:
+o    Consistent navbar with badminton branding + active mode highlight
+o    Optional responsive sidebar / bottom nav on mobile
+2.    Redesign each screen:
+o    Analytics / Practice / Strategy / History / Racket: consistent headers, “coach insights” cards, clear primary actions
+o    Use badminton motifs subtly (court grid background, shuttle trail separators, motion cues)
+3.    Fix navigation:
+o    Every top-bar button routes correctly
+o    CTAs, breadcrumbs, back buttons, deep links all correct
+4.    Add micro-interactions (UI only):
+o    Button hover/press states, subtle transitions, skeletons/spinners only if they already exist conceptually (don’t change when data loads—just presentation)
+5.    Keep changes incremental:
+o    Make small commits/patches; after each screen, run lint/build/tests and quick manual route checks.
+________________________________________
+Agent 3 — REFINER (Polish, consistency, accessibility, responsiveness)
+Goal: make it feel like a Google-judge-ready product without touching behavior.
+Actions:
+1.    Visual consistency pass:
+o    unify spacing/typography/color usage
+o    align card styles, shadows, borders, corner radius, icon set
+2.    Accessibility:
+o    keyboard navigation, focus states, aria labels for icon buttons, contrast checks
+3.    Responsiveness:
+o    mobile layouts, safe-area padding, collapsible nav, readable charts/cards
+4.    Performance (UI-only):
+o    remove layout thrash, avoid unnecessary re-renders only if clearly UI-only and safe
+5.    Ensure badminton identity is coherent and not cheesy.
+________________________________________
+Agent 4 — SUPERVISOR (Guardrails + regression prevention)
+Goal: ensure constraints are honored and nothing functional changed.
+Actions:
+1.    Diff audit:
+o    Verify edits are confined to UI components, styling, and navigation mapping.
+o    Confirm no API endpoints changed, no data transformations changed, no prompt/model logic changed.
+2.    Route audit:
+o    Confirm all navigation elements point to valid routes and render correct screens.
+3.    Behavior regression checks:
+o    Run tests/build; do click-through smoke test across all modes
+4.    Produce a final report:
+o    What changed (UI-only), what routes were fixed, how to verify locally.
+________________________________________
+Mandatory MCP usage checklist (do this early)
+1.    List available MCP tools and confirm you can call Pencil, Figma, Supabase tools.
+2.    Use Figma MCP to pull design context if a Figma file/workspace is linked; extract components/tokens. 
+3.    Use Supabase MCP strictly for read-only verification of schemas/fields the UI depends on. 
+4.    Use Pencil to draft/iterate UI layouts quickly where helpful, then implement in code. 
+________________________________________
+Acceptance criteria (you must meet all)
+•    The entire UI is redesigned to be clearly badminton coaching themed and visually cohesive.
+•    All UI navigation (top bar, buttons, links) routes to the correct existing pages.
+•    No functional changes: same data, same outputs, same feature behavior.
+•    App builds cleanly; key flows still work end-to-end.
+•    A short final “what changed + how to verify” summary is provided.
+Now start. First step: Planner reads the repo and outputs the Implementation Spec + file-level TODO list.

@@ -1,0 +1,296 @@
+     1→# RallyCoach - AI-Powered Badminton Coach
+     2→
+     3→An intelligent badminton coaching application that uses computer vision and AI to analyze technique, provide real-time feedback, generate tactical insights, and recommend equipment.
+     4→
+     5→## Features
+     6→
+     7→### Video Analytics
+     8→Upload badminton videos for comprehensive AI analysis:
+     9→- **Pose Detection**: MediaPipe extracts body landmarks from every frame
+    10→- **Shot Detection**: Automatically identifies shots based on wrist velocity patterns
+    11→- **Form Analysis**: Compares player form against ideal technique and identifies errors
+    12→- **AI Skill Assessment**: Gemini AI auto-detects skill level (Beginner/Intermediate/Advanced)
+    13→- **Multi-Player Support**: Detects multiple players in doubles matches with player selection
+    14→- **Skeleton Overlay**: Visual feedback with color-coded form quality (green/yellow/red)
+    15→- **Drill Recommendations**: Targeted drills for each detected issue
+    16→
+    17→### Practice Mode
+    18→Real-time form coaching using your webcam:
+    19→- **Live Pose Tracking**: MediaPipe runs in-browser for instant feedback
+    20→- **Green/Red Skeleton**: Visual indicator of form quality
+    21→- **Coaching Cues**: Text feedback guiding your movements
+    22→- **Session Recording**: Optionally record practice sessions for later review
+    23→- **Metrics Display**: Real-time elbow angle, knee angle, stance width
+    24→- **Progress Tracking**: Green/red frame ratio tracks consistency
+    25→
+    26→### Strategy Analysis
+    27→Analyze rally patterns and get tactical insights:
+    28→- **Trajectory Tracking**: Visualize shot placement patterns
+    29→- **2D/3D Court View**: Interactive court visualization with Three.js
+    30→- **Rally State Machine**: Tracks attack/defense/neutral phases
+    31→- **Shot Recommendations**: AI suggests optimal shot selections with rationale
+    32→- **Coaching Points**: Personalized tactical advice
+    33→
+    34→### Racket Finder
+    35→Personalized equipment recommendations:
+    36→- **Profile-Based Matching**: Based on skill level, play style, and weaknesses
+    37→- **Detailed Specs**: Weight, balance, flexibility, price range
+    38→- **Match Scoring**: Percentage match for each recommendation
+    39→- **eBay Integration**: Direct links to purchase options
+    40→- **Favorites**: Save rackets for later reference
+    41→
+    42→## Tech Stack
+    43→
+    44→### Frontend (rallycoach/)
+    45→- **Next.js 14** with App Router
+    46→- **React 18** with TypeScript
+    47→- **TailwindCSS** for styling
+    48→- **@mediapipe/tasks-vision** for in-browser pose detection
+    49→- **@react-three/fiber** + **Three.js** for 3D court visualization
+    50→- **Recharts** for analytics charts
+    51→- **@supabase/supabase-js** for auth and data
+    52→
+    53→### Backend (backend/)
+    54→- **Python 3.11** with FastAPI
+    55→- **MediaPipe** for server-side pose estimation
+    56→- **OpenCV** for video processing and annotation
+    57→- **Google Gemini API** (gemini-2.0-flash-exp) for AI coaching feedback
+    58→- **Supabase** for authentication, database, and video storage
+    59→
+    60→## Project Structure
+    61→
+    62→```
+    63→RallyCoach/
+    64→├── backend/
+    65→│   ├── main.py              # FastAPI server with all endpoints
+    66→│   ├── analysis.py          # Video analysis pipeline
+    67→│   ├── pose_estimation.py   # MediaPipe pose detection
+    68→│   ├── gemini_client.py     # Gemini API integration
+    69→│   ├── video_annotator.py   # Skeleton overlay rendering
+    70→│   ├── video_processing.py  # Video frame utilities
+    71→│   ├── requirements.txt     # Python dependencies
+    72→│   └── .env                 # Backend environment variables
+    73→├── rallycoach/              # Next.js frontend
+    74→│   ├── src/
+    75→│   │   ├── app/             # Next.js App Router pages
+    76→│   │   │   ├── page.tsx           # Landing page
+    77→│   │   │   ├── dashboard/         # User dashboard
+    78→│   │   │   ├── analytics/         # Video analysis page
+    79→│   │   │   ├── practice/          # Real-time practice mode
+    80→│   │   │   ├── strategy/          # Strategy analysis
+    81→│   │   │   ├── racket/            # Racket recommendations
+    82→│   │   │   ├── history/           # Session history
+    83→│   │   │   └── api/               # API routes
+    84→│   │   ├── components/      # React components
+    85→│   │   ├── lib/             # Utilities and engines
+    86→│   │   │   ├── supabase.ts        # Supabase client
+    87→│   │   │   ├── pose-utils.ts      # Pose processing utilities
+    88→│   │   │   ├── rules-engine.ts    # Form evaluation rules
+    89→│   │   │   ├── scoring-rules.ts   # Banded scoring system
+    90→│   │   │   ├── strategy_engine/   # Rally analysis engine
+    91→│   │   │   └── courtSpec.ts       # BWF court specifications
+    92→│   │   └── data/            # Static data (rackets.json)
+    93→│   ├── package.json
+    94→│   └── .env.local           # Frontend environment variables
+    95→├── supabase-setup.sql       # Initial database schema
+    96→├── supabase-migration-v2.sql # Extended schema with sessions/issues
+    97→└── README.md
+    98→```
+    99→
+   100→## Setup Instructions
+   101→
+   102→### Prerequisites
+   103→- Python 3.11+
+   104→- Node.js 18+
+   105→- Supabase account
+   106→- Google AI Studio account (for Gemini API)
+   107→
+   108→### 1. Supabase Setup
+   109→
+   110→1. Create a project at [supabase.com](https://supabase.com)
+   111→
+   112→2. Get your credentials from Settings > API:
+   113→   - Project URL
+   114→   - Anon Key (public)
+   115→   - Service Role Key (secret, for backend)
+   116→
+   117→3. Run the database migrations in SQL Editor:
+   118→   - First run `supabase-setup.sql` for base tables
+   119→   - Then run `supabase-migration-v2.sql` for extended schema
+   120→
+   121→4. Create a Storage bucket named `videos`:
+   122→   - Set to Private
+   123→   - Add policies for authenticated users
+   124→
+   125→### 2. Get Gemini API Key
+   126→
+   127→1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+   128→2. Create a new API key
+   129→3. Copy for later use
+   130→
+   131→### 3. Backend Setup
+   132→
+   133→```bash
+   134→cd backend
+   135→
+   136→# Create virtual environment
+   137→python -m venv venv
+   138→
+   139→# Activate virtual environment
+   140→# Windows:
+   141→venv\Scripts\activate
+   142→# Mac/Linux:
+   143→source venv/bin/activate
+   144→
+   145→# Install dependencies
+   146→pip install -r requirements.txt
+   147→
+   148→# Configure environment variables in backend/.env:
+   149→# GEMINI_API_KEY=your-gemini-key
+   150→# SUPABASE_URL=https://your-project.supabase.co
+   151→# SUPABASE_ANON_KEY=your-anon-key
+   152→# SUPABASE_SERVICE_KEY=your-service-role-key
+   153→```
+   154→
+   155→### 4. Frontend Setup
+   156→
+   157→```bash
+   158→cd rallycoach
+   159→
+   160→# Install dependencies
+   161→npm install
+   162→
+   163→# Configure environment variables in .env.local:
+   164→# NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   165→# NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   166→# GEMINI_API_KEY=your-gemini-key (for API routes)
+   167→```
+   168→
+   169→### 5. Run the Application
+   170→
+   171→**Start Backend:**
+   172→```bash
+   173→cd backend
+   174→# Ensure venv is activated
+   175→python main.py
+   176→```
+   177→Backend runs on `http://localhost:8000`
+   178→
+   179→**Start Frontend:**
+   180→```bash
+   181→cd rallycoach
+   182→npm run dev
+   183→```
+   184→Frontend runs on `http://localhost:3000`
+   185→
+   186→## Usage
+   187→
+   188→1. **Sign Up / Sign In** - Create an account at the landing page
+   189→
+   190→2. **Video Analytics** - Upload a badminton video to get:
+   191→   - Pose skeleton overlay
+   192→   - Shot-by-shot analysis
+   193→   - Form error detection
+   194→   - AI skill level assessment
+   195→   - Recommended drills
+   196→
+   197→3. **Practice Mode** - Use your webcam for real-time coaching:
+   198→   - Stand 6-8 feet from camera
+   199→   - Ensure good lighting
+   200→   - Follow the skeleton overlay colors
+   201→
+   202→4. **Strategy Analysis** - Upload match footage to:
+   203→   - Visualize rally patterns
+   204→   - Get tactical recommendations
+   205→   - Review coaching points
+   206→
+   207→5. **Racket Finder** - Get equipment recommendations:
+   208→   - Select skill level and play style
+   209→   - Choose areas to improve
+   210→   - Browse matched rackets
+   211→
+   212→## API Endpoints
+   213→
+   214→### Backend API (FastAPI)
+   215→
+   216→| Endpoint | Method | Description |
+   217→|----------|--------|-------------|
+   218→| `/` | GET | Health check |
+   219→| `/health` | GET | Service status |
+   220→| `/api/analyze` | POST | Analyze uploaded video |
+   221→| `/api/sessions` | GET | List user sessions |
+   222→| `/api/sessions/{id}` | GET | Get session details |
+   223→| `/api/practice` | POST | Save practice session |
+   224→| `/api/stats/dashboard` | GET | Dashboard statistics |
+   225→| `/temp/{filename}` | GET | Serve annotated videos |
+   226→
+   227→### Frontend API Routes (Next.js)
+   228→
+   229→| Route | Description |
+   230→|-------|-------------|
+   231→| `/api/analysis/start` | Start video analysis |
+   232→| `/api/analysis/auto-level` | Gemini skill level detection |
+   233→| `/api/practice/tick` | Practice mode tick feedback |
+   234→| `/api/strategy/recommend` | Strategy recommendations |
+   235→| `/api/racket/recommend` | Racket recommendations |
+   236→
+   237→## How It Works
+   238→
+   239→### Video Analysis Pipeline
+   240→
+   241→1. **Upload** - Video uploaded via TUS resumable protocol to Supabase Storage
+   242→2. **Pose Extraction** - MediaPipe extracts 33 body landmarks per frame
+   243→3. **Shot Detection** - Wrist velocity spikes identify shot events
+   244→4. **Shot Classification** - Heuristics classify shots (Smash, Clear, Net Shot, etc.)
+   245→5. **Form Evaluation** - Rules engine compares poses to ideal form
+   246→6. **Skill Assessment** - Gemini AI analyzes metrics to determine skill level
+   247→7. **Feedback Generation** - Gemini provides coaching feedback and training plans
+   248→8. **Annotation** - Skeleton overlay rendered on video with color-coded quality
+   249→9. **Storage** - Results saved to Supabase (sessions, issues tables)
+   250→
+   251→### Real-Time Practice
+   252→
+   253→1. **Webcam Capture** - Browser MediaDevices API
+   254→2. **In-Browser Pose** - MediaPipe Tasks Vision runs client-side
+   255→3. **Rule Evaluation** - Form rules evaluated every frame
+   256→4. **Visual Feedback** - Canvas overlay shows skeleton in green/red
+   257→5. **Coaching Cues** - Text feedback guides corrections
+   258→6. **Session Tracking** - Metrics aggregated and saved
+   259→
+   260→## Troubleshooting
+   261→
+   262→### Video Upload Issues
+   263→- Check file size (max 100MB)
+   264→- Verify Supabase storage bucket exists and has correct policies
+   265→- Check browser console for CORS errors
+   266→
+   267→### Pose Detection Issues
+   268→- Ensure good lighting and camera angle
+   269→- Keep full body visible in frame
+   270→- Try the demo mode if camera fails
+   271→
+   272→### Gemini API Errors
+   273→- Verify API key is valid
+   274→- Check quota limits in Google AI Studio
+   275→- Ensure network connectivity
+   276→
+   277→### Database Errors
+   278→- Run both SQL migration files in order
+   279→- Check RLS policies are configured
+   280→- Verify service role key for backend writes
+   281→
+   282→## License
+   283→
+   284→MIT License - Feel free to use and modify for your projects.
+   285→
+   286→## Acknowledgments
+   287→
+   288→- [MediaPipe](https://mediapipe.dev/) for pose estimation
+   289→- [Google Gemini](https://ai.google.dev/) for AI coaching
+   290→- [Supabase](https://supabase.com/) for backend services
+   291→- [Next.js](https://nextjs.org/) and [React](https://react.dev/) for the frontend
+   292→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

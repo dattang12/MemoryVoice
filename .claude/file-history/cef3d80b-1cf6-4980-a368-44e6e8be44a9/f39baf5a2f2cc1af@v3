@@ -1,0 +1,782 @@
+"""
+YOLO + ByteTrack Player Tracking Pipeline
+
+Provides stable track_ids across video frames for player isolation.
+Uses YOLOv8 for person detection and ByteTrack for tracking.
+Includes court region detection to filter out audience.
+"""
+
+from dataclasses import dataclass, asdict, field
+from typing import Optional, Tuple
+import base64
+import cv2
+import numpy as np
+
+try:
+    from ultralytics import YOLO
+    import supervision as sv
+    TRACKING_AVAILABLE = True
+except ImportError:
+    TRACKING_AVAILABLE = False
+    print("[WARN] ultralytics or supervision not installed - tracking disabled")
+
+try:
+    import mediapipe as mp
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    MEDIAPIPE_AVAILABLE = False
+    print("[WARN] mediapipe not installed - pose estimation disabled")
+
+
+def detect_court_region(frame: np.ndarray) -> Tuple[float, float, float, float]:
+    """
+    Detect badminton court region using green color detection.
+
+    Badminton courts are typically green. This function finds the largest
+    green region in the frame to identify the court boundaries.
+
+    Args:
+        frame: BGR image (OpenCV format)
+
+    Returns:
+        Normalized bounding box (x, y, w, h) where values are 0-1.
+        Returns center 70% of frame if no court detected.
+    """
+    h, w = frame.shape[:2]
+
+    # Convert to HSV for better color detection
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Green color range for badminton courts (multiple shades)
+    # Light green to dark green
+    lower_green1 = np.array([35, 40, 40])
+    upper_green1 = np.array([85, 255, 255])
+
+    # Create mask for green regions
+    mask = cv2.inRange(hsv, lower_green1, upper_green1)
+
+    # Apply morphological operations to clean up the mask
+    kernel = np.ones((15, 15), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if contours:
+        # Find the largest contour (likely the court)
+        largest_contour = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(largest_contour)
+
+        # Court should be at least 10% of frame area
+        if area > (w * h * 0.1):
+            x, y, bw, bh = cv2.boundingRect(largest_contour)
+
+            # Add padding (10% on each side)
+            pad_x = int(bw * 0.1)
+            pad_y = int(bh * 0.1)
+            x = max(0, x - pad_x)
+            y = max(0, y - pad_y)
+            bw = min(w - x, bw + 2 * pad_x)
+            bh = min(h - y, bh + 2 * pad_y)
+
+            # Return normalized coordinates
+            return (x / w, y / h, bw / w, bh / h)
+
+    # Fallback: use center 70% of frame (horizontal) and 80% (vertical)
+    # This covers most standard badminton video framing
+    return (0.15, 0.1, 0.7, 0.8)
+
+
+def is_in_court_region(bbox: tuple, court_region: tuple) -> bool:
+    """
+    Check if a bounding box center is within the court region.
+
+    Args:
+        bbox: (x, y, w, h) normalized bounding box
+        court_region: (x, y, w, h) normalized court bounding box
+
+    Returns:
+        True if bbox center is within court region
+    """
+    # Get bbox center
+    cx = bbox[0] + bbox[2] / 2
+    cy = bbox[1] + bbox[3] / 2
+
+    # Get court bounds
+    court_x1, court_y1 = court_region[0], court_region[1]
+    court_x2 = court_x1 + court_region[2]
+    court_y2 = court_y1 + court_region[3]
+
+    # Check if center is within court
+    return court_x1 <= cx <= court_x2 and court_y1 <= cy <= court_y2
+
+
+def analyze_player_movement(track_positions: list) -> dict:
+    """
+    Analyze movement patterns to distinguish players from spectators.
+
+    Players characteristics:
+    - High movement variance (running around court)
+    - Fast movement speed
+    - Position changes across court width
+
+    Spectators characteristics:
+    - Low movement variance (sitting/standing still)
+    - Near-zero movement speed
+    - Fixed position
+
+    Args:
+        track_positions: List of (x, y) center positions across frames
+
+    Returns:
+        dict with movement metrics: variance, speed, is_likely_player
+    """
+    if len(track_positions) < 5:
+        return {'variance': 0, 'avg_speed': 0, 'is_likely_player': False}
+
+    positions = np.array(track_positions)
+
+    # Calculate position variance (how much they move around)
+    variance_x = np.var(positions[:, 0])
+    variance_y = np.var(positions[:, 1])
+    total_variance = variance_x + variance_y
+
+    # Calculate average speed (distance between consecutive frames)
+    speeds = []
+    for i in range(1, len(positions)):
+        dx = positions[i, 0] - positions[i-1, 0]
+        dy = positions[i, 1] - positions[i-1, 1]
+        speed = np.sqrt(dx**2 + dy**2)
+        speeds.append(speed)
+
+    avg_speed = np.mean(speeds) if speeds else 0
+    max_speed = np.max(speeds) if speeds else 0
+
+    # Players typically have:
+    # - Variance > 0.001 (move around the court)
+    # - Average speed > 0.002 (actively moving)
+    # - Max speed > 0.01 (sprinting for shots)
+    is_likely_player = (
+        total_variance > 0.001 or  # Significant position variance
+        avg_speed > 0.002 or        # Active movement
+        max_speed > 0.015           # Occasional fast movements (lunges, sprints)
+    )
+
+    return {
+        'variance': total_variance,
+        'avg_speed': avg_speed,
+        'max_speed': max_speed,
+        'is_likely_player': is_likely_player
+    }
+
+
+def detect_match_format(track_summaries: list, court_region: tuple) -> str:
+    """
+    Detect if the match is singles or doubles based on player positions.
+
+    Singles: 1 player per side (2 total on court)
+    Doubles: 2 players per side (4 total on court)
+
+    Args:
+        track_summaries: List of TrackSummary objects
+        court_region: (x, y, w, h) normalized court region
+
+    Returns:
+        'singles' or 'doubles'
+    """
+    if len(track_summaries) <= 2:
+        return 'singles'
+
+    # Count players per side
+    near_side_count = sum(1 for s in track_summaries if s.side == 'near')
+    far_side_count = sum(1 for s in track_summaries if s.side == 'far')
+
+    # If either side has 2 players, it's doubles
+    if near_side_count >= 2 or far_side_count >= 2:
+        return 'doubles'
+
+    return 'singles'
+
+
+@dataclass
+class TrackedPerson:
+    """A single tracked person in a frame."""
+    track_id: int
+    bbox: tuple  # (x, y, w, h) normalized 0-1
+    landmarks: Optional[list] = None  # 33 MediaPipe landmarks
+    confidence: float = 0.0
+    pose_confidence: float = 0.0
+
+
+@dataclass
+class FrameTracking:
+    """Tracking data for a single frame."""
+    frame_index: int
+    timestamp: float
+    tracks: list = field(default_factory=list)  # List of TrackedPerson
+
+
+@dataclass
+class TrackSummary:
+    """Summary info for a unique track_id."""
+    track_id: int
+    first_frame: int
+    last_frame: int
+    frame_count: int
+    avg_confidence: float
+    thumbnail_base64: str = ""
+    side: Optional[str] = None  # 'near' or 'far'
+
+
+class PlayerTracker:
+    """
+    YOLO + ByteTrack player tracking pipeline.
+
+    Provides stable track_ids that persist across frames,
+    enabling strict player isolation for downstream analysis.
+
+    Features:
+    - Court region detection to filter out audience
+    - Maximum 4 players (badminton singles/doubles)
+    - Frame skipping for performance optimization
+    """
+
+    MAX_PLAYERS = 4  # Max players in badminton (doubles)
+
+    def __init__(self, fps: int = 30, model_path: str = "yolov8n.pt"):
+        """
+        Initialize tracker with YOLO model and ByteTrack.
+
+        Args:
+            fps: Video frame rate (used for ByteTrack timing)
+            model_path: Path to YOLO model weights
+        """
+        if not TRACKING_AVAILABLE:
+            raise RuntimeError("Tracking requires ultralytics and supervision packages")
+
+        self.fps = fps
+        self.yolo = YOLO(model_path)
+        self.byte_tracker = sv.ByteTrack(
+            track_activation_threshold=0.25,
+            lost_track_buffer=30,
+            minimum_matching_threshold=0.8,
+            frame_rate=fps
+        )
+
+        # Court region (will be detected from first frame)
+        self.court_region = None
+
+        # Initialize MediaPipe Pose for skeleton extraction
+        self.pose = None
+        if MEDIAPIPE_AVAILABLE:
+            self.pose = mp.solutions.pose.Pose(
+                static_image_mode=True,
+                model_complexity=1,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+
+    def process_video(self, video_path: str, skip_frames: int = 2) -> list:
+        """
+        Process entire video through YOLO + ByteTrack + MediaPipe pipeline.
+
+        Features:
+        - Court region detection to filter out audience
+        - Only tracks players on the court (max 4)
+        - Frame skipping for performance (default: every 3rd frame)
+
+        Args:
+            video_path: Path to input video file
+            skip_frames: Process every Nth frame (default=2 means process every 3rd frame)
+
+        Returns:
+            List of FrameTracking objects with stable track_ids (filtered to court players)
+        """
+        results = []
+        cap = cv2.VideoCapture(video_path)
+
+        if not cap.isOpened():
+            raise ValueError(f"Cannot open video: {video_path}")
+
+        # Get video properties
+        actual_fps = cap.get(cv2.CAP_PROP_FPS) or self.fps
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        h_vid = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        w_vid = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        # Detect court region from first frame
+        ret, first_frame = cap.read()
+        if ret:
+            self.court_region = detect_court_region(first_frame)
+            print(f"[Tracking] Court region detected: x={self.court_region[0]:.2f}, "
+                  f"y={self.court_region[1]:.2f}, w={self.court_region[2]:.2f}, h={self.court_region[3]:.2f}")
+        else:
+            self.court_region = (0.15, 0.1, 0.7, 0.8)  # Fallback
+            print("[Tracking] Using default court region (center 70%)")
+
+        # Reset to beginning
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+        frame_index = 0
+        processed_count = 0
+
+        # Track visibility counts for filtering top players
+        track_visibility = {}  # track_id -> frame count
+
+        print(f"[Tracking] Processing {total_frames} frames at {actual_fps:.1f} fps (skip={skip_frames})")
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Frame skipping for performance (process every Nth frame)
+            if skip_frames > 0 and frame_index % (skip_frames + 1) != 0:
+                # For skipped frames, carry forward the last tracking result
+                if results:
+                    last_result = results[-1]
+                    results.append(FrameTracking(
+                        frame_index=frame_index,
+                        timestamp=frame_index / actual_fps,
+                        tracks=last_result.tracks  # Carry forward
+                    ))
+                frame_index += 1
+                continue
+
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w = frame.shape[:2]
+
+            # 1. YOLO detection (persons only, class_id=0)
+            detections = self.yolo(frame, classes=[0], verbose=False)[0]
+            sv_detections = sv.Detections.from_ultralytics(detections)
+
+            # 2. ByteTrack assigns stable track_ids
+            tracked = self.byte_tracker.update_with_detections(sv_detections)
+
+            # 3. Process each tracked person - FILTER TO COURT REGION
+            frame_tracks = []
+
+            if tracked.tracker_id is not None and len(tracked.tracker_id) > 0:
+                # First pass: collect all court-filtered detections
+                court_candidates = []
+
+                for i, track_id in enumerate(tracked.tracker_id):
+                    bbox_xyxy = tracked.xyxy[i]  # x1, y1, x2, y2
+                    confidence = float(tracked.confidence[i])
+
+                    # Normalize bbox to 0-1 range
+                    x1, y1, x2, y2 = bbox_xyxy
+                    norm_bbox = (x1 / w, y1 / h, (x2 - x1) / w, (y2 - y1) / h)
+
+                    # FILTER: Only include persons within court region
+                    if is_in_court_region(norm_bbox, self.court_region):
+                        court_candidates.append({
+                            'track_id': int(track_id),
+                            'bbox_xyxy': bbox_xyxy,
+                            'norm_bbox': norm_bbox,
+                            'confidence': confidence
+                        })
+
+                        # Update visibility count
+                        tid = int(track_id)
+                        track_visibility[tid] = track_visibility.get(tid, 0) + 1
+
+                # Sort by confidence and limit to MAX_PLAYERS
+                court_candidates.sort(key=lambda x: x['confidence'], reverse=True)
+                court_candidates = court_candidates[:self.MAX_PLAYERS]
+
+                # Second pass: run MediaPipe only on filtered candidates
+                for candidate in court_candidates:
+                    track_id = candidate['track_id']
+                    bbox_xyxy = candidate['bbox_xyxy']
+                    confidence = candidate['confidence']
+
+                    # Add padding for pose estimation
+                    pad = 0.1
+                    x1, y1, x2, y2 = bbox_xyxy
+                    bw, bh = x2 - x1, y2 - y1
+                    x1_padded = max(0, x1 - bw * pad)
+                    y1_padded = max(0, y1 - bh * pad)
+                    x2_padded = min(w, x2 + bw * pad)
+                    y2_padded = min(h, y2 + bh * pad)
+
+                    # Crop ROI for MediaPipe
+                    cropped = frame_rgb[int(y1_padded):int(y2_padded),
+                                       int(x1_padded):int(x2_padded)]
+
+                    # Run MediaPipe Pose on cropped region
+                    landmarks_full = None
+                    pose_confidence = 0.0
+
+                    if self.pose is not None and cropped.size > 0:
+                        pose_result = self.pose.process(cropped)
+
+                        if pose_result.pose_landmarks:
+                            landmarks_full = []
+                            visibility_sum = 0.0
+
+                            for lm in pose_result.pose_landmarks.landmark:
+                                full_x = (x1_padded + lm.x * (x2_padded - x1_padded)) / w
+                                full_y = (y1_padded + lm.y * (y2_padded - y1_padded)) / h
+
+                                landmarks_full.append({
+                                    'x': full_x,
+                                    'y': full_y,
+                                    'z': lm.z,
+                                    'visibility': lm.visibility
+                                })
+                                visibility_sum += lm.visibility
+
+                            pose_confidence = visibility_sum / len(landmarks_full)
+
+                    # Updated norm_bbox with padding
+                    norm_bbox_padded = (
+                        x1_padded / w,
+                        y1_padded / h,
+                        (x2_padded - x1_padded) / w,
+                        (y2_padded - y1_padded) / h
+                    )
+
+                    frame_tracks.append(TrackedPerson(
+                        track_id=track_id,
+                        bbox=norm_bbox_padded,
+                        landmarks=landmarks_full,
+                        confidence=confidence,
+                        pose_confidence=pose_confidence
+                    ))
+
+            results.append(FrameTracking(
+                frame_index=frame_index,
+                timestamp=frame_index / actual_fps,
+                tracks=frame_tracks
+            ))
+
+            frame_index += 1
+            processed_count += 1
+
+            # Progress logging
+            if processed_count % 100 == 0:
+                print(f"[Tracking] Processed {processed_count} frames...")
+
+        cap.release()
+
+        # Final filtering: keep only top MAX_PLAYERS by total visibility
+        top_track_ids = self._get_top_tracks(track_visibility, self.MAX_PLAYERS)
+        results = self._filter_results_to_tracks(results, top_track_ids)
+
+        print(f"[Tracking] Complete: {processed_count} frames processed, "
+              f"{len(top_track_ids)} players identified (filtered from {len(track_visibility)} candidates)")
+
+        return results
+
+    def _get_top_tracks(self, track_visibility: dict, max_count: int) -> set:
+        """Get the top N track IDs by visibility count."""
+        sorted_tracks = sorted(track_visibility.items(), key=lambda x: -x[1])
+        return set(tid for tid, _ in sorted_tracks[:max_count])
+
+    def _filter_results_to_tracks(self, results: list, keep_track_ids: set) -> list:
+        """Filter tracking results to only include specified track IDs."""
+        filtered = []
+        for frame in results:
+            filtered_tracks = [t for t in frame.tracks if t.track_id in keep_track_ids]
+            filtered.append(FrameTracking(
+                frame_index=frame.frame_index,
+                timestamp=frame.timestamp,
+                tracks=filtered_tracks
+            ))
+        return filtered
+
+    def _get_unique_track_ids(self, results: list) -> set:
+        """Get set of all unique track IDs from results."""
+        track_ids = set()
+        for frame in results:
+            for track in frame.tracks:
+                track_ids.add(track.track_id)
+        return track_ids
+
+    def extract_track_thumbnails(
+        self,
+        video_path: str,
+        tracking_results: list,
+        size: tuple = (80, 120)
+    ) -> dict:
+        """
+        Extract thumbnail image for each unique track_id.
+
+        Args:
+            video_path: Path to input video
+            tracking_results: List of FrameTracking from process_video
+            size: Thumbnail dimensions (width, height)
+
+        Returns:
+            Dict mapping track_id to base64-encoded JPEG thumbnail
+        """
+        thumbnails = {}
+        cap = cv2.VideoCapture(video_path)
+
+        if not cap.isOpened():
+            return thumbnails
+
+        h_vid = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        w_vid = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        # Find first clear appearance of each track (confidence > 0.7)
+        track_first_frame = {}
+        for frame in tracking_results:
+            for track in frame.tracks:
+                if track.track_id not in track_first_frame:
+                    if track.confidence > 0.7:
+                        track_first_frame[track.track_id] = (
+                            frame.frame_index,
+                            track.bbox
+                        )
+
+        # Extract thumbnails
+        for track_id, (frame_idx, bbox) in track_first_frame.items():
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            ret, frame = cap.read()
+
+            if ret:
+                x, y, bw, bh = bbox
+                x1, y1 = int(x * w_vid), int(y * h_vid)
+                x2, y2 = int((x + bw) * w_vid), int((y + bh) * h_vid)
+
+                # Ensure bounds are valid
+                x1, y1 = max(0, x1), max(0, y1)
+                x2, y2 = min(w_vid, x2), min(h_vid, y2)
+
+                if x2 > x1 and y2 > y1:
+                    crop = frame[y1:y2, x1:x2]
+                    crop = cv2.resize(crop, size)
+                    _, buffer = cv2.imencode('.jpg', crop,
+                                            [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    thumbnails[track_id] = base64.b64encode(buffer).decode('utf-8')
+
+        cap.release()
+        return thumbnails
+
+    def get_track_summaries(self, tracking_results: list, filter_by_movement: bool = True) -> list:
+        """
+        Generate summary statistics for each unique track.
+
+        Includes movement analysis to filter out spectators:
+        - Players move around the court (high variance)
+        - Spectators stay in one place (low variance)
+
+        Args:
+            tracking_results: List of FrameTracking from process_video
+            filter_by_movement: If True, only return tracks with player-like movement
+
+        Returns:
+            List of TrackSummary objects (filtered to likely players)
+        """
+        track_data = {}
+
+        for frame in tracking_results:
+            for track in frame.tracks:
+                tid = track.track_id
+
+                if tid not in track_data:
+                    track_data[tid] = {
+                        'first_frame': frame.frame_index,
+                        'last_frame': frame.frame_index,
+                        'frame_count': 0,
+                        'confidence_sum': 0.0,
+                        'avg_y': 0.0,  # For side detection
+                        'positions': []  # For movement analysis
+                    }
+
+                data = track_data[tid]
+                data['last_frame'] = frame.frame_index
+                data['frame_count'] += 1
+                data['confidence_sum'] += track.confidence
+                data['avg_y'] += track.bbox[1]  # y position
+
+                # Store center position for movement analysis
+                cx = track.bbox[0] + track.bbox[2] / 2
+                cy = track.bbox[1] + track.bbox[3] / 2
+                data['positions'].append((cx, cy))
+
+        # Build summaries with movement analysis
+        summaries = []
+        player_candidates = []
+
+        for tid, data in track_data.items():
+            avg_y = data['avg_y'] / data['frame_count'] if data['frame_count'] > 0 else 0.5
+
+            # Analyze movement to distinguish players from spectators
+            movement = analyze_player_movement(data['positions'])
+
+            summary = TrackSummary(
+                track_id=tid,
+                first_frame=data['first_frame'],
+                last_frame=data['last_frame'],
+                frame_count=data['frame_count'],
+                avg_confidence=data['confidence_sum'] / data['frame_count'],
+                side='near' if avg_y > 0.5 else 'far'
+            )
+
+            # Only include tracks with player-like movement
+            if filter_by_movement:
+                if movement['is_likely_player']:
+                    player_candidates.append((summary, movement['variance']))
+                    print(f"[Tracking] Track {tid}: PLAYER (variance={movement['variance']:.4f}, "
+                          f"speed={movement['avg_speed']:.4f}, frames={data['frame_count']})")
+                else:
+                    print(f"[Tracking] Track {tid}: SPECTATOR (variance={movement['variance']:.4f}, "
+                          f"speed={movement['avg_speed']:.4f}) - FILTERED OUT")
+            else:
+                summaries.append(summary)
+
+        if filter_by_movement:
+            # Sort by movement variance (most active = most likely player)
+            player_candidates.sort(key=lambda x: -x[1])
+            summaries = [s for s, _ in player_candidates]
+
+        # Detect match format based on player positions
+        match_format = detect_match_format(summaries, self.court_region)
+        max_players = 2 if match_format == 'singles' else 4
+
+        print(f"[Tracking] Detected match format: {match_format.upper()} (max {max_players} players)")
+
+        # Limit to appropriate number of players
+        summaries = summaries[:max_players]
+
+        # Sort by frame count for consistent ordering
+        summaries.sort(key=lambda s: -s.frame_count)
+
+        return summaries
+
+    def close(self):
+        """Release MediaPipe resources."""
+        if self.pose is not None:
+            self.pose.close()
+
+
+def extract_unique_tracks(tracking_results: list) -> list:
+    """
+    Extract unique track IDs with metadata (standalone function).
+
+    Args:
+        tracking_results: List of FrameTracking objects
+
+    Returns:
+        List of dicts with track_id, first_seen, confidence
+    """
+    tracks = {}
+
+    for frame in tracking_results:
+        for track in frame.tracks:
+            if track.track_id not in tracks:
+                tracks[track.track_id] = {
+                    'track_id': track.track_id,
+                    'first_seen': frame.timestamp,
+                    'confidence': track.confidence
+                }
+            else:
+                # Update to max confidence seen
+                tracks[track.track_id]['confidence'] = max(
+                    tracks[track.track_id]['confidence'],
+                    track.confidence
+                )
+
+    return list(tracks.values())
+
+
+def serialize_tracking_results(tracking_results: list) -> list:
+    """
+    Convert tracking results to JSON-serializable format.
+
+    Args:
+        tracking_results: List of FrameTracking objects
+
+    Returns:
+        List of dicts suitable for JSON serialization
+    """
+    serialized = []
+
+    for frame in tracking_results:
+        frame_data = {
+            'frame_index': frame.frame_index,
+            'timestamp': frame.timestamp,
+            'tracks': []
+        }
+
+        for track in frame.tracks:
+            track_data = {
+                'track_id': track.track_id,
+                'bbox': {
+                    'x': track.bbox[0],
+                    'y': track.bbox[1],
+                    'w': track.bbox[2],
+                    'h': track.bbox[3]
+                },
+                'confidence': track.confidence,
+                'pose_confidence': track.pose_confidence,
+                'landmarks': track.landmarks
+            }
+            frame_data['tracks'].append(track_data)
+
+        serialized.append(frame_data)
+
+    return serialized
+
+
+# Fallback tracker for when YOLO/ByteTrack not available
+class SimpleBboxTracker:
+    """
+    Simple bbox proximity tracker as fallback.
+    Uses center-of-mass distance for matching.
+    """
+
+    def __init__(self, threshold: float = 0.15):
+        self.threshold = threshold
+        self.next_id = 1
+        self.tracks = {}  # track_id -> last bbox
+
+    def update(self, bboxes: list) -> list:
+        """
+        Update tracker with new bboxes.
+
+        Args:
+            bboxes: List of (x, y, w, h) normalized bboxes
+
+        Returns:
+            List of track_ids corresponding to input bboxes
+        """
+        if not bboxes:
+            return []
+
+        assigned_ids = []
+        used_tracks = set()
+
+        for bbox in bboxes:
+            best_id = None
+            best_dist = float('inf')
+
+            # Find closest existing track
+            cx, cy = bbox[0] + bbox[2]/2, bbox[1] + bbox[3]/2
+
+            for tid, last_bbox in self.tracks.items():
+                if tid in used_tracks:
+                    continue
+
+                lcx, lcy = last_bbox[0] + last_bbox[2]/2, last_bbox[1] + last_bbox[3]/2
+                dist = ((cx - lcx)**2 + (cy - lcy)**2) ** 0.5
+
+                if dist < best_dist and dist < self.threshold:
+                    best_dist = dist
+                    best_id = tid
+
+            if best_id is not None:
+                assigned_ids.append(best_id)
+                used_tracks.add(best_id)
+                self.tracks[best_id] = bbox
+            else:
+                # New track
+                assigned_ids.append(self.next_id)
+                self.tracks[self.next_id] = bbox
+                self.next_id += 1
+
+        return assigned_ids

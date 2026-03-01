@@ -1,0 +1,84 @@
+     1→import cv2
+     2→import math
+     3→import mediapipe as mp
+     4→
+     5→# Initialize MediaPipe Pose (simpler, no model file needed)
+     6→mp_pose = mp.solutions.pose
+     7→pose_estimator = mp_pose.Pose(
+     8→    static_image_mode=False,
+     9→    model_complexity=1,
+    10→    enable_segmentation=False
+    11→)
+    12→
+    13→
+    14→def calc_angle(p1, p2, p3):
+    15→    """Calculate angle at p2 formed by points p1->p2->p3."""
+    16→    ax, ay = p1
+    17→    bx, by = p2
+    18→    cx, cy = p3
+    19→
+    20→    BA = (ax - bx, ay - by)
+    21→    BC = (cx - bx, cy - by)
+    22→
+    23→    dot = BA[0] * BC[0] + BA[1] * BC[1]
+    24→    magBA = math.hypot(*BA)
+    25→    magBC = math.hypot(*BC)
+    26→
+    27→    if magBA * magBC == 0:
+    28→        return 0.0
+    29→
+    30→    cos_angle = max(-1.0, min(1.0, dot / (magBA * magBC)))
+    31→    angle = math.degrees(math.acos(cos_angle))
+    32→    return angle
+    33→
+    34→
+    35→def extract_pose_from_video(video_path):
+    36→    """
+    37→    Extract pose data from video using MediaPipe Pose.
+    38→    Returns list of pose dictionaries and frames.
+    39→    """
+    40→    cap = cv2.VideoCapture(video_path)
+    41→    pose_data = []
+    42→    frames = []
+    43→
+    44→    while True:
+    45→        ret, frame = cap.read()
+    46→        if not ret:
+    47→            break
+    48→
+    49→        frames.append(frame)
+    50→
+    51→        # Convert BGR to RGB for MediaPipe
+    52→        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    53→        results = pose_estimator.process(rgb)
+    54→
+    55→        if results.pose_landmarks:
+    56→            h, w, _ = frame.shape
+    57→            landmarks = results.pose_landmarks.landmark
+    58→
+    59→            pose = {
+    60→                'right_shoulder': (landmarks[12].x * w, landmarks[12].y * h),
+    61→                'right_elbow': (landmarks[14].x * w, landmarks[14].y * h),
+    62→                'right_wrist': (landmarks[16].x * w, landmarks[16].y * h),
+    63→                'left_shoulder': (landmarks[11].x * w, landmarks[11].y * h),
+    64→                'left_elbow': (landmarks[13].x * w, landmarks[13].y * h),
+    65→                'left_wrist': (landmarks[15].x * w, landmarks[15].y * h),
+    66→                'right_hip': (landmarks[24].x * w, landmarks[24].y * h),
+    67→                'left_hip': (landmarks[23].x * w, landmarks[23].y * h),
+    68→                'right_knee': (landmarks[26].x * w, landmarks[26].y * h),
+    69→                'left_knee': (landmarks[25].x * w, landmarks[25].y * h),
+    70→                'right_ankle': (landmarks[28].x * w, landmarks[28].y * h),
+    71→                'left_ankle': (landmarks[27].x * w, landmarks[27].y * h),
+    72→            }
+    73→        else:
+    74→            pose = None
+    75→
+    76→        pose_data.append(pose)
+    77→
+    78→    cap.release()
+    79→    return pose_data, frames
+    80→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

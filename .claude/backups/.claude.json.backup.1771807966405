@@ -1,0 +1,462 @@
+{
+  "numStartups": 66,
+  "installMethod": "global",
+  "autoUpdates": true,
+  "hasSeenTasksHint": true,
+  "tipsHistory": {
+    "new-user-warmup": 1,
+    "plan-mode-for-complex-tasks": 65,
+    "memory-command": 65,
+    "theme-command": 49,
+    "status-line": 52,
+    "stickers-command": 3,
+    "prompt-queue": 19,
+    "shift-enter": 61,
+    "enter-to-steer-in-relatime": 49,
+    "todo-list": 49,
+    "install-github-app": 62,
+    "install-slack-app": 62,
+    "drag-and-drop-images": 62,
+    "double-esc-code-restore": 63,
+    "continue": 63,
+    "shift-tab": 62,
+    "image-paste": 49,
+    "ultrathink-keyword": 7,
+    "custom-agents": 53,
+    "desktop-app": 53,
+    "permissions": 61,
+    "rename-conversation": 65,
+    "custom-commands": 65,
+    "web-app": 65,
+    "mobile-app": 65,
+    "default-permission-mode-config": 62,
+    "agent-flag": 65,
+    "frontend-design-plugin": 34,
+    "overage-promo": 55,
+    "git-worktrees": 62
+  },
+  "promptQueueUseCount": 108,
+  "cachedStatsigGates": {
+    "tengu_log_1p_events": true,
+    "tengu_tool_pear": false,
+    "tengu_disable_bypass_permissions_mode": false,
+    "tengu_vscode_review_upsell": false,
+    "tengu_web_tasks": true,
+    "tengu_backstage_only": false,
+    "tengu_enable_versioned_plugins": false,
+    "code_slack_app_install_banner": false,
+    "tengu_tool_result_persistence": true,
+    "tengu_c4w_usage_limit_notifications_enabled": true,
+    "tengu_thinkback": false,
+    "tengu_ant_attribution_header_new": true,
+    "tengu_prompt_suggestion": true,
+    "tengu_year_end_2025_campaign_promo": false,
+    "tengu_session_memory": false
+  },
+  "cachedDynamicConfigs": {
+    "tengu_1p_event_batch_config": {
+      "scheduledDelayMillis": 5000,
+      "maxExportBatchSize": 200,
+      "maxQueueSize": 8192
+    }
+  },
+  "cachedGrowthBookFeatures": {
+    "strawberry_granite_flag": "N/A",
+    "persimmon_marble_flag": "N/A",
+    "tengu_mcp_tool_search": true,
+    "tengu_disable_bypass_permissions_mode": false,
+    "tengu_tool_pear": false,
+    "tengu_c4w_usage_limit_notifications_enabled": true,
+    "tengu_thinkback": false,
+    "tengu_ant_attribution_header_new": true,
+    "tengu_vscode_review_upsell": false,
+    "tengu_1p_event_batch_config": {
+      "scheduledDelayMillis": 5000,
+      "maxExportBatchSize": 200,
+      "maxQueueSize": 8192
+    },
+    "tengu_scratch": false,
+    "tengu_log_segment_events": false,
+    "tengu_log_datadog_events": true,
+    "tengu_event_sampling_config": {},
+    "tengu_streaming_tool_execution2": true,
+    "tengu_tool_search_unsupported_models": [
+      "haiku"
+    ],
+    "tengu_vscode_onboarding": false,
+    "tengu_sumi": true,
+    "tengu-top-of-feed-tip": {
+      "tip": "",
+      "color": ""
+    },
+    "tengu_react_vulnerability_warning": false,
+    "tengu_code_diff_cli": true,
+    "tengu_post_compact_survey": false,
+    "enhanced_telemetry_beta": false,
+    "tengu_opus_default_pro_plan": false,
+    "tengu_permission_explainer": true,
+    "tengu_chrome_auto_enable": false,
+    "tengu_pid_based_version_locking": true,
+    "tengu_session_memory": false,
+    "tengu_bash_haiku_prefetch": true,
+    "tengu_plan_mode_interview_phase": false,
+    "tengu_sm_compact": false,
+    "tengu_compact_streaming_retry": false,
+    "tengu_keybinding_customization": false,
+    "tengu_claudeai_mcp_connectors": true,
+    "tengu_plank_river_frost": "user_intent",
+    "tengu_attribution_header": true,
+    "tengu_brass_pebble": false,
+    "tengu_cache_plum_violet": true,
+    "tengu_marble_anvil": true,
+    "tengu_scarf_coffee": false,
+    "tengu_keybinding_customization_release": true,
+    "tengu_marble_kite": false,
+    "tengu_kv7_prompt_sort": true,
+    "tengu_coral_fern": false,
+    "tengu_file_write_optimization": true,
+    "tengu_tst_kx7": false,
+    "tengu_pr_status_cli": true,
+    "tengu_cork_m4q": true,
+    "tengu_system_prompt_global_cache": true,
+    "tengu_workout": false,
+    "tengu_compact_cache_prefix": true,
+    "tengu_quiet_fern": true,
+    "tengu_plum_vx3": true,
+    "tengu_oboe": true,
+    "tengu_tst_names_in_messages": false,
+    "tengu_vinteuil_phrase": true,
+    "tengu_chomp_inflection": true,
+    "tengu_silver_lantern": false,
+    "tengu_copper_lantern": false,
+    "tengu_workout2": true,
+    "tengu_marble_lantern_disabled": false,
+    "tengu_copper_lantern_config": {
+      "meridian": "2026-02-05T07:59:00Z"
+    },
+    "tengu_penguins_enabled": true,
+    "tengu_penguins_off": null,
+    "tengu_mcp_elicitation": false,
+    "tengu_snippet_save": false,
+    "tengu_fgts": false,
+    "tengu_immediate_model_command": false,
+    "tengu_mulberry_fog": false,
+    "tengu_bergotte_lantern": false,
+    "tengu_prompt_cache_1h_config": {
+      "allowlist": [
+        "repl_main_thread*",
+        "sdk"
+      ]
+    },
+    "tengu_disable_streaming_to_non_streaming_fallback": false,
+    "tengu_birthday_hat": true,
+    "tengu_moth_copse": false,
+    "tengu_amber_prism": false,
+    "tengu_slate_nexus": false,
+    "tengu_marble_sandcastle": true,
+    "tengu_birch_mist": false,
+    "tengu_worktree_mode": true,
+    "tengu_pebble_leaf_prune": false,
+    "tengu_streaming_text": false,
+    "tengu_swann_brevity": "control",
+    "tengu_tool_input_aliasing": false,
+    "tengu_destructive_command_warning": false,
+    "tengu_oak_drum": true
+  },
+  "userID": "438c9e082da8feffb90478a291105006c79b665c79569e948f693f2a24a34ad6",
+  "firstStartTime": "2025-12-02T23:37:04.668Z",
+  "sonnet45MigrationComplete": true,
+  "opus45MigrationComplete": true,
+  "s1mAccessCache": {
+    "81825cf5-e84d-40d8-85e0-8d4e46d4c001": {
+      "hasAccess": false,
+      "hasAccessNotAsDefault": false,
+      "timestamp": 1771359520113
+    }
+  },
+  "thinkingMigrationComplete": true,
+  "githubRepoPaths": {
+    "ycheng4-design/mindful-companion": [
+      "c:\\Users\\ASUS\\mindful-companion"
+    ],
+    "ycheng4-design/rallycoach": [
+      "C:\\Users\\ASUS\\Desktop\\Gemini 3 hack"
+    ]
+  },
+  "groveConfigCache": {
+    "79a593fd-4dc6-4ba2-b651-91626841805d": {
+      "grove_enabled": true,
+      "timestamp": 1771747812216
+    }
+  },
+  "opusProMigrationComplete": true,
+  "opusProMigrationTimestamp": 1768448154553,
+  "cachedChromeExtensionInstalled": true,
+  "changelogLastFetched": 1771661156904,
+  "claudeCodeFirstTokenDate": "2025-12-02T23:41:57.425374Z",
+  "shiftEnterKeyBindingInstalled": true,
+  "hasCompletedOnboarding": true,
+  "lastOnboardingVersion": "2.1.7",
+  "projects": {
+    "C:/Users/ASUS/Desktop/Gemini 3 hack": {
+      "allowedTools": [],
+      "mcpContextUris": [],
+      "mcpServers": {
+        "supabase": {
+          "type": "http",
+          "url": "https://mcp.supabase.com/mcp"
+        },
+        "figma-remote-mcp": {
+          "type": "http",
+          "url": "https://mcp.figma.com/mcp"
+        },
+        "chembl": {
+          "type": "http",
+          "url": "https://mcp.deepsense.ai/chembl/mcp"
+        },
+        "icd-10-codes": {
+          "type": "http",
+          "url": "https://mcp.deepsense.ai/icd10_codes/mcp"
+        },
+        "hugging-face": {
+          "type": "http",
+          "url": "https://huggingface.co/mcp"
+        },
+        "asana": {
+          "type": "http",
+          "url": "https://mcp.asana.com/v2/mcp"
+        },
+        "cdata-connect-ai": {
+          "type": "http",
+          "url": "https://mcp.cloud.cdata.com/mcp"
+        },
+        "cloudflare": {
+          "type": "http",
+          "url": "https://bindings.mcp.cloudflare.com/mcp"
+        },
+        "monday": {
+          "type": "http",
+          "url": "https://mcp.monday.com/mcp"
+        },
+        "notion": {
+          "type": "http",
+          "url": "https://mcp.notion.com/mcp"
+        },
+        "vercel": {
+          "type": "http",
+          "url": "https://mcp.vercel.com"
+        }
+      },
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": true,
+      "projectOnboardingSeenCount": 4,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "reactVulnerabilityCache": {
+        "detected": false,
+        "package": null,
+        "packageName": null,
+        "version": null,
+        "packageManager": null
+      },
+      "lastCost": 0,
+      "lastAPIDuration": 0,
+      "lastAPIDurationWithoutRetries": 0,
+      "lastToolDuration": 0,
+      "lastDuration": 21126,
+      "lastLinesAdded": 0,
+      "lastLinesRemoved": 0,
+      "lastTotalInputTokens": 0,
+      "lastTotalOutputTokens": 0,
+      "lastTotalCacheCreationInputTokens": 0,
+      "lastTotalCacheReadInputTokens": 0,
+      "lastTotalWebSearchRequests": 0,
+      "lastModelUsage": {},
+      "lastSessionId": "96e4cad8-f415-406a-83b2-40352ecc74bd",
+      "disabledMcpServers": [
+        "asana"
+      ],
+      "lastFpsAverage": 2.85,
+      "lastFpsLow1Pct": 188.25,
+      "lastSessionMetrics": {
+        "frame_duration_ms_count": 55,
+        "frame_duration_ms_min": 0.0272000000004482,
+        "frame_duration_ms_max": 5.3121000000001,
+        "frame_duration_ms_avg": 0.5434709090910557,
+        "frame_duration_ms_p50": 0.07130000000006476,
+        "frame_duration_ms_p95": 2.659490000000187,
+        "frame_duration_ms_p99": 4.035324000000385
+      }
+    },
+    "C:/Users/ASUS/Desktop/bad": {
+      "allowedTools": [],
+      "mcpContextUris": [],
+      "mcpServers": {},
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": true,
+      "projectOnboardingSeenCount": 0,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "reactVulnerabilityCache": {
+        "detected": false,
+        "package": null,
+        "packageName": null,
+        "version": null,
+        "packageManager": null
+      }
+    },
+    "C:/Users/ASUS/Desktop/Hello World": {
+      "allowedTools": [],
+      "mcpContextUris": [],
+      "mcpServers": {},
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": true,
+      "projectOnboardingSeenCount": 1,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "reactVulnerabilityCache": {
+        "detected": false,
+        "package": null,
+        "packageName": null,
+        "version": null,
+        "packageManager": null
+      },
+      "lastCost": 0,
+      "lastAPIDuration": 0,
+      "lastAPIDurationWithoutRetries": 0,
+      "lastToolDuration": 0,
+      "lastDuration": 24402,
+      "lastLinesAdded": 0,
+      "lastLinesRemoved": 0,
+      "lastTotalInputTokens": 0,
+      "lastTotalOutputTokens": 0,
+      "lastTotalCacheCreationInputTokens": 0,
+      "lastTotalCacheReadInputTokens": 0,
+      "lastTotalWebSearchRequests": 0,
+      "lastFpsAverage": 1.06,
+      "lastFpsLow1Pct": 146.64,
+      "lastModelUsage": {},
+      "lastSessionId": "f07d238d-5782-464a-82a0-97247f18a39e"
+    },
+    "C:/Users/ASUS": {
+      "allowedTools": [],
+      "mcpContextUris": [],
+      "mcpServers": {},
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": true,
+      "projectOnboardingSeenCount": 4,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "reactVulnerabilityCache": {
+        "detected": false,
+        "package": null,
+        "packageName": null,
+        "version": null,
+        "packageManager": null
+      }
+    }
+  },
+  "lastReleaseNotesSeen": "2.1.50",
+  "hasShownOpus45Notice": {
+    "81825cf5-e84d-40d8-85e0-8d4e46d4c001": true
+  },
+  "officialMarketplaceAutoInstallAttempted": true,
+  "officialMarketplaceAutoInstalled": true,
+  "mcpServers": {
+    "pencil": {
+      "command": "c:\\Users\\ASUS\\.vscode\\extensions\\highagency.pencildev-0.6.26\\out\\mcp-server-windows-x64.exe",
+      "args": [
+        "--app",
+        "visual_studio_code"
+      ],
+      "env": {},
+      "type": "stdio"
+    }
+  },
+  "lastPlanModeUse": 1769408075210,
+  "hasUsedBackslashReturn": true,
+  "skillUsage": {
+    "frontend-design": {
+      "usageCount": 1,
+      "lastUsedAt": 1769736788853
+    },
+    "brainstorming": {
+      "usageCount": 4,
+      "lastUsedAt": 1770549318819
+    },
+    "systematic-debugging": {
+      "usageCount": 5,
+      "lastUsedAt": 1770246598297
+    },
+    "mcp-builder": {
+      "usageCount": 1,
+      "lastUsedAt": 1769991863827
+    },
+    "vercel-react-best-practices": {
+      "usageCount": 2,
+      "lastUsedAt": 1770423327869
+    },
+    "ui-ux-pro-max": {
+      "usageCount": 1,
+      "lastUsedAt": 1770360086957
+    },
+    "continuous-learning-v2": {
+      "usageCount": 1,
+      "lastUsedAt": 1770423332953
+    },
+    "everything-claude-code:go-test": {
+      "usageCount": 1,
+      "lastUsedAt": 1770549323546
+    },
+    "everything-claude-code:multi-execute": {
+      "usageCount": 1,
+      "lastUsedAt": 1770549324951
+    },
+    "everything-claude-code:multi-workflow": {
+      "usageCount": 1,
+      "lastUsedAt": 1770549326462
+    },
+    "agent-browser": {
+      "usageCount": 1,
+      "lastUsedAt": 1770625348479
+    },
+    "plugin:figma:figma:create_design_system_rules (MCP)": {
+      "usageCount": 1,
+      "lastUsedAt": 1771115058600
+    }
+  },
+  "clientDataCache": {
+    "data": {},
+    "timestamp": 1771807457268
+  },
+  "hasShownOpus46Notice": {
+    "81825cf5-e84d-40d8-85e0-8d4e46d4c001": true
+  },
+  "claudeInChromeDefaultEnabled": false,
+  "hasCompletedClaudeInChromeOnboarding": true,
+  "penguinModeOrgEnabled": true,
+  "opus46FeedSeenCount": 24,
+  "showSpinnerTree": false,
+  "hasVisitedExtraUsage": true,
+  "oauthAccount": {
+    "accountUuid": "79a593fd-4dc6-4ba2-b651-91626841805d",
+    "emailAddress": "yc64914@gmail.com",
+    "organizationUuid": "81825cf5-e84d-40d8-85e0-8d4e46d4c001",
+    "hasExtraUsageEnabled": true,
+    "billingType": "stripe_subscription",
+    "subscriptionCreatedAt": "2025-12-02T23:16:12.656727Z",
+    "displayName": "YICHENG",
+    "organizationRole": "admin",
+    "workspaceRole": null,
+    "organizationName": "yc64914@gmail.com's Organization",
+    "accountCreatedAt": "2025-10-25T18:36:03.833353Z"
+  },
+  "effortCalloutDismissed": true,
+  "sonnet1m45MigrationComplete": true,
+  "cachedExtraUsageDisabledReason": null,
+  "birthdayHatAnimationCount": 3
+}

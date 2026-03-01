@@ -1,0 +1,177 @@
+     1→import { NextResponse } from 'next/server';
+     2→import { getRacketRecommendations } from '@/lib/gemini';
+     3→import racketsData from '@/data/rackets.json';
+     4→import type { Racket, RacketRecommendRequest } from '@/lib/types';
+     5→
+     6→const rackets: Racket[] = racketsData as Racket[];
+     7→
+     8→export async function POST(request: Request) {
+     9→  try {
+    10→    const body: RacketRecommendRequest = await request.json();
+    11→    const { level, weaknesses, style_pref } = body;
+    12→
+    13→    if (!level || !weaknesses || weaknesses.length === 0) {
+    14→      return NextResponse.json(
+    15→        { error: 'level and weaknesses are required' },
+    16→        { status: 400 }
+    17→      );
+    18→    }
+    19→
+    20→    // Filter rackets by skill level first
+    21→    const eligibleRackets = rackets.filter((r) =>
+    22→      r.skill_level.includes(level)
+    23→    );
+    24→
+    25→    // If Gemini API is available, use AI ranking
+    26→    if (process.env.GEMINI_API_KEY) {
+    27→      try {
+    28→        const recommendations = await getRacketRecommendations(
+    29→          eligibleRackets.length > 0 ? eligibleRackets : rackets,
+    30→          level,
+    31→          weaknesses,
+    32→          style_pref
+    33→        );
+    34→
+    35→        return NextResponse.json({ recommendations });
+    36→      } catch (error) {
+    37→        console.error('Gemini recommendation error:', error);
+    38→        // Fall back to deterministic ranking
+    39→      }
+    40→    }
+    41→
+    42→    // Deterministic fallback ranking
+    43→    const recommendations = deterministicRanking(
+    44→      eligibleRackets.length > 0 ? eligibleRackets : rackets,
+    45→      level,
+    46→      weaknesses,
+    47→      style_pref
+    48→    );
+    49→
+    50→    return NextResponse.json({ recommendations });
+    51→  } catch (error) {
+    52→    console.error('Racket recommendation error:', error);
+    53→    return NextResponse.json(
+    54→      { error: 'Failed to get recommendations' },
+    55→      { status: 500 }
+    56→    );
+    57→  }
+    58→}
+    59→
+    60→function deterministicRanking(
+    61→  rackets: Racket[],
+    62→  level: string,
+    63→  weaknesses: string[],
+    64→  stylePref?: string
+    65→) {
+    66→  const scored = rackets.map((racket) => {
+    67→    let score = 50;
+    68→    const reasons: string[] = [];
+    69→
+    70→    // Level match bonus
+    71→    if (racket.skill_level.includes(level)) {
+    72→      score += 15;
+    73→      reasons.push(`suitable for ${level} players`);
+    74→    }
+    75→
+    76→    // Style preference match
+    77→    if (stylePref && racket.play_style.includes(stylePref)) {
+    78→      score += 20;
+    79→      reasons.push(`${stylePref} play style`);
+    80→    }
+    81→
+    82→    // Weakness-based scoring
+    83→    if (weaknesses.includes('smash_power')) {
+    84→      if (racket.balance === 'Head Heavy') {
+    85→        score += 15;
+    86→        reasons.push('head-heavy for power');
+    87→      }
+    88→      if (racket.flexibility === 'Stiff') {
+    89→        score += 10;
+    90→      }
+    91→    }
+    92→
+    93→    if (weaknesses.includes('defense')) {
+    94→      if (racket.balance === 'Head Light' || racket.balance === 'Even Balance') {
+    95→        score += 15;
+    96→        reasons.push('balanced for quick defense');
+    97→      }
+    98→      if (racket.weight.includes('5U') || racket.weight.includes('6U')) {
+    99→        score += 10;
+   100→      }
+   101→    }
+   102→
+   103→    if (weaknesses.includes('footwork')) {
+   104→      // Lighter rackets help with overall movement
+   105→      if (racket.weight.includes('5U') || racket.weight.includes('6U')) {
+   106→        score += 10;
+   107→        reasons.push('lightweight for agility');
+   108→      }
+   109→    }
+   110→
+   111→    if (weaknesses.includes('net_play')) {
+   112→      if (racket.balance === 'Head Light') {
+   113→        score += 15;
+   114→        reasons.push('head-light for quick net shots');
+   115→      }
+   116→    }
+   117→
+   118→    if (weaknesses.includes('consistency')) {
+   119→      if (racket.flexibility === 'Flexible' || racket.flexibility === 'Medium') {
+   120→        score += 15;
+   121→        reasons.push('forgiving flex for consistency');
+   122→      }
+   123→      if (racket.balance === 'Even Balance') {
+   124→        score += 10;
+   125→      }
+   126→    }
+   127→
+   128→    if (weaknesses.includes('endurance')) {
+   129→      // Lighter rackets reduce fatigue
+   130→      if (racket.weight.includes('5U') || racket.weight.includes('6U') || racket.weight.includes('4U')) {
+   131→        score += 10;
+   132→        reasons.push('lighter weight reduces fatigue');
+   133→      }
+   134→    }
+   135→
+   136→    // Beginner-friendly adjustments
+   137→    if (level === 'beginner') {
+   138→      if (racket.flexibility === 'Flexible') {
+   139→        score += 10;
+   140→      }
+   141→      if (racket.price_band === 'budget') {
+   142→        score += 5;
+   143→        reasons.push('budget-friendly');
+   144→      }
+   145→    }
+   146→
+   147→    // Advanced player adjustments
+   148→    if (level === 'advanced') {
+   149→      if (racket.price_band === 'premium') {
+   150→        score += 5;
+   151→      }
+   152→      if (racket.flexibility === 'Stiff') {
+   153→        score += 5;
+   154→      }
+   155→    }
+   156→
+   157→    // Generate match reason
+   158→    const matchReason =
+   159→      reasons.length > 0
+   160→        ? `Great choice: ${reasons.slice(0, 2).join(', ')}.`
+   161→        : `Solid option for ${level} players looking to improve.`;
+   162→
+   163→    return {
+   164→      ...racket,
+   165→      match_score: Math.min(score, 100),
+   166→      match_reason: matchReason,
+   167→    };
+   168→  });
+   169→
+   170→  // Sort by score and return top 5
+   171→  return scored.sort((a, b) => b.match_score - a.match_score).slice(0, 5);
+   172→}
+   173→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

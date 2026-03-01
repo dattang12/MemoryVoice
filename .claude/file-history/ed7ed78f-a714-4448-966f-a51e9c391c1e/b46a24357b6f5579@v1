@@ -1,0 +1,1223 @@
+'use client';
+
+import { useState, useEffect, useRef, Suspense, lazy, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import DashboardNav from '@/components/DashboardNav';
+import { supabase, uploadVideo, getVideoUrl } from '@/lib/supabase';
+import type { Session, TrajectoryPoint, StrategyResult } from '@/lib/types';
+import {
+  createPlaybackEngine,
+  PlaybackEngine,
+  updatePlaybackTime,
+  type TimeScale,
+  type ActiveView,
+  type PlaybackEngineRefs,
+} from '@/lib/playback-engine';
+
+// PHASE 4: Lazy load 3D component to avoid SSR issues
+const CourtTrajectory3D = lazy(() => import('@/components/CourtTrajectory3D'));
+
+// ============================================
+// Strategy Mode Page
+// ============================================
+
+type StrategyStep = 'select' | 'confirm' | 'processing' | 'results';
+
+interface HistorySession extends Session {
+  thumbnail_url?: string;
+}
+
+// Strategy Recommendation types
+interface StrategyRecommendation {
+  id: string;
+  name: string;
+  reason: string;
+  confidence: number;
+  jumpToVideoTimeSec?: number;
+  trajectory2D: TrajectoryPoint[];
+  trajectory3D?: TrajectoryPoint[];
+}
+
+function StrategyContent() {
+  const searchParams = useSearchParams();
+  const sessionIdParam = searchParams.get('session');
+
+  // Step state
+  const [step, setStep] = useState<StrategyStep>('select');
+  const [selectedSource, setSelectedSource] = useState<'upload' | 'history' | null>(null);
+
+  // Video/session state
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
+  const [selectedHistorySession, setSelectedHistorySession] = useState<HistorySession | null>(null);
+
+  // History drawer
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [historySessions, setHistorySessions] = useState<HistorySession[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Processing state
+  const [processing, setProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  // Results state
+  const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
+  const [recommendations, setRecommendations] = useState<StrategyRecommendation[]>([]);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<StrategyRecommendation | null>(null);
+  const [coachingPoints, setCoachingPoints] = useState<string[]>([]);
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Load from session param
+  useEffect(() => {
+    if (sessionIdParam) {
+      loadSessionFromHistory(sessionIdParam);
+    }
+  }, [sessionIdParam]);
+
+  // Load history sessions
+  const loadHistorySessions = async () => {
+    setLoadingHistory(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('type', ['analytics', 'practice'])
+        .not('video_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setHistorySessions(data || []);
+    } catch (err) {
+      console.error('Error loading history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Load session from history
+  const loadSessionFromHistory = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      setSelectedHistorySession(data);
+      setSessionId(data.id);
+      setVideoUrl(data.video_url);
+      setSelectedSource('history');
+      setStep('confirm');
+    } catch (err) {
+      console.error('Error loading session:', err);
+      setError('Failed to load session');
+    }
+  };
+
+  // Handle file upload
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      setError('Please select a video file');
+      return;
+    }
+
+    // Max file size 100MB (TUS resumable upload handles large files)
+    if (file.size > 100 * 1024 * 1024) {
+      setError('File size must be less than 100MB. Please compress your video before uploading.');
+      return;
+    }
+
+    setError(null);
+    setVideoFile(file);
+    setVideoUrl(URL.createObjectURL(file));
+    setSelectedSource('upload');
+    setStep('confirm');
+  };
+
+  // Handle history selection
+  const handleHistorySelect = (session: HistorySession) => {
+    setSelectedHistorySession(session);
+    setSessionId(session.id);
+    setVideoUrl(session.video_url || null);
+    setSelectedSource('history');
+    setShowHistoryDrawer(false);
+    setStep('confirm');
+  };
+
+  // Handle confirmation: No
+  const handleConfirmNo = () => {
+    setVideoFile(null);
+    setVideoUrl(null);
+    setSessionId(null);
+    setSelectedHistorySession(null);
+    setSelectedSource(null);
+    setStep('select');
+    setError(null);
+    setRecommendations([]);
+    setSelectedRecommendation(null);
+  };
+
+  // Handle confirmation: Yes
+  const handleConfirmYes = async () => {
+    setStep('processing');
+    setProcessing(true);
+    setProcessProgress(0);
+    setError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated. Please log in again.');
+
+      // If new upload, create session and upload video
+      let currentSessionId = sessionId;
+      let uploadedVideoUrl = videoUrl;
+
+      if (selectedSource === 'upload' && videoFile) {
+        // Upload video with progress tracking
+        // This is critical - do NOT create session if upload fails
+        setProcessProgress(5);
+
+        let videoPath: string | null = null;
+        try {
+          videoPath = await uploadVideo(videoFile, user.id, (progress) => {
+            // Upload progress: 5-25%
+            setProcessProgress(5 + Math.round(progress * 0.2));
+          });
+
+          if (!videoPath) {
+            throw new Error('Upload returned empty path');
+          }
+
+          // Get public URL
+          uploadedVideoUrl = getVideoUrl(videoPath);
+          console.log('Strategy video uploaded:', videoPath);
+
+        } catch (uploadError) {
+          console.error('Strategy video upload failed:', uploadError);
+          const uploadErrorMsg = uploadError instanceof Error
+            ? uploadError.message
+            : 'Failed to upload video. Please try again.';
+          throw new Error(uploadErrorMsg);
+        }
+
+        // Create session only AFTER successful upload
+        setProcessProgress(25);
+        const { data: session, error: sessionError } = await supabase
+          .from('sessions')
+          .insert({
+            user_id: user.id,
+            type: 'strategy',
+            video_path: videoPath,
+            video_url: uploadedVideoUrl,
+            filename: videoFile.name,
+            status: 'processing',
+          })
+          .select()
+          .single();
+
+        if (sessionError) {
+          console.error('Session creation error:', sessionError);
+          throw new Error('Failed to create analysis session');
+        }
+
+        currentSessionId = session.id;
+        setSessionId(session.id);
+      } else if (sessionId) {
+        // Update existing session type to strategy
+        await supabase
+          .from('sessions')
+          .update({ status: 'processing' })
+          .eq('id', sessionId);
+      }
+
+      if (!currentSessionId) throw new Error('No session ID');
+
+      // Generate strategy analysis
+      setProcessProgress(30);
+      const result = await generateStrategyAnalysis(currentSessionId);
+      setProcessProgress(100);
+
+      setStrategyResult(result);
+      setCoachingPoints(result.coaching_points || []);
+
+      // Generate recommendations from the strategy result
+      const generatedRecs = generateRecommendations(result);
+      setRecommendations(generatedRecs);
+      if (generatedRecs.length > 0) {
+        setSelectedRecommendation(generatedRecs[0]);
+      }
+
+      // Update session status
+      await supabase
+        .from('sessions')
+        .update({ status: 'ready' })
+        .eq('id', currentSessionId);
+
+      setStep('results');
+    } catch (err) {
+      console.error('Strategy processing error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to analyze video. Please try again.';
+      setError(errorMessage);
+      setStep('confirm');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Generate strategy recommendations from result
+  const generateRecommendations = (result: StrategyResult): StrategyRecommendation[] => {
+    // Generate multiple recommendation variants
+    const recommendations: StrategyRecommendation[] = [];
+
+    // Recommendation 1: Optimal path (existing refined trajectory)
+    recommendations.push({
+      id: 'optimal-deep',
+      name: 'Deep Clear Strategy',
+      reason: 'Push opponent to the back court with deep clears to create attacking opportunities.',
+      confidence: 92,
+      jumpToVideoTimeSec: 2,
+      trajectory2D: result.refined_trajectory,
+      trajectory3D: result.refined_trajectory,
+    });
+
+    // Recommendation 2: Cross-court variant
+    const crossCourtTrajectory = result.refined_trajectory.map((p, i) => ({
+      ...p,
+      x: i % 2 === 0 ? 0.2 : 0.8, // Alternate sides
+      court_x: i % 2 === 0 ? 0.2 : 0.8,
+    }));
+    recommendations.push({
+      id: 'cross-court',
+      name: 'Cross-Court Attack',
+      reason: 'Use sharp cross-court angles to move opponent laterally and open up straight line kills.',
+      confidence: 87,
+      jumpToVideoTimeSec: 4,
+      trajectory2D: crossCourtTrajectory,
+      trajectory3D: crossCourtTrajectory,
+    });
+
+    // Recommendation 3: Net rush
+    const netRushTrajectory = result.refined_trajectory.map((p, i) => ({
+      ...p,
+      y: i % 2 === 0 ? 0.3 : 0.55, // Closer to net
+      court_y: i % 2 === 0 ? 0.3 : 0.55,
+    }));
+    recommendations.push({
+      id: 'net-rush',
+      name: 'Net Domination',
+      reason: 'Control the front court with tight net shots to force weak lifts and create smash opportunities.',
+      confidence: 78,
+      jumpToVideoTimeSec: 6,
+      trajectory2D: netRushTrajectory,
+      trajectory3D: netRushTrajectory,
+    });
+
+    return recommendations;
+  };
+
+  // Generate strategy analysis (mock implementation)
+  const generateStrategyAnalysis = async (sessionId: string): Promise<StrategyResult> => {
+    // Simulate processing time
+    for (let i = 30; i <= 90; i += 10) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setProcessProgress(i);
+    }
+
+    // Generate mock trajectory data
+    const originalTrajectory: TrajectoryPoint[] = [];
+    const refinedTrajectory: TrajectoryPoint[] = [];
+
+    // Generate a rally pattern
+    const rallyPoints = 8;
+    for (let i = 0; i < rallyPoints; i++) {
+      const t = i / rallyPoints;
+      const isEven = i % 2 === 0;
+
+      // Original trajectory (player's actual shots)
+      originalTrajectory.push({
+        x: 0.3 + Math.random() * 0.4,
+        y: isEven ? 0.15 + Math.random() * 0.2 : 0.65 + Math.random() * 0.2,
+        timestamp: i * 2,
+        court_x: 0.3 + Math.random() * 0.4,
+        court_y: isEven ? 0.2 : 0.8,
+      });
+
+      // Refined trajectory (optimal shots)
+      refinedTrajectory.push({
+        x: isEven ? 0.7 : 0.3, // More decisive placement
+        y: isEven ? 0.1 : 0.9, // Deeper shots
+        timestamp: i * 2,
+        court_x: isEven ? 0.7 : 0.3,
+        court_y: isEven ? 0.1 : 0.9,
+      });
+    }
+
+    // Generate coaching points
+    const coachingPointsOptions = [
+      'Your shots tend to land mid-court. Push for deeper clears to the back tramlines.',
+      'Good variation in cross-court angles. Consider adding more straight drops to surprise opponents.',
+      'Rally patterns show predictable sequences. Mix up the pace with sudden smashes.',
+      'Effective use of the net area. Maintain the pressure with quicker net exchanges.',
+      'Recovery positioning is slightly late. Focus on split-step timing after each shot.',
+      'Strong defensive clears under pressure. Work on transitioning to attack faster.',
+      'Shot selection in the forecourt is excellent. Add deceptive flicks to your arsenal.',
+      'Backhand shots are going wide. Adjust your grip and follow-through angle.',
+    ];
+
+    const selectedPoints = coachingPointsOptions
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5 + Math.floor(Math.random() * 2));
+
+    // Save to database
+    const result: StrategyResult = {
+      id: crypto.randomUUID(),
+      session_id: sessionId,
+      original_trajectory: originalTrajectory,
+      refined_trajectory: refinedTrajectory,
+      coaching_points: selectedPoints,
+      created_at: new Date().toISOString(),
+    };
+
+    await supabase.from('strategy_results').insert(result);
+
+    return result;
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <DashboardNav />
+
+      <main className="ml-64 p-8">
+        <div className="max-w-5xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Strategy Analysis</h1>
+            <p className="text-gray-600 mt-1">
+              Analyze your rally patterns and get AI-powered tactical insights
+            </p>
+          </div>
+
+          {/* Error display */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+              <button
+                onClick={() => setError(null)}
+                className="ml-4 text-red-500 hover:text-red-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Step: Select Source */}
+          {step === 'select' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Upload New */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition text-left group"
+              >
+                <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary-200 transition">
+                  <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Video</h3>
+                <p className="text-gray-500">
+                  Upload a new match or rally video for strategy analysis
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </button>
+
+              {/* Choose from History */}
+              <button
+                onClick={() => {
+                  loadHistorySessions();
+                  setShowHistoryDrawer(true);
+                }}
+                className="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition text-left group"
+              >
+                <div className="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-200 transition">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Choose from History</h3>
+                <p className="text-gray-500">
+                  Select a previously analyzed video from your session history
+                </p>
+              </button>
+            </div>
+          )}
+
+          {/* Step: Confirm Video */}
+          {step === 'confirm' && videoUrl && (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              {/* Video preview */}
+              <div className="bg-gray-900 aspect-video relative">
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  className="w-full h-full object-contain"
+                  controls
+                />
+              </div>
+
+              {/* Confirmation prompt */}
+              <div className="p-6 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Is this the correct video?
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      {selectedSource === 'upload' && videoFile
+                        ? videoFile.name
+                        : selectedHistorySession?.filename || 'Selected video'}
+                      {selectedHistorySession && (
+                        <span className="ml-2 text-gray-400">
+                          from {formatDate(selectedHistorySession.created_at)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleConfirmNo}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+                    >
+                      No, go back
+                    </button>
+                    <button
+                      onClick={handleConfirmYes}
+                      className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+                    >
+                      Yes, analyze
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Processing */}
+          {step === 'processing' && (
+            <div className="bg-white rounded-xl p-12 shadow-sm text-center">
+              <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-primary-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Analyzing Your Strategy...
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Tracking shuttle trajectories and generating tactical insights
+              </p>
+              <div className="w-64 mx-auto bg-gray-200 rounded-full h-2 mb-2">
+                <div
+                  className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${processProgress}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-500">{processProgress}% complete</p>
+            </div>
+          )}
+
+          {/* Step: Results */}
+          {step === 'results' && strategyResult && (
+            <div className="space-y-6">
+              {/* Court Animation */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-900">Rally Trajectory Analysis</h3>
+                  <p className="text-sm text-gray-500">Original shots vs. optimal placement</p>
+                </div>
+                <div className="p-6">
+                  <CourtTrajectoryAnimation
+                    originalTrajectory={strategyResult.original_trajectory}
+                    refinedTrajectory={selectedRecommendation?.trajectory2D || strategyResult.refined_trajectory}
+                  />
+                </div>
+              </div>
+
+              {/* Strategy Recommendations */}
+              {recommendations.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-900">Recommended Strategies</h3>
+                    <p className="text-sm text-gray-500">Select a strategy to see the optimal trajectory</p>
+                  </div>
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {recommendations.map((rec) => (
+                      <button
+                        key={rec.id}
+                        onClick={() => setSelectedRecommendation(rec)}
+                        className={`p-4 rounded-lg border-2 text-left transition ${
+                          selectedRecommendation?.id === rec.id
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{rec.name}</h4>
+                          <span className={`text-sm font-bold ${
+                            rec.confidence >= 90 ? 'text-green-600' :
+                            rec.confidence >= 80 ? 'text-yellow-600' : 'text-orange-600'
+                          }`}>
+                            {rec.confidence}%
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">{rec.reason}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Coaching Points */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-900">Key Tactical Insights</h3>
+                  <p className="text-sm text-gray-500">{coachingPoints.length} points to improve your game</p>
+                </div>
+                <div className="p-6">
+                  <ul className="space-y-4">
+                    {coachingPoints.map((point, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">
+                          {index + 1}
+                        </span>
+                        <p className="text-gray-700">{point}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-between">
+                <button
+                  onClick={handleConfirmNo}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+                >
+                  Analyze Another Video
+                </button>
+                <Link
+                  href="/history"
+                  className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+                >
+                  View All Sessions
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* History Drawer */}
+          {showHistoryDrawer && (
+            <div className="fixed inset-0 z-50">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={() => setShowHistoryDrawer(false)}
+              />
+              <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl">
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900">Select from History</h3>
+                  <button
+                    onClick={() => setShowHistoryDrawer(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="overflow-y-auto h-[calc(100vh-72px)]">
+                  {loadingHistory ? (
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4" />
+                      <p className="text-gray-500">Loading sessions...</p>
+                    </div>
+                  ) : historySessions.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-500">No sessions with video found.</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-3">
+                      {historySessions.map((session) => (
+                        <button
+                          key={session.id}
+                          onClick={() => handleHistorySelect(session)}
+                          className="w-full p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition text-left"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-16 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                              {session.video_url ? (
+                                <video
+                                  src={session.video_url}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">
+                                {session.filename || 'Untitled Session'}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {formatDate(session.created_at)}
+                              </p>
+                            </div>
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ============================================
+// Court Trajectory Animation Component
+// Uses PlaybackEngine for proper lifecycle management
+// ============================================
+
+interface CourtTrajectoryAnimationProps {
+  originalTrajectory: TrajectoryPoint[];
+  refinedTrajectory: TrajectoryPoint[];
+}
+
+// Speed options
+const SPEED_OPTIONS: { value: TimeScale; label: string }[] = [
+  { value: 0.25, label: '0.25x' },
+  { value: 0.5, label: '0.5x' },
+  { value: 1, label: '1x' },
+  { value: 2, label: '2x' },
+];
+
+function CourtTrajectoryAnimation({
+  originalTrajectory,
+  refinedTrajectory,
+}: CourtTrajectoryAnimationProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // UI state (for display only)
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [showOriginal, setShowOriginal] = useState(true);
+  const [showRefined, setShowRefined] = useState(true);
+  const [speed, setSpeed] = useState<TimeScale>(1);
+  const [activeView, setActiveView] = useState<ActiveView>('2d');
+  const [progress, setProgress] = useState(0);
+
+  // Playback engine refs - these are the source of truth for animation state
+  const engineRef = useRef<PlaybackEngineRefs>(createPlaybackEngine());
+  const animationRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+
+  // Keep refs for callbacks to avoid stale closures
+  const showOriginalRef = useRef(showOriginal);
+  const showRefinedRef = useRef(showRefined);
+  const originalTrajectoryRef = useRef(originalTrajectory);
+  const refinedTrajectoryRef = useRef(refinedTrajectory);
+
+  // Sync refs with state
+  useEffect(() => {
+    showOriginalRef.current = showOriginal;
+  }, [showOriginal]);
+
+  useEffect(() => {
+    showRefinedRef.current = showRefined;
+  }, [showRefined]);
+
+  useEffect(() => {
+    originalTrajectoryRef.current = originalTrajectory;
+  }, [originalTrajectory]);
+
+  useEffect(() => {
+    refinedTrajectoryRef.current = refinedTrajectory;
+  }, [refinedTrajectory]);
+
+  // Initialize engine on mount
+  useEffect(() => {
+    mountedRef.current = true;
+    const engine = engineRef.current;
+    engine.playingRef.current = true;
+    engine.timeScaleRef.current = 1;
+    engine.tRef.current = 0;
+    engine.activeViewRef.current = '2d';
+
+    return () => {
+      mountedRef.current = false;
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, []);
+
+  // 2D Canvas rendering loop
+  const render2D = useCallback((timestamp: number) => {
+    if (!mountedRef.current) return;
+
+    const engine = engineRef.current;
+    const canvas = canvasRef.current;
+
+    // Only render if 2D view is active
+    if (engine.activeViewRef.current !== '2d' || !canvas) {
+      // Continue loop but skip render
+      animationRef.current = requestAnimationFrame(render2D);
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      animationRef.current = requestAnimationFrame(render2D);
+      return;
+    }
+
+    // Update time using playback engine
+    const t = updatePlaybackTime(engine, timestamp);
+
+    // Update progress state for UI (throttled)
+    setProgress(t);
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Court dimensions (scaled)
+    const courtMargin = 40;
+    const courtWidth = width - courtMargin * 2;
+    const courtHeight = height - courtMargin * 2;
+
+    // Clear
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw court background
+    ctx.fillStyle = '#15803d';
+    ctx.fillRect(courtMargin, courtMargin, courtWidth, courtHeight);
+
+    // Draw court lines
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+
+    // Outer boundary
+    ctx.strokeRect(courtMargin, courtMargin, courtWidth, courtHeight);
+
+    // Center line
+    ctx.beginPath();
+    ctx.moveTo(courtMargin, height / 2);
+    ctx.lineTo(width - courtMargin, height / 2);
+    ctx.stroke();
+
+    // Service lines
+    const serviceLineY1 = courtMargin + courtHeight * 0.22;
+    const serviceLineY2 = courtMargin + courtHeight * 0.78;
+    ctx.beginPath();
+    ctx.moveTo(courtMargin, serviceLineY1);
+    ctx.lineTo(width - courtMargin, serviceLineY1);
+    ctx.moveTo(courtMargin, serviceLineY2);
+    ctx.lineTo(width - courtMargin, serviceLineY2);
+    ctx.stroke();
+
+    // Center service line
+    ctx.beginPath();
+    ctx.moveTo(width / 2, serviceLineY1);
+    ctx.lineTo(width / 2, serviceLineY2);
+    ctx.stroke();
+
+    // Draw trajectory helper
+    const drawTrajectory = (
+      points: TrajectoryPoint[],
+      color: string,
+      progress: number
+    ) => {
+      const visiblePoints = Math.floor(points.length * progress);
+
+      // Draw lines
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+
+      for (let i = 0; i < visiblePoints; i++) {
+        const p = points[i];
+        const x = courtMargin + p.x * courtWidth;
+        const y = courtMargin + p.y * courtHeight;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw points
+      for (let i = 0; i < visiblePoints; i++) {
+        const p = points[i];
+        const x = courtMargin + p.x * courtWidth;
+        const y = courtMargin + p.y * courtHeight;
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
+    // Draw trajectories using refs
+    if (showOriginalRef.current && originalTrajectoryRef.current.length > 0) {
+      drawTrajectory(originalTrajectoryRef.current, '#ef4444', t);
+    }
+
+    if (showRefinedRef.current && refinedTrajectoryRef.current.length > 0) {
+      drawTrajectory(refinedTrajectoryRef.current, '#22c55e', t);
+    }
+
+    // Continue animation loop
+    animationRef.current = requestAnimationFrame(render2D);
+  }, []);
+
+  // Start/stop animation loop based on active view
+  useEffect(() => {
+    const engine = engineRef.current;
+    engine.activeViewRef.current = activeView;
+    engine.lastTimestampRef.current = 0; // Reset timestamp to avoid big delta
+
+    // Always run the 2D loop for state management, it will skip rendering if 3D is active
+    if (activeView === '2d' && !animationRef.current) {
+      animationRef.current = requestAnimationFrame(render2D);
+    }
+
+    return () => {
+      // Don't cancel on view switch, let it continue
+    };
+  }, [activeView, render2D]);
+
+  // Start initial animation
+  useEffect(() => {
+    if (!animationRef.current) {
+      animationRef.current = requestAnimationFrame(render2D);
+    }
+  }, [render2D]);
+
+  // Handle play/pause toggle - update both state and ref
+  const handlePlayPause = useCallback(() => {
+    const engine = engineRef.current;
+    const newPlaying = PlaybackEngine.toggle(engine);
+    setIsPlaying(newPlaying);
+    // Reset timestamp to avoid big jumps when resuming
+    engine.lastTimestampRef.current = 0;
+  }, []);
+
+  // Handle speed change - update both state and ref
+  const handleSpeedChange = useCallback((newSpeed: TimeScale) => {
+    const engine = engineRef.current;
+    PlaybackEngine.setSpeed(engine, newSpeed);
+    setSpeed(newSpeed);
+  }, []);
+
+  // Handle view change
+  const handleViewChange = useCallback((view: ActiveView) => {
+    const engine = engineRef.current;
+    PlaybackEngine.setActiveView(engine, view);
+    setActiveView(view);
+  }, []);
+
+  // Step controls
+  const stepForward = useCallback(() => {
+    const engine = engineRef.current;
+    PlaybackEngine.step(engine, 0.05);
+    setProgress(engine.tRef.current);
+  }, []);
+
+  const stepBackward = useCallback(() => {
+    const engine = engineRef.current;
+    PlaybackEngine.step(engine, -0.05);
+    setProgress(engine.tRef.current);
+  }, []);
+
+  const resetAnimation = useCallback(() => {
+    const engine = engineRef.current;
+    PlaybackEngine.reset(engine);
+    setProgress(0);
+  }, []);
+
+  return (
+    <div>
+      {/* 2D/3D Toggle */}
+      <div className="flex justify-center mb-4">
+        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+          <button
+            onClick={() => handleViewChange('2d')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeView === '2d' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            2D View
+          </button>
+          <button
+            onClick={() => handleViewChange('3d')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeView === '3d' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            3D View
+          </button>
+        </div>
+      </div>
+
+      {/* Conditional 2D/3D rendering - keep both mounted but hide inactive */}
+      <div className={activeView === '2d' ? 'block' : 'hidden'}>
+        <canvas
+          ref={canvasRef}
+          width={500}
+          height={700}
+          className="w-full max-w-md mx-auto rounded-lg"
+        />
+      </div>
+
+      {activeView === '3d' && (
+        <Suspense fallback={
+          <div className="w-full h-[500px] bg-gray-900 rounded-lg flex items-center justify-center">
+            <div className="text-white">Loading 3D view...</div>
+          </div>
+        }>
+          <CourtTrajectory3D
+            originalTrajectory={originalTrajectory}
+            refinedTrajectory={refinedTrajectory}
+            showOriginal={showOriginal}
+            showRefined={showRefined}
+            animationProgress={progress}
+            isPlaying={isPlaying}
+            timeScale={speed}
+          />
+        </Suspense>
+      )}
+
+      {/* Enhanced Controls */}
+      <div className="mt-4 space-y-3">
+        {/* Play/Pause and Step Controls */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            onClick={stepBackward}
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            title="Step backward"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handlePlayPause}
+            className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg font-medium text-sm flex items-center gap-2"
+          >
+            {isPlaying ? (
+              <>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                </svg>
+                Pause
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Play
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={stepForward}
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            title="Step forward"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 18l8.5-6L6 6v12zm2 0V6l6.5 6L8 18zm8-12h2v12h-2V6z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={resetAnimation}
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            title="Reset"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Speed Control */}
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-sm text-gray-500">Speed:</span>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+            {SPEED_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleSpeedChange(option.value)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+                  speed === option.value
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="flex items-center gap-2 px-4">
+          <span className="text-xs text-gray-500">{Math.round(progress * 100)}%</span>
+          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-500 transition-all duration-100"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Trajectory toggles */}
+        <div className="flex items-center justify-center gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showOriginal}
+              onChange={(e) => setShowOriginal(e.target.checked)}
+              className="rounded"
+            />
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-red-500 rounded-full" />
+              Original
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showRefined}
+              onChange={(e) => setShowRefined(e.target.checked)}
+              className="rounded"
+            />
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-green-500 rounded-full" />
+              Optimal
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <p className="text-sm text-gray-600">
+          <span className="text-red-500 font-medium">Red trajectory:</span> Your actual shot placements during the rally.
+          <br />
+          <span className="text-green-500 font-medium">Green trajectory:</span> AI-suggested optimal placements for better court coverage.
+          {activeView === '3d' && (
+            <>
+              <br />
+              <span className="text-gray-500 text-xs mt-2 block">
+                Tip: Drag to rotate, scroll to zoom, right-click to pan in 3D view.
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Loading Component
+// ============================================
+
+function StrategyLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <DashboardNav />
+      <main className="ml-64 p-8">
+        <div className="max-w-5xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-48 mb-4" />
+            <div className="h-4 bg-gray-200 rounded w-96 mb-8" />
+            <div className="grid grid-cols-2 gap-6">
+              <div className="h-48 bg-gray-200 rounded-xl" />
+              <div className="h-48 bg-gray-200 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ============================================
+// Export
+// ============================================
+
+export default function StrategyPage() {
+  return (
+    <Suspense fallback={<StrategyLoading />}>
+      <StrategyContent />
+    </Suspense>
+  );
+}

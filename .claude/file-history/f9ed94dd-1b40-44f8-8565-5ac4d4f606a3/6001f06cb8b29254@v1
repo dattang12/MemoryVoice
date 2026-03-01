@@ -1,0 +1,503 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import DashboardNav from '@/components/DashboardNav';
+import { supabase } from '@/lib/supabase';
+import type { RacketRecommendation } from '@/lib/types';
+
+// Track which images have failed to avoid repeated errors
+const failedImages = new Set<string>();
+
+const SKILL_LEVELS = [
+  { value: 'beginner', label: 'Beginner', description: 'New to badminton' },
+  { value: 'intermediate', label: 'Intermediate', description: '1-3 years experience' },
+  { value: 'advanced', label: 'Advanced', description: '3+ years, competitive play' },
+];
+
+const PLAY_STYLES = [
+  { value: 'power', label: 'Power', description: 'Strong smashes and clears' },
+  { value: 'control', label: 'Control', description: 'Precise placement and drops' },
+  { value: 'all-round', label: 'All-Round', description: 'Balanced gameplay' },
+];
+
+const WEAKNESSES = [
+  { value: 'smash_power', label: 'Smash Power' },
+  { value: 'defense', label: 'Defense' },
+  { value: 'footwork', label: 'Footwork' },
+  { value: 'net_play', label: 'Net Play' },
+  { value: 'endurance', label: 'Endurance' },
+  { value: 'consistency', label: 'Consistency' },
+];
+
+export default function RacketPage() {
+  const [level, setLevel] = useState<string>('intermediate');
+  const [style, setStyle] = useState<string>('all-round');
+  const [weaknesses, setWeaknesses] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState<RacketRecommendation[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  const loadFavorites = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('racket_favorites')
+        .select('racket_id')
+        .eq('user_id', user.id);
+
+      // Gracefully handle if table doesn't exist
+      if (error) {
+        console.log('Favorites not available:', error.message);
+        return;
+      }
+
+      if (data) {
+        setFavorites(new Set(data.map((f) => f.racket_id)));
+      }
+    } catch (err) {
+      // Table may not exist - just use local state
+      console.log('Using local favorites only');
+    }
+  };
+
+  const toggleWeakness = (weakness: string) => {
+    setWeaknesses((prev) =>
+      prev.includes(weakness)
+        ? prev.filter((w) => w !== weakness)
+        : [...prev, weakness]
+    );
+  };
+
+  const getRecommendations = async () => {
+    if (weaknesses.length === 0) {
+      setError('Please select at least one weakness to improve');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/racket/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level,
+          weaknesses,
+          style_pref: style,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get recommendations');
+      }
+
+      const data = await response.json();
+      setRecommendations(data.recommendations);
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Failed to get recommendations. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleFavorite = async (racketId: string) => {
+    // Always toggle locally first for immediate UI feedback
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(racketId)) {
+        next.delete(racketId);
+      } else {
+        next.add(racketId);
+      }
+      return next;
+    });
+
+    // Try to persist to database if user is logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      if (favorites.has(racketId)) {
+        // Remove from favorites
+        await supabase
+          .from('racket_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('racket_id', racketId);
+      } else {
+        // Add to favorites
+        await supabase.from('racket_favorites').insert({
+          user_id: user.id,
+          racket_id: racketId,
+        });
+      }
+    } catch (err) {
+      // Table may not exist - favorites are still stored locally
+      console.log('Favorites stored locally only');
+    }
+  };
+
+  const openEbaySearch = (query: string) => {
+    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <DashboardNav />
+
+      <main className="ml-64 p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Racket Finder</h1>
+            <p className="text-gray-600 mt-1">
+              Get personalized racket recommendations based on your playing profile
+            </p>
+          </div>
+
+          {/* Selection Form */}
+          <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Skill Level */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Skill Level</h3>
+                <div className="space-y-2">
+                  {SKILL_LEVELS.map((lvl) => (
+                    <button
+                      key={lvl.value}
+                      onClick={() => setLevel(lvl.value)}
+                      className={`w-full text-left p-3 rounded-lg border transition ${
+                        level === lvl.value
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-medium text-gray-900">{lvl.label}</p>
+                      <p className="text-sm text-gray-500">{lvl.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Play Style */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Play Style</h3>
+                <div className="space-y-2">
+                  {PLAY_STYLES.map((s) => (
+                    <button
+                      key={s.value}
+                      onClick={() => setStyle(s.value)}
+                      className={`w-full text-left p-3 rounded-lg border transition ${
+                        style === s.value
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-medium text-gray-900">{s.label}</p>
+                      <p className="text-sm text-gray-500">{s.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Weaknesses */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">
+                  Areas to Improve
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {WEAKNESSES.map((w) => (
+                    <button
+                      key={w.value}
+                      onClick={() => toggleWeakness(w.value)}
+                      className={`px-3 py-2 rounded-lg border text-sm transition ${
+                        weaknesses.includes(w.value)
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Select at least one area
+                </p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={getRecommendations}
+                disabled={loading}
+                className="px-8 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center space-x-2">
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span>Finding Rackets...</span>
+                  </span>
+                ) : (
+                  'Get Recommendations'
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Recommendations Grid */}
+          {recommendations.length > 0 && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Top 5 Recommended Rackets
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recommendations.map((racket, index) => (
+                  <RacketCard
+                    key={racket.id}
+                    racket={racket}
+                    index={index}
+                    isFavorite={favorites.has(racket.id)}
+                    onToggleFavorite={() => toggleFavorite(racket.id)}
+                    onOpenEbay={() => openEbaySearch(racket.ebay_search_query)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {recommendations.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">🏸</span>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Find Your Perfect Racket
+              </h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                Select your skill level, playing style, and areas you want to
+                improve, then click &quot;Get Recommendations&quot; to see personalized
+                racket suggestions.
+              </p>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// Racket Card Component with image handling
+function RacketCard({
+  racket,
+  index,
+  isFavorite,
+  onToggleFavorite,
+  onOpenEbay,
+}: {
+  racket: RacketRecommendation;
+  index: number;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onOpenEbay: () => void;
+}) {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  // Check if this image has already failed
+  const hasFailedBefore = racket.image_url && failedImages.has(racket.image_url);
+  const showImage = racket.image_url && !imageError && !hasFailedBefore;
+
+  const handleImageError = useCallback(() => {
+    if (racket.image_url) {
+      // Log the failing URL once
+      if (!failedImages.has(racket.image_url)) {
+        console.warn('Racket image failed to load:', racket.image_url);
+        failedImages.add(racket.image_url);
+      }
+    }
+    setImageError(true);
+    setImageLoading(false);
+  }, [racket.image_url]);
+
+  const handleImageLoad = useCallback(() => {
+    setImageLoading(false);
+  }, []);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition">
+      {/* Rank Badge */}
+      <div className="relative">
+        <div className="bg-gray-100 h-48 flex items-center justify-center overflow-hidden">
+          {showImage ? (
+            <>
+              {imageLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+                </div>
+              )}
+              <Image
+                src={racket.image_url!}
+                alt={`${racket.brand} ${racket.name}`}
+                width={192}
+                height={192}
+                className={`object-contain max-h-44 transition-opacity ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                unoptimized // Use unoptimized for external eBay images
+              />
+            </>
+          ) : (
+            <span className="text-6xl">🏸</span>
+          )}
+        </div>
+        <div className="absolute top-3 left-3 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+          <span className="text-white font-bold text-sm">
+            #{index + 1}
+          </span>
+        </div>
+        <button
+          onClick={onToggleFavorite}
+          className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition"
+        >
+          <svg
+            className={`w-5 h-5 ${
+              isFavorite
+                ? 'text-red-500 fill-current'
+                : 'text-gray-400'
+            }`}
+            fill={isFavorite ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h3 className="font-semibold text-gray-900">
+              {racket.name}
+            </h3>
+            <p className="text-sm text-gray-500">{racket.brand}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-primary-600">
+              {racket.match_score}%
+            </p>
+            <p className="text-xs text-gray-500">match</p>
+          </div>
+        </div>
+
+        {/* Match Reason */}
+        <p className="text-sm text-gray-600 mb-3">
+          {racket.match_reason}
+        </p>
+
+        {/* Specs */}
+        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+          <div className="bg-gray-50 rounded p-2">
+            <p className="text-gray-500">Weight</p>
+            <p className="font-medium text-gray-900">
+              {racket.weight}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded p-2">
+            <p className="text-gray-500">Balance</p>
+            <p className="font-medium text-gray-900">
+              {racket.balance}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded p-2">
+            <p className="text-gray-500">Flex</p>
+            <p className="font-medium text-gray-900">
+              {racket.flexibility}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded p-2">
+            <p className="text-gray-500">Price</p>
+            <p className="font-medium text-gray-900">
+              {racket.price_range}
+            </p>
+          </div>
+        </div>
+
+        {/* Style Tags */}
+        <div className="flex flex-wrap gap-1 mb-4">
+          {racket.play_style.map((style) => (
+            <span
+              key={style}
+              className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs"
+            >
+              {style}
+            </span>
+          ))}
+        </div>
+
+        {/* Action Button */}
+        <button
+          onClick={onOpenEbay}
+          className="w-full py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition flex items-center justify-center space-x-2"
+        >
+          <span>View on eBay</span>
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}

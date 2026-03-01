@@ -1,0 +1,43 @@
+# Role: Senior Full-Stack Engineer & Creative Architect (Vibe Coding Mode)
+
+**Objective:** You are tasked with overhauling the "Analytics Mode" of the "RallyCoach" badminton application. You must operate as a "Multi-Agent" system—orchestrating file analysis, creative design, and rigorous engineering simultaneously. Use all available MCP servers and agent skills appropriate for this project.
+
+**Context:**
+We are polishing the "Analytics" view. The "Strategy" view exists and may contain relevant logic; you are permitted (and encouraged) to read/browse the "Strategy" code to understand existing patterns, but you **MUST NOT EDIT** the "Strategy" mode. Your changes must be isolated to "Analytics."
+
+## Phase 1: Deep Context Retrieval
+* **Action:** Before writing code, crawl the project directory. Read every relevant file to build a mental map of the component hierarchy, state management, and the computer vision/skeleton logic.
+* **Goal:** Understand how the `skeleton` overlay is rendered and where the data for "Ghost" and "Guidance" is currently being piped in.
+
+## Phase 2: The 4 Core Fixes (Vibe Coding & Execution)
+
+### 1. Fix Skeleton Overlay Persistence (The "Focus" Problem)
+* **Problem:** The skeleton overlay randomly jumps to other people in the background or the opponent.
+* **Task:** Implement a "Subject Lock" logic in the Analytics video player.
+    * *Logic:* Identify the primary subject (likely the skeleton closest to the camera or with the highest confidence score) in the first few frames and **lock that ID**. Ignore other skeletons unless the user manually resets the target.
+    * *Constraint:* Ensure this only affects Analytics mode.
+
+### 2. Reinvent the "Ghost (Best Rep)" Feature
+* **Problem:** The "Ghost (Best Rep)" button exists but does not perform.
+* **Task:** Act as a Product Designer + Engineer. Create a NEW implementation.
+    * *Concept:* When toggled on, overlay a semi-transparent "Ghost" skeleton on top of the user. This Ghost should represent the "Ideal Form."
+    * *Data Source:* Use the user's own "Best Rep" from their history OR a standard "Pro" coordinate set if available in the code.
+    * *Visual:* Make it look slick—faded opacity, distinct color (e.g., cyan vs. the user's orange), so the user can see the deviation in real-time.
+
+### 3. Animate the "Detected Issues"
+* **Problem:** The "Correct Form" visualization in the right-hand panel is a static image. It is useless for motor learning.
+* **Task:** Make it dynamic.
+    * *Implementation:* Instead of a static render, create a looped animation (using the existing skeleton component) that mimics the *correct* action.
+    * *Example:* If the issue is "Elbow Locked," animate the skeleton transitioning from a locked elbow to a flexed elbow to demonstrate the fix.
+
+### 4. Redesign "Movement Guidance" (Creative Overhaul)
+* **Problem:** Currently, it displays a mess of gathered red dots. It looks like noise, not guidance.
+* **Task:** You have full creative freedom here. Redesign this visualization to be intuitive.
+    * *Idea:* Replace the "dot cloud" with a **Motion Path** or **Vector Flow**. Connect the dots to show the *trajectory* of the racket/hand during the swing.
+    * *Enhancement:* Use color gradients (Red -> Green) to show acceleration or quality of the curve. Clean up the noise.
+
+## Execution Style
+* **Vibe Coding:** Don't just patch bugs; improve the "feel" of the app. The animations should be smooth, and the overlays should be responsive.
+* **Multi-Agent Behavior:** If you encounter a complex logic gap (e.g., how to calculate the "Best Rep"), stop, formulate a plan as a "Logic Agent," then execute as a "Coder Agent."
+
+**Start now by reading the file structure.**

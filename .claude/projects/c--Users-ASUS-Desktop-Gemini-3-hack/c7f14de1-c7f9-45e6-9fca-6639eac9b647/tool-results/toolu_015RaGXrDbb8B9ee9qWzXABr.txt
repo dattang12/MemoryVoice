@@ -1,0 +1,690 @@
+     1→import os
+     2→import shutil
+     3→from typing import Optional, List
+     4→from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Query
+     5→from fastapi.middleware.cors import CORSMiddleware
+     6→from fastapi.responses import JSONResponse, FileResponse
+     7→from pydantic import BaseModel
+     8→from dotenv import load_dotenv
+     9→from supabase import create_client
+    10→
+    11→# Import analysis modules
+    12→from analysis import analyze_video
+    13→from pose_estimation import extract_pose_from_video
+    14→from video_annotator import create_annotated_video_with_analysis
+    15→
+    16→load_dotenv()
+    17→
+    18→app = FastAPI(title="Badminton Analyzer & Coach API")
+    19→
+    20→# ============================================
+    21→# Pydantic Models for Request/Response
+    22→# ============================================
+    23→
+    24→class PracticeSessionData(BaseModel):
+    25→    user_id: str
+    26→    drill_type: str
+    27→    total_frames: int
+    28→    green_frames: int
+    29→    red_frames: int
+    30→    duration_seconds: float
+    31→    avg_elbow_angle: Optional[float] = None
+    32→    avg_stance_width: Optional[float] = None
+    33→    peak_form_score: Optional[float] = 0
+    34→    issues: Optional[List[dict]] = []
+    35→
+    36→class IssueData(BaseModel):
+    37→    code: str
+    38→    title: str
+    39→    severity: str = "medium"
+    40→    description: Optional[str] = None
+    41→    drill: Optional[dict] = {}
+    42→    timestamps: Optional[List[float]] = []
+    43→    occurrence_count: Optional[int] = 1
+    44→
+    45→# CORS - Allow frontend to connect
+    46→app.add_middleware(
+    47→    CORSMiddleware,
+    48→    allow_origins=["*"],  # Allow all origins for development
+    49→    allow_credentials=True,
+    50→    allow_methods=["*"],
+    51→    allow_headers=["*"],
+    52→)
+    53→
+    54→# Supabase Setup
+    55→SUPABASE_URL = os.getenv("SUPABASE_URL")
+    56→SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+    57→SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+    58→
+    59→# Create Supabase client with SERVICE_ROLE key for backend operations
+    60→# This bypasses RLS and allows database writes without authentication
+    61→supabase = None
+    62→if SUPABASE_URL and SUPABASE_URL != "https://your-project.supabase.co":
+    63→    if SUPABASE_SERVICE_KEY and SUPABASE_SERVICE_KEY != "your-service-role-key":
+    64→        try:
+    65→            supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    66→            print("[OK] Supabase initialized with SERVICE_ROLE key (RLS bypass enabled)")
+    67→        except Exception as e:
+    68→            print(f"[ERROR] Supabase initialization failed: {e}")
+    69→    else:
+    70→        print("[ERROR] SUPABASE_SERVICE_KEY not configured - database writes will fail")
+    71→
+    72→@app.get("/")
+    73→def root():
+    74→    return {"status": "Badminton Coach API Active", "version": "1.0"}
+    75→
+    76→@app.get("/health")
+    77→def health():
+    78→    return {
+    79→        "status": "healthy",
+    80→        "supabase_connected": supabase is not None,
+    81→        "gemini_api_key": os.getenv("GEMINI_API_KEY") != "your-gemini-api-key-here"
+    82→    }
+    83→
+    84→@app.get("/temp/{filename}")
+    85→async def serve_temp_video(filename: str):
+    86→    """Serve annotated videos from temp directory for local playback"""
+    87→    file_path = f"temp/{filename}"
+    88→    if os.path.exists(file_path):
+    89→        return FileResponse(
+    90→            file_path,
+    91→            media_type="video/mp4",
+    92→            headers={
+    93→                "Accept-Ranges": "bytes",
+    94→                "Cache-Control": "no-cache"
+    95→            }
+    96→        )
+    97→    raise HTTPException(status_code=404, detail="Video not found")
+    98→
+    99→@app.post("/api/analyze")
+   100→async def analyze_badminton_video(
+   101→    file: UploadFile = File(...),
+   102→    user_id: str = Form("guest"),
+   103→    language: str = Form("en")
+   104→):
+   105→    """
+   106→    Analyze uploaded badminton video.
+   107→    Returns: pose data, shot detection, Gemini feedback, and annotated video URL.
+   108→    Saves to both legacy analysis_results and new sessions/issues tables.
+   109→    """
+   110→
+   111→    # Setup temp directory
+   112→    os.makedirs("temp", exist_ok=True)
+   113→    temp_input_path = f"temp/input_{file.filename}"
+   114→    temp_annotated_path = f"temp/annotated_{file.filename}"
+   115→    session_id = None
+   116→
+   117→    try:
+   118→        # 1. Save uploaded video
+   119→        with open(temp_input_path, "wb") as buffer:
+   120→            shutil.copyfileobj(file.file, buffer)
+   121→
+   122→        print(f"Video saved: {temp_input_path}")
+   123→
+   124→        # 2. Run analysis (pose detection + shot analysis + Gemini feedback)
+   125→        analysis_result = analyze_video(temp_input_path, language)
+   126→
+   127→        print(f"Analysis complete: {len(analysis_result.get('shots', []))} shots detected")
+   128→
+   129→        # 3. Extract pose data for annotation
+   130→        pose_data, frames = extract_pose_from_video(temp_input_path)
+   131→
+   132→        # 4. Create annotated video with skeleton overlay
+   133→        create_annotated_video_with_analysis(
+   134→            temp_input_path,
+   135→            temp_annotated_path,
+   136→            pose_data,
+   137→            analysis_result.get('shots', [])
+   138→        )
+   139→
+   140→        print(f"Annotated video created: {temp_annotated_path}")
+   141→
+   142→        # 5. Upload annotated video to Supabase Storage (if configured)
+   143→        annotated_video_url = ""
+   144→        if supabase:
+   145→            try:
+   146→                storage_path = f"{user_id}/annotated/{os.path.basename(temp_annotated_path)}"
+   147→
+   148→                with open(temp_annotated_path, 'rb') as video_file:
+   149→                    video_bytes = video_file.read()
+   150→
+   151→                # Upload to Supabase Storage
+   152→                result = supabase.storage.from_("videos").upload(
+   153→                    storage_path,
+   154→                    video_bytes,
+   155→                    file_options={"content-type": "video/mp4", "upsert": "true"}
+   156→                )
+   157→
+   158→                # Get public URL
+   159→                annotated_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+   160→
+   161→                print(f"Video uploaded to Supabase: {annotated_video_url}")
+   162→
+   163→                # 6. Calculate overall score based on pose errors
+   164→                shots = analysis_result.get('shots', [])
+   165→                total_errors = sum(len(shot.get('pose_errors', [])) for shot in shots)
+   166→                overall_score = max(0, 100 - (total_errors * 10))  # Deduct 10 points per error
+   167→
+   168→                # 7. Convert pose_data to frontend-compatible format (landmarks array)
+   169→                pose_landmarks_array = convert_pose_to_landmarks(pose_data)
+   170→
+   171→                # 8. Extract issues from shots for the issues table
+   172→                detected_issues = extract_issues_from_shots(shots)
+   173→
+   174→                # 9. Save to NEW sessions table
+   175→                try:
+   176→                    session_payload = {
+   177→                        "user_id": user_id if user_id != "guest" else None,
+   178→                        "type": "analytics",
+   179→                        "video_path": storage_path,
+   180→                        "video_url": annotated_video_url,
+   181→                        "filename": file.filename,
+   182→                        "overall_score": overall_score,
+   183→                        "frame_count": len(pose_data),
+   184→                        "pose_data": pose_landmarks_array,  # Full pose data for overlay
+   185→                        "summary": {
+   186→                            "shot_count": len(shots),
+   187→                            "error_count": total_errors,
+   188→                            "feedback": analysis_result.get('gemini_feedback', {}),
+   189→                            "language": language
+   190→                        }
+   191→                    }
+   192→
+   193→                    session_response = supabase.table("sessions").insert(session_payload).execute()
+   194→                    if session_response.data:
+   195→                        session_id = session_response.data[0]['id']
+   196→                        print(f"[OK] Session saved: {session_id}")
+   197→
+   198→                        # 10. Save issues to issues table
+   199→                        for issue in detected_issues:
+   200→                            issue_payload = {
+   201→                                "session_id": session_id,
+   202→                                "code": issue['code'],
+   203→                                "title": issue['title'],
+   204→                                "severity": issue.get('severity', 'medium'),
+   205→                                "description": issue.get('description', ''),
+   206→                                "timestamps": issue.get('timestamps', []),
+   207→                                "occurrence_count": issue.get('occurrence_count', 1),
+   208→                                "drill": issue.get('drill', {})
+   209→                            }
+   210→                            supabase.table("issues").insert(issue_payload).execute()
+   211→
+   212→                        print(f"[OK] {len(detected_issues)} issues saved")
+   213→
+   214→                except Exception as session_error:
+   215→                    print(f"[WARN] Session table insert failed (table may not exist): {session_error}")
+   216→                    # Continue with legacy table
+   217→
+   218→                # 11. Save to LEGACY analysis_results table (backward compatibility)
+   219→                try:
+   220→                    db_payload = {
+   221→                        "result_json": {
+   222→                            "user_id": user_id,
+   223→                            "video_url": annotated_video_url,
+   224→                            "shot_count": len(shots),
+   225→                            "shots": shots,
+   226→                            "feedback": analysis_result.get('gemini_feedback', {}),
+   227→                            "language": language,
+   228→                            "session_id": session_id  # Link to new session
+   229→                        }
+   230→                    }
+   231→
+   232→                    db_response = supabase.table("analysis_results").insert(db_payload).execute()
+   233→                    print(f"[OK] Legacy database insert: Record ID = {db_response.data[0]['id'] if db_response.data else 'N/A'}")
+   234→
+   235→                except Exception as db_error:
+   236→                    print(f"[ERROR] Legacy database insert failed: {db_error}")
+   237→
+   238→            except Exception as e:
+   239→                print(f"Supabase upload error: {e}")
+   240→                annotated_video_url = f"http://localhost:8000/temp/{os.path.basename(temp_annotated_path)}"
+   241→        else:
+   242→            print("Supabase not configured - video saved locally only")
+   243→            annotated_video_url = f"http://localhost:8000/temp/{os.path.basename(temp_annotated_path)}"
+   244→
+   245→        # 12. Prepare response with full pose data for frontend overlay
+   246→        response = {
+   247→            "session_id": session_id,
+   248→            "shots": analysis_result.get('shots', []),
+   249→            "gemini_feedback": analysis_result.get('gemini_feedback', ''),
+   250→            "annotated_video_url": annotated_video_url,
+   251→            "pose_data": convert_pose_to_landmarks(pose_data),  # Full landmarks for overlay
+   252→            "total_shots": len(analysis_result.get('shots', [])),
+   253→            "overall_score": overall_score if supabase else 0,
+   254→            "issues": detected_issues if supabase else []
+   255→        }
+   256→
+   257→        print(f"[OK] Sending response with video URL: {annotated_video_url}")
+   258→        print(f"[OK] Session ID: {session_id}")
+   259→        print(f"[OK] Pose frames: {len(pose_data)}")
+   260→
+   261→        return JSONResponse(content=response)
+   262→
+   263→    except Exception as e:
+   264→        print(f"Error during analysis: {e}")
+   265→        import traceback
+   266→        traceback.print_exc()
+   267→        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+   268→
+   269→    finally:
+   270→        # Cleanup temp input file (keep annotated for serving)
+   271→        try:
+   272→            if os.path.exists(temp_input_path):
+   273→                os.remove(temp_input_path)
+   274→        except Exception as e:
+   275→            print(f"Cleanup error: {e}")
+   276→
+   277→
+   278→# ============================================
+   279→# Helper Functions
+   280→# ============================================
+   281→
+   282→def convert_pose_to_landmarks(pose_data):
+   283→    """
+   284→    Convert backend pose_data format to frontend-compatible landmarks array.
+   285→    Each frame becomes an array of {x, y, z, visibility} for each landmark.
+   286→    """
+   287→    landmarks_array = []
+   288→
+   289→    # MediaPipe landmark mapping
+   290→    landmark_names = [
+   291→        'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer',
+   292→        'right_eye_inner', 'right_eye', 'right_eye_outer',
+   293→        'left_ear', 'right_ear', 'mouth_left', 'mouth_right',
+   294→        'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+   295→        'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky',
+   296→        'left_index', 'right_index', 'left_thumb', 'right_thumb',
+   297→        'left_hip', 'right_hip', 'left_knee', 'right_knee',
+   298→        'left_ankle', 'right_ankle', 'left_heel', 'right_heel',
+   299→        'left_foot_index', 'right_foot_index'
+   300→    ]
+   301→
+   302→    for frame_pose in pose_data:
+   303→        if frame_pose is None:
+   304→            landmarks_array.append(None)
+   305→            continue
+   306→
+   307→        frame_landmarks = []
+   308→        for name in landmark_names:
+   309→            if name in frame_pose:
+   310→                coords = frame_pose[name]
+   311→                # Normalize coordinates (assuming video width/height ~640x480)
+   312→                frame_landmarks.append({
+   313→                    'x': coords[0] / 640 if coords[0] else 0,
+   314→                    'y': coords[1] / 480 if coords[1] else 0,
+   315→                    'z': 0,
+   316→                    'visibility': 1.0
+   317→                })
+   318→            else:
+   319→                frame_landmarks.append({'x': 0, 'y': 0, 'z': 0, 'visibility': 0})
+   320→
+   321→        landmarks_array.append(frame_landmarks)
+   322→
+   323→    return landmarks_array
+   324→
+   325→
+   326→def extract_issues_from_shots(shots):
+   327→    """
+   328→    Extract and aggregate issues from shot analysis results.
+   329→    Groups similar errors and records timestamps.
+   330→    """
+   331→    issues_map = {}
+   332→
+   333→    # Issue code mapping
+   334→    error_to_code = {
+   335→        'elbow not fully extended': 'ELBOW_ANGLE_OVERHEAD',
+   336→        'arm not raised': 'ARM_NOT_RAISED',
+   337→        'knees not bent': 'KNEE_BEND',
+   338→    }
+   339→
+   340→    for shot in shots:
+   341→        frame = shot.get('frame', 0)
+   342→        # Estimate timestamp (assuming 30fps)
+   343→        timestamp = frame / 30.0
+   344→
+   345→        for error in shot.get('pose_errors', []):
+   346→            error_lower = error.lower()
+   347→
+   348→            # Find matching code
+   349→            code = 'FORM_ERROR'
+   350→            for key, val in error_to_code.items():
+   351→                if key in error_lower:
+   352→                    code = val
+   353→                    break
+   354→
+   355→            if code not in issues_map:
+   356→                issues_map[code] = {
+   357→                    'code': code,
+   358→                    'title': get_issue_title(code),
+   359→                    'severity': get_issue_severity(code),
+   360→                    'description': error,
+   361→                    'timestamps': [],
+   362→                    'occurrence_count': 0,
+   363→                    'drill': get_drill_for_issue(code)
+   364→                }
+   365→
+   366→            issues_map[code]['timestamps'].append(round(timestamp, 2))
+   367→            issues_map[code]['occurrence_count'] += 1
+   368→
+   369→    return list(issues_map.values())
+   370→
+   371→
+   372→def get_issue_title(code):
+   373→    """Get human-readable title for issue code."""
+   374→    titles = {
+   375→        'ELBOW_ANGLE_OVERHEAD': 'Elbow Extension (Overhead)',
+   376→        'ARM_NOT_RAISED': 'Arm Not Raised High Enough',
+   377→        'KNEE_BEND': 'Knee Bend (Lunge)',
+   378→        'STANCE_WIDTH': 'Stance Width',
+   379→        'FORM_ERROR': 'Form Issue'
+   380→    }
+   381→    return titles.get(code, code.replace('_', ' ').title())
+   382→
+   383→
+   384→def get_issue_severity(code):
+   385→    """Get severity level for issue code."""
+   386→    high_severity = ['ELBOW_ANGLE_OVERHEAD', 'KNEE_BEND']
+   387→    medium_severity = ['ARM_NOT_RAISED', 'STANCE_WIDTH']
+   388→
+   389→    if code in high_severity:
+   390→        return 'high'
+   391→    elif code in medium_severity:
+   392→        return 'medium'
+   393→    return 'low'
+   394→
+   395→
+   396→def get_drill_for_issue(code):
+   397→    """Get recommended drill for issue code."""
+   398→    drills = {
+   399→        'ELBOW_ANGLE_OVERHEAD': {
+   400→            'id': 'elbow-extension',
+   401→            'name': 'Elbow Extension Drill',
+   402→            'steps': [
+   403→                'Stand with racket arm extended overhead',
+   404→                'Practice full extension motion slowly',
+   405→                'Focus on locking elbow at contact point'
+   406→            ],
+   407→            'tips': ['Keep wrist relaxed', 'Use mirror for feedback'],
+   408→            'duration_minutes': 5
+   409→        },
+   410→        'KNEE_BEND': {
+   411→            'id': 'lunge-practice',
+   412→            'name': 'Lunge Practice Drill',
+   413→            'steps': [
+   414→                'Start in ready stance',
+   415→                'Step forward with lead leg',
+   416→                'Bend knee to 90 degrees, push back'
+   417→            ],
+   418→            'tips': ['Keep back straight', 'Push through heel'],
+   419→            'duration_minutes': 10
+   420→        },
+   421→        'ARM_NOT_RAISED': {
+   422→            'id': 'overhead-preparation',
+   423→            'name': 'Overhead Preparation Drill',
+   424→            'steps': [
+   425→                'Practice racket preparation motion',
+   426→                'Raise arm with elbow high',
+   427→                'Focus on early preparation'
+   428→            ],
+   429→            'tips': ['Watch the shuttle early', 'Turn sideways'],
+   430→            'duration_minutes': 5
+   431→        }
+   432→    }
+   433→    return drills.get(code, {'id': 'general', 'name': 'General Form Drill', 'steps': [], 'tips': []})
+   434→
+   435→
+   436→# ============================================
+   437→# Session Management Endpoints
+   438→# ============================================
+   439→
+   440→@app.get("/api/sessions")
+   441→async def list_sessions(
+   442→    user_id: str = Query(..., description="User ID to fetch sessions for"),
+   443→    session_type: Optional[str] = Query(None, description="Filter by type: analytics or practice"),
+   444→    limit: int = Query(50, ge=1, le=100, description="Max number of results")
+   445→):
+   446→    """
+   447→    List sessions for a user with optional type filter.
+   448→    Returns sessions from the new sessions table.
+   449→    """
+   450→    if not supabase:
+   451→        raise HTTPException(status_code=503, detail="Database not configured")
+   452→
+   453→    try:
+   454→        query = supabase.table("sessions").select("*").eq("user_id", user_id)
+   455→
+   456→        if session_type:
+   457→            query = query.eq("type", session_type)
+   458→
+   459→        query = query.order("created_at", desc=True).limit(limit)
+   460→
+   461→        response = query.execute()
+   462→
+   463→        return JSONResponse(content={
+   464→            "sessions": response.data if response.data else [],
+   465→            "count": len(response.data) if response.data else 0
+   466→        })
+   467→
+   468→    except Exception as e:
+   469→        print(f"Error listing sessions: {e}")
+   470→        raise HTTPException(status_code=500, detail=f"Failed to list sessions: {str(e)}")
+   471→
+   472→
+   473→@app.get("/api/sessions/{session_id}")
+   474→async def get_session(session_id: str):
+   475→    """
+   476→    Get a single session by ID with all associated issues.
+   477→    Returns full session data including pose_data for overlay rendering.
+   478→    """
+   479→    if not supabase:
+   480→        raise HTTPException(status_code=503, detail="Database not configured")
+   481→
+   482→    try:
+   483→        # Fetch session
+   484→        session_response = supabase.table("sessions").select("*").eq("id", session_id).single().execute()
+   485→
+   486→        if not session_response.data:
+   487→            raise HTTPException(status_code=404, detail="Session not found")
+   488→
+   489→        session = session_response.data
+   490→
+   491→        # Fetch associated issues
+   492→        issues_response = supabase.table("issues").select("*").eq("session_id", session_id).execute()
+   493→
+   494→        session['issues'] = issues_response.data if issues_response.data else []
+   495→
+   496→        return JSONResponse(content=session)
+   497→
+   498→    except HTTPException:
+   499→        raise
+   500→    except Exception as e:
+   501→        print(f"Error fetching session: {e}")
+   502→        raise HTTPException(status_code=500, detail=f"Failed to fetch session: {str(e)}")
+   503→
+   504→
+   505→@app.post("/api/practice")
+   506→async def save_practice_session(data: PracticeSessionData):
+   507→    """
+   508→    Save a practice session from the frontend.
+   509→    Creates entries in sessions, practice_stats, and optionally issues tables.
+   510→    """
+   511→    if not supabase:
+   512→        raise HTTPException(status_code=503, detail="Database not configured")
+   513→
+   514→    try:
+   515→        # Calculate green ratio
+   516→        green_ratio = data.green_frames / data.total_frames if data.total_frames > 0 else 0
+   517→        overall_score = int(green_ratio * 100)
+   518→
+   519→        # 1. Create session record
+   520→        session_payload = {
+   521→            "user_id": data.user_id if data.user_id != "guest" else None,
+   522→            "type": "practice",
+   523→            "duration_seconds": data.duration_seconds,
+   524→            "overall_score": overall_score,
+   525→            "summary": {
+   526→                "drill_type": data.drill_type,
+   527→                "green_ratio": round(green_ratio, 3),
+   528→                "total_frames": data.total_frames,
+   529→                "green_frames": data.green_frames,
+   530→                "red_frames": data.red_frames
+   531→            }
+   532→        }
+   533→
+   534→        session_response = supabase.table("sessions").insert(session_payload).execute()
+   535→
+   536→        if not session_response.data:
+   537→            raise HTTPException(status_code=500, detail="Failed to create session")
+   538→
+   539→        session_id = session_response.data[0]['id']
+   540→
+   541→        # 2. Create practice_stats record
+   542→        stats_payload = {
+   543→            "user_id": data.user_id if data.user_id != "guest" else None,
+   544→            "session_id": session_id,
+   545→            "drill_type": data.drill_type,
+   546→            "total_frames": data.total_frames,
+   547→            "green_frames": data.green_frames,
+   548→            "red_frames": data.red_frames,
+   549→            "avg_elbow_angle": data.avg_elbow_angle,
+   550→            "avg_stance_width": data.avg_stance_width,
+   551→            "peak_form_score": data.peak_form_score,
+   552→            "duration_seconds": data.duration_seconds
+   553→        }
+   554→
+   555→        supabase.table("practice_stats").insert(stats_payload).execute()
+   556→
+   557→        # 3. Save any detected issues
+   558→        for issue in data.issues:
+   559→            issue_payload = {
+   560→                "session_id": session_id,
+   561→                "code": issue.get('code', 'FORM_ERROR'),
+   562→                "title": issue.get('title', 'Form Issue'),
+   563→                "severity": issue.get('severity', 'medium'),
+   564→                "description": issue.get('description', ''),
+   565→                "timestamps": issue.get('timestamps', []),
+   566→                "occurrence_count": issue.get('occurrence_count', 1),
+   567→                "drill": issue.get('drill', {})
+   568→            }
+   569→            supabase.table("issues").insert(issue_payload).execute()
+   570→
+   571→        print(f"[OK] Practice session saved: {session_id}")
+   572→
+   573→        return JSONResponse(content={
+   574→            "success": True,
+   575→            "session_id": session_id,
+   576→            "overall_score": overall_score,
+   577→            "green_ratio": round(green_ratio, 3)
+   578→        })
+   579→
+   580→    except HTTPException:
+   581→        raise
+   582→    except Exception as e:
+   583→        print(f"Error saving practice session: {e}")
+   584→        raise HTTPException(status_code=500, detail=f"Failed to save practice session: {str(e)}")
+   585→
+   586→
+   587→@app.get("/api/stats/dashboard")
+   588→async def get_dashboard_stats(user_id: str = Query(..., description="User ID")):
+   589→    """
+   590→    Get aggregated stats for the dashboard.
+   591→    Returns 7-day history, top issues, and summary metrics.
+   592→    """
+   593→    if not supabase:
+   594→        raise HTTPException(status_code=503, detail="Database not configured")
+   595→
+   596→    try:
+   597→        # Fetch recent sessions
+   598→        sessions_response = supabase.table("sessions")\
+   599→            .select("id, created_at, type, overall_score, summary")\
+   600→            .eq("user_id", user_id)\
+   601→            .order("created_at", desc=True)\
+   602→            .limit(100)\
+   603→            .execute()
+   604→
+   605→        sessions = sessions_response.data if sessions_response.data else []
+   606→
+   607→        # Fetch practice stats
+   608→        practice_response = supabase.table("practice_stats")\
+   609→            .select("*")\
+   610→            .eq("user_id", user_id)\
+   611→            .order("created_at", desc=True)\
+   612→            .limit(50)\
+   613→            .execute()
+   614→
+   615→        practice_stats = practice_response.data if practice_response.data else []
+   616→
+   617→        # Fetch daily aggregates (if available)
+   618→        daily_response = supabase.table("daily_aggregates")\
+   619→            .select("*")\
+   620→            .eq("user_id", user_id)\
+   621→            .order("date", desc=True)\
+   622→            .limit(7)\
+   623→            .execute()
+   624→
+   625→        daily_aggregates = daily_response.data if daily_response.data else []
+   626→
+   627→        # Calculate summary metrics
+   628→        total_sessions = len(sessions)
+   629→        analytics_sessions = len([s for s in sessions if s.get('type') == 'analytics'])
+   630→        practice_sessions = len([s for s in sessions if s.get('type') == 'practice'])
+   631→
+   632→        avg_score = 0
+   633→        if sessions:
+   634→            scores = [s.get('overall_score', 0) for s in sessions if s.get('overall_score')]
+   635→            avg_score = sum(scores) / len(scores) if scores else 0
+   636→
+   637→        total_practice_time = sum(ps.get('duration_seconds', 0) for ps in practice_stats)
+   638→        avg_green_ratio = 0
+   639→        if practice_stats:
+   640→            ratios = [ps.get('green_ratio', 0) for ps in practice_stats if ps.get('green_ratio')]
+   641→            avg_green_ratio = sum(ratios) / len(ratios) if ratios else 0
+   642→
+   643→        # Get top issues from recent sessions
+   644→        all_issues = []
+   645→        for session in sessions[:20]:
+   646→            issues_resp = supabase.table("issues").select("code, title, occurrence_count")\
+   647→                .eq("session_id", session['id']).execute()
+   648→            if issues_resp.data:
+   649→                all_issues.extend(issues_resp.data)
+   650→
+   651→        # Aggregate issues by code
+   652→        issue_counts = {}
+   653→        for issue in all_issues:
+   654→            code = issue.get('code', 'unknown')
+   655→            if code not in issue_counts:
+   656→                issue_counts[code] = {'code': code, 'title': issue.get('title', code), 'count': 0}
+   657→            issue_counts[code]['count'] += issue.get('occurrence_count', 1)
+   658→
+   659→        top_issues = sorted(issue_counts.values(), key=lambda x: x['count'], reverse=True)[:5]
+   660→
+   661→        return JSONResponse(content={
+   662→            "summary": {
+   663→                "total_sessions": total_sessions,
+   664→                "analytics_sessions": analytics_sessions,
+   665→                "practice_sessions": practice_sessions,
+   666→                "avg_score": round(avg_score, 1),
+   667→                "total_practice_minutes": round(total_practice_time / 60, 1),
+   668→                "avg_green_ratio": round(avg_green_ratio, 3)
+   669→            },
+   670→            "daily_aggregates": daily_aggregates,
+   671→            "top_issues": top_issues,
+   672→            "recent_sessions": sessions[:10]
+   673→        })
+   674→
+   675→    except Exception as e:
+   676→        print(f"Error fetching dashboard stats: {e}")
+   677→        raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard stats: {str(e)}")
+   678→
+   679→
+   680→if __name__ == "__main__":
+   681→    import uvicorn
+   682→    print("Starting Badminton Coach API...")
+   683→    print(f"Supabase configured: {supabase is not None}")
+   684→    print(f"Gemini API configured: {os.getenv('GEMINI_API_KEY', 'NOT SET') != 'your-gemini-api-key-here'}")
+   685→    uvicorn.run(app, host="0.0.0.0", port=8000)
+   686→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

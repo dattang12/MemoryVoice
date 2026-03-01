@@ -1,0 +1,332 @@
+     1→-- RallyCoach V2 Database Migration
+     2→-- Run these SQL commands in your Supabase SQL Editor
+     3→-- This adds support for: Sessions, Issues, Events, Practice Stats
+     4→
+     5→-- ============================================
+     6→-- 1. CREATE SESSIONS TABLE
+     7→-- ============================================
+     8→-- Stores both Analytics and Practice sessions
+     9→CREATE TABLE IF NOT EXISTS sessions (
+    10→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    11→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    12→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    13→    type TEXT NOT NULL CHECK (type IN ('analytics', 'practice')),
+    14→    video_path TEXT,  -- Storage path for uploaded video (analytics only)
+    15→    video_url TEXT,   -- Public URL for video playback
+    16→    filename TEXT,    -- Original filename
+    17→    duration_seconds NUMERIC,
+    18→    overall_score NUMERIC DEFAULT 0,  -- 0-100 score
+    19→    summary JSONB DEFAULT '{}'::jsonb,  -- {top_issues: [], notes: ""}
+    20→    pose_data JSONB DEFAULT '[]'::jsonb,  -- Array of landmarks per frame (for overlay)
+    21→    frame_count INTEGER DEFAULT 0
+    22→);
+    23→
+    24→COMMENT ON TABLE sessions IS 'Stores both Analytics (video upload) and Practice (webcam) sessions';
+    25→
+    26→-- ============================================
+    27→-- 2. CREATE ISSUES TABLE
+    28→-- ============================================
+    29→-- Detected issues per session with drill recommendations
+    30→CREATE TABLE IF NOT EXISTS issues (
+    31→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    32→    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    33→    code TEXT NOT NULL,  -- e.g., 'ELBOW_LOW_BACKHAND', 'STANCE_TOO_NARROW'
+    34→    title TEXT NOT NULL,
+    35→    severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high')),
+    36→    description TEXT,
+    37→    drill JSONB DEFAULT '{}'::jsonb,  -- {steps: [], tips: [], duration_minutes: 5}
+    38→    keyframes JSONB DEFAULT '[]'::jsonb,  -- [{svg: "...", label: "Setup"}, ...]
+    39→    timestamps JSONB DEFAULT '[]'::jsonb,  -- [1.2, 3.5, 7.8] seconds where issue occurred
+    40→    occurrence_count INTEGER DEFAULT 1,
+    41→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    42→);
+    43→
+    44→COMMENT ON TABLE issues IS 'Form issues detected in a session with associated drills';
+    45→
+    46→-- ============================================
+    47→-- 3. CREATE EVENTS TABLE
+    48→-- ============================================
+    49→-- Per-frame events for detailed analysis
+    50→CREATE TABLE IF NOT EXISTS events (
+    51→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    52→    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    53→    t NUMERIC NOT NULL,  -- Timestamp in seconds
+    54→    frame_number INTEGER,
+    55→    code TEXT NOT NULL,  -- Rule code e.g., 'ELBOW_ANGLE'
+    56→    value NUMERIC,  -- Measured value
+    57→    threshold_min NUMERIC,
+    58→    threshold_max NUMERIC,
+    59→    passed BOOLEAN DEFAULT true,
+    60→    severity TEXT CHECK (severity IN ('low', 'medium', 'high')),
+    61→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    62→);
+    63→
+    64→COMMENT ON TABLE events IS 'Per-frame rule evaluation results';
+    65→
+    66→-- ============================================
+    67→-- 4. CREATE PRACTICE_STATS TABLE
+    68→-- ============================================
+    69→-- Aggregated stats for practice sessions
+    70→CREATE TABLE IF NOT EXISTS practice_stats (
+    71→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    72→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    73→    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    74→    drill_type TEXT,  -- 'smash', 'clear', 'netshot', 'footwork'
+    75→    total_frames INTEGER DEFAULT 0,
+    76→    green_frames INTEGER DEFAULT 0,
+    77→    red_frames INTEGER DEFAULT 0,
+    78→    green_ratio NUMERIC GENERATED ALWAYS AS (
+    79→        CASE WHEN total_frames > 0 THEN green_frames::NUMERIC / total_frames ELSE 0 END
+    80→    ) STORED,
+    81→    avg_elbow_angle NUMERIC,
+    82→    avg_stance_width NUMERIC,
+    83→    peak_form_score NUMERIC DEFAULT 0,
+    84→    duration_seconds NUMERIC DEFAULT 0,
+    85→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    86→);
+    87→
+    88→COMMENT ON TABLE practice_stats IS 'Aggregated statistics for practice sessions';
+    89→
+    90→-- ============================================
+    91→-- 5. CREATE DAILY_AGGREGATES TABLE
+    92→-- ============================================
+    93→-- Daily aggregated metrics for dashboard charts
+    94→CREATE TABLE IF NOT EXISTS daily_aggregates (
+    95→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    96→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    97→    date DATE NOT NULL,
+    98→    analytics_sessions INTEGER DEFAULT 0,
+    99→    practice_sessions INTEGER DEFAULT 0,
+   100→    total_practice_minutes NUMERIC DEFAULT 0,
+   101→    avg_technique_score NUMERIC DEFAULT 0,
+   102→    avg_green_ratio NUMERIC DEFAULT 0,
+   103→    top_issues JSONB DEFAULT '[]'::jsonb,  -- [{code: "...", count: 5}, ...]
+   104→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+   105→    UNIQUE(user_id, date)
+   106→);
+   107→
+   108→COMMENT ON TABLE daily_aggregates IS 'Daily aggregated metrics for dashboard charts';
+   109→
+   110→-- ============================================
+   111→-- 6. ENABLE ROW LEVEL SECURITY
+   112→-- ============================================
+   113→ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+   114→ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
+   115→ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+   116→ALTER TABLE practice_stats ENABLE ROW LEVEL SECURITY;
+   117→ALTER TABLE daily_aggregates ENABLE ROW LEVEL SECURITY;
+   118→
+   119→-- ============================================
+   120→-- 7. RLS POLICIES FOR SESSIONS
+   121→-- ============================================
+   122→DROP POLICY IF EXISTS "Users can view their own sessions" ON sessions;
+   123→CREATE POLICY "Users can view their own sessions"
+   124→    ON sessions FOR SELECT
+   125→    USING (auth.uid() = user_id);
+   126→
+   127→DROP POLICY IF EXISTS "Users can insert their own sessions" ON sessions;
+   128→CREATE POLICY "Users can insert their own sessions"
+   129→    ON sessions FOR INSERT
+   130→    WITH CHECK (auth.uid() = user_id);
+   131→
+   132→DROP POLICY IF EXISTS "Users can update their own sessions" ON sessions;
+   133→CREATE POLICY "Users can update their own sessions"
+   134→    ON sessions FOR UPDATE
+   135→    USING (auth.uid() = user_id);
+   136→
+   137→DROP POLICY IF EXISTS "Users can delete their own sessions" ON sessions;
+   138→CREATE POLICY "Users can delete their own sessions"
+   139→    ON sessions FOR DELETE
+   140→    USING (auth.uid() = user_id);
+   141→
+   142→-- ============================================
+   143→-- 8. RLS POLICIES FOR ISSUES
+   144→-- ============================================
+   145→DROP POLICY IF EXISTS "Users can view issues for their sessions" ON issues;
+   146→CREATE POLICY "Users can view issues for their sessions"
+   147→    ON issues FOR SELECT
+   148→    USING (
+   149→        EXISTS (
+   150→            SELECT 1 FROM sessions
+   151→            WHERE sessions.id = issues.session_id
+   152→            AND sessions.user_id = auth.uid()
+   153→        )
+   154→    );
+   155→
+   156→DROP POLICY IF EXISTS "Users can insert issues for their sessions" ON issues;
+   157→CREATE POLICY "Users can insert issues for their sessions"
+   158→    ON issues FOR INSERT
+   159→    WITH CHECK (
+   160→        EXISTS (
+   161→            SELECT 1 FROM sessions
+   162→            WHERE sessions.id = issues.session_id
+   163→            AND sessions.user_id = auth.uid()
+   164→        )
+   165→    );
+   166→
+   167→DROP POLICY IF EXISTS "Users can delete issues for their sessions" ON issues;
+   168→CREATE POLICY "Users can delete issues for their sessions"
+   169→    ON issues FOR DELETE
+   170→    USING (
+   171→        EXISTS (
+   172→            SELECT 1 FROM sessions
+   173→            WHERE sessions.id = issues.session_id
+   174→            AND sessions.user_id = auth.uid()
+   175→        )
+   176→    );
+   177→
+   178→-- ============================================
+   179→-- 9. RLS POLICIES FOR EVENTS
+   180→-- ============================================
+   181→DROP POLICY IF EXISTS "Users can view events for their sessions" ON events;
+   182→CREATE POLICY "Users can view events for their sessions"
+   183→    ON events FOR SELECT
+   184→    USING (
+   185→        EXISTS (
+   186→            SELECT 1 FROM sessions
+   187→            WHERE sessions.id = events.session_id
+   188→            AND sessions.user_id = auth.uid()
+   189→        )
+   190→    );
+   191→
+   192→DROP POLICY IF EXISTS "Users can insert events for their sessions" ON events;
+   193→CREATE POLICY "Users can insert events for their sessions"
+   194→    ON events FOR INSERT
+   195→    WITH CHECK (
+   196→        EXISTS (
+   197→            SELECT 1 FROM sessions
+   198→            WHERE sessions.id = events.session_id
+   199→            AND sessions.user_id = auth.uid()
+   200→        )
+   201→    );
+   202→
+   203→-- ============================================
+   204→-- 10. RLS POLICIES FOR PRACTICE_STATS
+   205→-- ============================================
+   206→DROP POLICY IF EXISTS "Users can view their own practice stats" ON practice_stats;
+   207→CREATE POLICY "Users can view their own practice stats"
+   208→    ON practice_stats FOR SELECT
+   209→    USING (auth.uid() = user_id);
+   210→
+   211→DROP POLICY IF EXISTS "Users can insert their own practice stats" ON practice_stats;
+   212→CREATE POLICY "Users can insert their own practice stats"
+   213→    ON practice_stats FOR INSERT
+   214→    WITH CHECK (auth.uid() = user_id);
+   215→
+   216→-- ============================================
+   217→-- 11. RLS POLICIES FOR DAILY_AGGREGATES
+   218→-- ============================================
+   219→DROP POLICY IF EXISTS "Users can view their own daily aggregates" ON daily_aggregates;
+   220→CREATE POLICY "Users can view their own daily aggregates"
+   221→    ON daily_aggregates FOR SELECT
+   222→    USING (auth.uid() = user_id);
+   223→
+   224→DROP POLICY IF EXISTS "Users can upsert their own daily aggregates" ON daily_aggregates;
+   225→CREATE POLICY "Users can upsert their own daily aggregates"
+   226→    ON daily_aggregates FOR INSERT
+   227→    WITH CHECK (auth.uid() = user_id);
+   228→
+   229→DROP POLICY IF EXISTS "Users can update their own daily aggregates" ON daily_aggregates;
+   230→CREATE POLICY "Users can update their own daily aggregates"
+   231→    ON daily_aggregates FOR UPDATE
+   232→    USING (auth.uid() = user_id);
+   233→
+   234→-- ============================================
+   235→-- 12. CREATE INDEXES
+   236→-- ============================================
+   237→CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(user_id, created_at DESC);
+   238→CREATE INDEX IF NOT EXISTS idx_sessions_type ON sessions(type);
+   239→CREATE INDEX IF NOT EXISTS idx_issues_session ON issues(session_id);
+   240→CREATE INDEX IF NOT EXISTS idx_issues_code ON issues(code);
+   241→CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+   242→CREATE INDEX IF NOT EXISTS idx_events_session_code ON events(session_id, code);
+   243→CREATE INDEX IF NOT EXISTS idx_events_t ON events(t);
+   244→CREATE INDEX IF NOT EXISTS idx_practice_stats_user ON practice_stats(user_id);
+   245→CREATE INDEX IF NOT EXISTS idx_practice_stats_session ON practice_stats(session_id);
+   246→CREATE INDEX IF NOT EXISTS idx_daily_aggregates_user_date ON daily_aggregates(user_id, date DESC);
+   247→
+   248→-- ============================================
+   249→-- 13. SERVICE ROLE BYPASS POLICIES
+   250→-- ============================================
+   251→-- These allow the backend (using service role key) to insert data for any user
+   252→
+   253→DROP POLICY IF EXISTS "Service role can insert sessions" ON sessions;
+   254→CREATE POLICY "Service role can insert sessions"
+   255→    ON sessions FOR INSERT
+   256→    WITH CHECK (true);
+   257→
+   258→DROP POLICY IF EXISTS "Service role can insert issues" ON issues;
+   259→CREATE POLICY "Service role can insert issues"
+   260→    ON issues FOR INSERT
+   261→    WITH CHECK (true);
+   262→
+   263→DROP POLICY IF EXISTS "Service role can insert events" ON events;
+   264→CREATE POLICY "Service role can insert events"
+   265→    ON events FOR INSERT
+   266→    WITH CHECK (true);
+   267→
+   268→DROP POLICY IF EXISTS "Service role can insert practice_stats" ON practice_stats;
+   269→CREATE POLICY "Service role can insert practice_stats"
+   270→    ON practice_stats FOR INSERT
+   271→    WITH CHECK (true);
+   272→
+   273→DROP POLICY IF EXISTS "Service role can insert daily_aggregates" ON daily_aggregates;
+   274→CREATE POLICY "Service role can insert daily_aggregates"
+   275→    ON daily_aggregates FOR INSERT
+   276→    WITH CHECK (true);
+   277→
+   278→-- ============================================
+   279→-- 14. HELPER FUNCTIONS
+   280→-- ============================================
+   281→
+   282→-- Function to update daily aggregates after session insert
+   283→CREATE OR REPLACE FUNCTION update_daily_aggregates()
+   284→RETURNS TRIGGER AS $$
+   285→BEGIN
+   286→    INSERT INTO daily_aggregates (user_id, date, analytics_sessions, practice_sessions, avg_technique_score)
+   287→    VALUES (
+   288→        NEW.user_id,
+   289→        DATE(NEW.created_at),
+   290→        CASE WHEN NEW.type = 'analytics' THEN 1 ELSE 0 END,
+   291→        CASE WHEN NEW.type = 'practice' THEN 1 ELSE 0 END,
+   292→        NEW.overall_score
+   293→    )
+   294→    ON CONFLICT (user_id, date)
+   295→    DO UPDATE SET
+   296→        analytics_sessions = daily_aggregates.analytics_sessions +
+   297→            CASE WHEN NEW.type = 'analytics' THEN 1 ELSE 0 END,
+   298→        practice_sessions = daily_aggregates.practice_sessions +
+   299→            CASE WHEN NEW.type = 'practice' THEN 1 ELSE 0 END,
+   300→        avg_technique_score = (daily_aggregates.avg_technique_score + NEW.overall_score) / 2;
+   301→
+   302→    RETURN NEW;
+   303→END;
+   304→$$ LANGUAGE plpgsql SECURITY DEFINER;
+   305→
+   306→-- Create trigger for daily aggregates
+   307→DROP TRIGGER IF EXISTS trigger_update_daily_aggregates ON sessions;
+   308→CREATE TRIGGER trigger_update_daily_aggregates
+   309→    AFTER INSERT ON sessions
+   310→    FOR EACH ROW
+   311→    EXECUTE FUNCTION update_daily_aggregates();
+   312→
+   313→-- ============================================
+   314→-- 15. STORAGE BUCKET (Run in Dashboard)
+   315→-- ============================================
+   316→-- Create a "keyframes" bucket for storing generated keyframe images
+   317→-- 1. Go to Storage in Supabase Dashboard
+   318→-- 2. Create bucket named "keyframes" (private)
+   319→-- 3. Add policy: Authenticated users can read/write their own folder
+   320→
+   321→-- ============================================
+   322→-- MIGRATION COMPLETE
+   323→-- ============================================
+   324→-- After running this migration:
+   325→-- 1. Update your backend to use these new tables
+   326→-- 2. Update frontend to query sessions instead of analysis_results
+   327→-- 3. Run the storage bucket setup manually in Dashboard
+   328→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

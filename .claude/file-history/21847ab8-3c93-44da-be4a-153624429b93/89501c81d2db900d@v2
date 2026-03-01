@@ -1,0 +1,176 @@
+---
+name: growthops-governance
+description: >
+  Approval queue and governance system for all GrowthOps actions. Use when asked to
+  "approve", "审批", "review queue", "pending actions", "what needs my approval",
+  "governance", or when any other skill needs human approval before executing.
+  This skill manages the approval pipeline for posts, DMs, emails, and outreach.
+tools: Bash
+metadata: {"openclaw":{"emoji":"✅"}}
+---
+
+# Governance & Approval Skill
+
+## What You Do
+Manage the approval queue for all GrowthOps actions that require human sign-off before execution. You are the gatekeeper between AI-generated actions and real-world execution.
+
+## CORE PRINCIPLE
+The human is ALWAYS in control. No post, no DM, no email goes out without approval (except auto-approved actions defined below).
+
+## What Requires Approval
+
+### MUST APPROVE (queue and wait):
+1. **Publishing any post** — XHS, LinkedIn, Twitter, Reddit, any platform
+2. **Sending first cold DM** to a founder
+3. **Sending first cold email** to a founder
+4. **Creating new social accounts**
+5. **Any action that costs money**
+6. **Changing strategy or configuration**
+7. **Contacting press, journalists, or partners**
+8. **Follow-up DMs to founders who said "maybe later"**
+
+### AUTO-APPROVED (execute immediately, log only):
+1. **Replying to comments on OUR posts** (using voice guidelines)
+2. **Continuing conversations** where founder replied to us
+3. **Replying to inbound DMs** (founder messaged us first)
+4. **Research, monitoring, and data collection**
+5. **Generating drafts** (drafts don't get published without approval)
+6. **Creating workspace files** for tracking
+7. **Scoring and classifying leads**
+8. **Generating reports**
+
+## Approval Queue Format
+
+Save all pending items to `workspace/approval-queue/YYYY-MM-DD.md`:
+
+```markdown
+# Approval Queue — {Date}
+
+## Pending Approval ({N} items)
+
+### 📝 POSTS ({N} pending)
+
+#### POST-001: {Platform} Post
+- **Platform**: LinkedIn / XHS / Twitter / Reddit
+- **Content**:
+  ```
+  {full post content}
+  ```
+- **Hashtags**: {tags}
+- **Scheduled For**: {suggested time}
+- **Why This Post**: {brief rationale}
+- **Status**: ⏳ PENDING / ✅ APPROVED / ❌ REJECTED / ✏️ EDIT REQUESTED
+- **Human Notes**: {space for human to add feedback}
+
+---
+
+### 💬 DMs ({N} pending)
+
+#### DM-001: {Platform} DM to {Founder Name}
+- **Platform**: Twitter / LinkedIn / XHS / Reddit
+- **To**: {name} — {company}
+- **Their Profile**: {brief profile summary}
+- **Lead Score**: {score}
+- **Why This Person**: {why they're a good target}
+- **Message**:
+  ```
+  {full DM text}
+  ```
+- **Status**: ⏳ PENDING / ✅ APPROVED / ❌ REJECTED / ✏️ EDIT REQUESTED
+
+---
+
+### 📧 EMAILS ({N} pending)
+
+#### EMAIL-001: Email to {Founder Name}
+- **To**: {email}
+- **Subject A**: {variant A}
+- **Subject B**: {variant B}
+- **Body**:
+  ```
+  {full email}
+  ```
+- **Sequence Step**: 1/2/3
+- **Status**: ⏳ PENDING / ✅ APPROVED / ❌ REJECTED / ✏️ EDIT REQUESTED
+```
+
+## How Approval Works
+
+### Step 1: Skill generates content → saves to approval queue
+### Step 2: Notify human "You have {N} items to approve"
+### Step 3: Human reviews and marks each item:
+- **✅ APPROVED** → Execute immediately
+- **❌ REJECTED** → Archive, do not execute, learn from rejection
+- **✏️ EDIT REQUESTED** → Human provides edits, skill revises, re-queues
+
+### Step 4: After approval
+- Execute the action (post, send DM, send email)
+- Move item from `approval-queue/` to `approval-queue/completed/`
+- Log the execution in relevant skill's workspace
+
+## Batch Approval
+
+For efficiency, present items in batches:
+```
+"You have 5 posts, 12 DMs, and 8 emails ready for review.
+Quick approve all? Or review individually?"
+```
+
+If human says "approve all" → execute all pending items.
+If human says "review" → present one by one.
+
+## Learning from Rejections
+
+When human rejects or edits content:
+1. Log what was rejected/edited in `workspace/approval-queue/learnings.md`
+2. Pattern: if 3+ similar items rejected, update the skill's template
+3. Ask human: "I noticed you've been editing {pattern}. Should I adjust my approach?"
+
+```markdown
+# Approval Learnings
+
+## Rejection Patterns
+| Date | Type | What Was Wrong | How To Fix |
+|------|------|----------------|------------|
+
+## Human Edits (What Human Changed)
+| Date | Original | Human's Version | Lesson |
+|------|----------|-----------------|--------|
+
+## Updated Guidelines (From Human Feedback)
+1. {lesson learned}
+2. {lesson learned}
+```
+
+## File System Rules (ENFORCED)
+- **NEVER modify** existing files on the user's laptop
+- **CAN create** new files in `workspace/` directory
+- **CAN create** new files in `~/.openclaw/` directory
+- If you need to update a file: create a NEW version, don't overwrite
+
+## Daily Governance Report
+
+At end of day, generate `workspace/approval-queue/daily-summary-YYYY-MM-DD.md`:
+
+```markdown
+# Governance Daily Summary — {Date}
+
+## Actions Taken
+- Posts published: {N}
+- DMs sent: {N}
+- Emails sent: {N}
+- Comments replied (auto): {N}
+- Conversations continued (auto): {N}
+
+## Approval Stats
+- Items submitted: {N}
+- Approved: {N}
+- Rejected: {N}
+- Edited: {N}
+- Approval rate: {%}
+- Avg wait time for approval: {hours}
+
+## Auto-Approved Actions Log
+| Time | Type | Action | Details |
+|------|------|--------|---------|
+```

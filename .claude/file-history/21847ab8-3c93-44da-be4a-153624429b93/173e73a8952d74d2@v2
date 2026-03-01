@@ -1,0 +1,39 @@
+# Heartbeat Checks
+
+## Founder Discovery (every 6 hours, 8 AM - 10 PM)
+- Check Product Hunt for new launches
+- Check Hacker News for "Show HN" and "Launch HN" posts
+- Look for new founders on BetaList
+- Save any new leads to workspace/leads/
+
+## Email Monitoring (every 2 hours, 8 AM - 8 PM)
+- Check for email replies (positive, negative, bounce)
+- Update suppression list with bounces and unsubscribes
+- Move positive replies to HOT tier
+- Trigger follow-up emails for sequences due today
+
+## Comment Monitoring (every 2 hours, 8 AM - 10 PM)
+- Check XHS posts for new comments
+- Check LinkedIn posts for new comments
+- Identify high-intent commenters (asking about signup, link, pricing)
+- Generate reply drafts for high-intent comments
+- Escalate hot leads from comments
+
+## Warmup Tracker (every 24 hours at 9 AM)
+- Check domain age and update daily email sending limit
+- Log previous day's email performance (opens, bounces, replies)
+- Alert if bounce rate exceeds 5%
+
+## Lead Scoring Refresh (every 24 hours at 10 AM)
+- Re-score leads that received new signals (reply, click, bounce)
+- Update tier classifications
+- Move upgraded leads to appropriate outreach queues
+
+## Competitor Watch (every 24 hours at 7 AM)
+- Quick scan for competitor news mentions
+- Check competitor social accounts for major announcements
+- Alert on significant competitive changes
+
+## Weekly Report Trigger (every Friday at 5 PM)
+- Compile all weekly data into performance report
+- Save to workspace/reports/weekly/

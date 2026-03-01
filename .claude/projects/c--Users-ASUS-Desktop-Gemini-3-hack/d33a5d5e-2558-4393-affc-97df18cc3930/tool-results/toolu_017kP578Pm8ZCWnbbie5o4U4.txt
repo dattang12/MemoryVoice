@@ -1,0 +1,8 @@
+C:\Users\ASUS\Desktop\Gemini 3 hack\supabase-setup.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\supabase-migration-v2.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\schema.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\migration.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\migration-v3.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\migration-v4-fix-type-constraint.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\migration-v5-practice-recordings.sql
+C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\supabase\migration-v4-strategy-engine.sql

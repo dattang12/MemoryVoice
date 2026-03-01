@@ -1,0 +1,57 @@
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+main.js:1805 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+index.js:625 Uncaught ModuleBuildError: Module build failed (from ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js):
+Error: 
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\MovementGuidance.tsx:386:1]
+ 386 │   }, [correctionKeyframe, interpolation, currentPose]);
+ 387 │ 
+ 388 │   return (
+ 389 │     <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+     ·      ───
+ 390 │       {/* Header */}
+ 391 │       {correctionKeyframe && (
+ 392 │         <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+     ╰────
+
+
+Caused by:
+    Syntax Error
+    at processResult (file://C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\node_modules\next\dist\compiled\webpack\bundle5.js:28:400590)
+    at <unknown> (file://C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\node_modules\next\dist\compiled\webpack\bundle5.js:28:402302)
+    at <unknown> (file://C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:8645)
+    at <unknown> (file://C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:5019)
+    at r.callback (file://C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:4039)
+getServerError @ nodeStackFrames.js:38
+eval @ index.js:625
+setTimeout
+hydrate @ index.js:613
+await in hydrate
+pageBootrap @ page-bootstrap.js:27
+eval @ next-dev.js:25
+Promise.then
+eval @ next-dev.js:23
+./node_modules/next/dist/client/next-dev.js @ main.js:809
+options.factory @ webpack.js:647
+__webpack_require__ @ webpack.js:37
+__webpack_exec__ @ main.js:1942
+(anonymous) @ main.js:1943
+webpackJsonpCallback @ webpack.js:1195
+(anonymous) @ main.js:9Understand this error
+websocket.js:46 [HMR] connected
+hydration-error-info.js:63 ./src/components/MovementGuidance.tsx
+Error: 
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\MovementGuidance.tsx:386:1]
+ 386 │   }, [correctionKeyframe, interpolation, currentPose]);
+ 387 │ 
+ 388 │   return (
+ 389 │     <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+     ·      ───
+ 390 │       {/* Header */}
+ 391 │       {correctionKeyframe && (
+ 392 │         <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+     ╰────
+
+Caused by:
+    Syntax Error

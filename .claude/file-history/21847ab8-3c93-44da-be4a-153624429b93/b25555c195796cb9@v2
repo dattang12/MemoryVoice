@@ -1,0 +1,1056 @@
+# GrowthOps Agent — Production Plan for PitchTok
+
+> **Generated**: February 14, 2026
+> **Powered by**: 7 specialized AI research agents (OpenClaw Researcher, Marketing Tools Analyst, Founder Discovery Specialist, AI Architect, Senior Engineer, Growth Hacker, Security Reviewer)
+> **Constraint**: No files modified on user's computer. Research-only plan.
+
+---
+
+## Executive Summary
+
+**Mission**: Build an OpenClaw-level AI agent system that automates PitchTok's founder acquisition pipeline across 4 channels: 小红书, LinkedIn, Email, and Phone — with the primary goal of getting US-based early-stage founders to upload pitch videos.
+
+**Benchmark**: OpenClaw — open-source AI agent with persistent memory, 700+ skills, multi-agent teams, and local execution. Our system mirrors this architecture but is purpose-built for growth marketing.
+
+---
+
+## Table of Contents
+
+1. [System Architecture](#1-system-architecture)
+2. [Founder Discovery Engine](#2-founder-discovery-engine)
+3. [Module Breakdown](#3-module-breakdown)
+4. [LinkedIn Cold Start](#4-linkedin-cold-start)
+5. [Email Automation](#5-email-automation)
+6. [Security & Compliance](#6-security--compliance-guardrails)
+7. [Dashboard](#7-dashboard)
+8. [Four-Week Implementation Plan](#8-four-week-implementation-plan)
+9. [Daily Operating Loop](#9-daily-operating-loop)
+10. [Cost Estimate](#10-cost-estimate)
+11. [Appendix A: OpenClaw Deep Dive](#appendix-a--openclaw-deep-dive)
+12. [Appendix B: Marketing Tools Intelligence](#appendix-b--marketing-tools-intelligence)
+13. [Appendix C: Founder Discovery Deep Dive](#appendix-c--founder-discovery-deep-dive)
+14. [Appendix D: AI Agent Architecture Deep Dive](#appendix-d--ai-agent-architecture-deep-dive)
+15. [Appendix E: Security & Compliance Deep Dive](#appendix-e--security--compliance-deep-dive)
+16. [Appendix F: Growth Hacker's Conversion Playbook](#appendix-f--growth-hackers-conversion-playbook)
+
+---
+
+## 1. SYSTEM ARCHITECTURE
+
+### 1.1 Tech Stack (Final Picks — No Hedging)
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| **Framework** | **CrewAI** (Python) | Role-based multi-agent teams map perfectly to marketing roles (Content Agent, Outreach Agent, Analytics Agent). Production-ready with CrewAI Flows. |
+| **Database** | **Supabase (Postgres)** | Real-time subscriptions for dashboard, Row-Level Security for team access, built-in auth, free tier is generous. Airtable is too fragile for production. |
+| **Frontend** | **Next.js 15 + Tailwind + shadcn/ui** | Server components, API routes, fast iteration. Dashboard for content queues, outreach queues, analytics. |
+| **Queue/Scheduler** | **BullMQ + Redis** | Node.js ecosystem matches Next.js. Handles email scheduling, follow-up chains, content publishing reminders. |
+| **LLM Layer** | **Claude API (primary) + OpenAI (fallback)** | Claude for long-form content/analysis, GPT-4o for quick classification tasks. Structured JSON outputs with Pydantic validation. |
+| **Email Sending** | **SendGrid** | Best deliverability + analytics. Dedicated IP available. Webhook support for reply tracking. |
+| **Lead Enrichment** | **Apollo.io API** | 210M+ contacts, verified emails, 70-80% success rate. Best for founder discovery. |
+| **Hosting** | **Vercel (frontend) + Railway/Render (Python agents)** | Vercel for Next.js, Railway for CrewAI Python workers. |
+| **Memory/State** | **Markdown files + Supabase** | OpenClaw pattern: persistent context in Markdown. Structured data in Postgres. |
+
+### 1.2 Multi-Agent Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 ORCHESTRATOR AGENT                    │
+│         (CrewAI Manager / Strategy Layer)             │
+│   Persistent memory · Goal tracking · Scheduling     │
+├──────────┬──────────┬──────────┬────────────────────┤
+│          │          │          │                      │
+▼          ▼          ▼          ▼                      ▼
+┌────────┐┌────────┐┌────────┐┌────────┐      ┌──────────┐
+│ CONTENT││OUTREACH││  LEAD  ││ANALYTI-│      │  EMAIL   │
+│ AGENT  ││ AGENT  ││ AGENT  ││CS AGENT│      │  AGENT   │
+│        ││        ││        ││        │      │          │
+│XHS:    ││LinkedIn││Apollo  ││Metrics │      │SendGrid  │
+│-Topics ││-Drafts ││Crunch- ││-Weekly │      │-Sequences│
+│-Scripts││-Connec-││base    ││ report │      │-A/B tests│
+│-Caps   ││ tion   ││Wellfnd ││-Experi-│      │-Follow-  │
+│LinkedIn││ notes  ││Product ││ ment   │      │ ups      │
+│-Posts  ││-DM     ││Hunt    ││ review │      │-Reply    │
+│-Threads││ drafts ││-Score  ││-Winner/│      │ tracking │
+│        ││-Follow ││-Enrich ││ loser  │      │          │
+│        ││ ups    ││-Classi-││        │      │          │
+│        ││        ││ fy     ││        │      │          │
+└────────┘└────────┘└────────┘└────────┘      └──────────┘
+     │          │          │          │              │
+     └──────────┴──────────┴──────────┴──────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │  SUPABASE   │
+                    │  (Postgres) │
+                    │  + Redis    │
+                    │  + BullMQ   │
+                    └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │  NEXT.JS    │
+                    │  DASHBOARD  │
+                    │  (Vercel)   │
+                    └─────────────┘
+```
+
+### 1.3 Data Model (Supabase/Postgres)
+
+**leads**
+```sql
+CREATE TABLE leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  role TEXT CHECK (role IN ('founder', 'investor')),
+  company TEXT,
+  website TEXT,
+  email TEXT,
+  linkedin_url TEXT,
+  xhs_handle TEXT,
+  source TEXT, -- 'apollo', 'crunchbase', 'producthunt', 'referral', 'xhs', 'linkedin', 'event'
+  tags JSONB DEFAULT '[]', -- ['AI', 'B2B SaaS', 'pre-seed']
+  stage TEXT, -- 'idea', 'mvp', 'seed', 'series_a'
+  geo TEXT, -- 'US-CA', 'US-NY', etc.
+  score INTEGER DEFAULT 0, -- 0-100 activation likelihood
+  status TEXT DEFAULT 'new', -- new→qualified→contacted→replied→call_booked→activated→uploaded
+  owner TEXT,
+  last_touch_at TIMESTAMPTZ,
+  next_action_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**messages**
+```sql
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id UUID REFERENCES leads(id),
+  channel TEXT CHECK (channel IN ('email', 'linkedin', 'xhs', 'phone')),
+  variant_id TEXT, -- 'A', 'B', 'C'
+  subject TEXT,
+  body TEXT,
+  created_by TEXT DEFAULT 'agent', -- 'agent' or 'human'
+  sent_at TIMESTAMPTZ,
+  reply_at TIMESTAMPTZ,
+  outcome TEXT, -- 'no_reply', 'bounced', 'positive', 'negative', 'referral'
+  experiment_id UUID REFERENCES experiments(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**content**
+```sql
+CREATE TABLE content (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform TEXT CHECK (platform IN ('xhs', 'linkedin')),
+  topic TEXT,
+  hook TEXT,
+  script TEXT,
+  caption TEXT,
+  hashtags TEXT[],
+  creative_assets JSONB DEFAULT '[]',
+  status TEXT DEFAULT 'draft', -- draft→review→scheduled→posted
+  post_url TEXT,
+  scheduled_at TIMESTAMPTZ,
+  posted_at TIMESTAMPTZ,
+  metrics JSONB DEFAULT '{}', -- {impressions, saves, shares, comments, profile_visits}
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**experiments**
+```sql
+CREATE TABLE experiments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  channel TEXT,
+  hypothesis TEXT,
+  variants JSONB, -- [{id: 'A', description: '...', subject: '...'}, {id: 'B', ...}]
+  success_metric TEXT, -- 'reply_rate', 'signup_rate', 'upload_rate'
+  sample_size_target INTEGER,
+  start_at TIMESTAMPTZ,
+  end_at TIMESTAMPTZ,
+  result JSONB, -- {winner: 'A', a_rate: 0.12, b_rate: 0.08, significant: true}
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## 2. FOUNDER DISCOVERY ENGINE (The #1 Priority)
+
+### 2.1 Lead Sources (Ranked by Conversion Potential)
+
+| Rank | Source | Method | Expected Volume | Est. Reply Rate |
+|------|--------|--------|-----------------|-----------------|
+| 1 | **Referrals** | Ask existing founders to refer peers | 10-20/week | 35-50% |
+| 2 | **Product Hunt** | Scrape daily launches, contact makers | 50-100/week | 15-25% |
+| 3 | **Y Combinator Directory** | Public YC companies, especially recent batches | 20-30/week | 10-15% |
+| 4 | **Apollo.io** | Filter: Founder/CEO, 1-10 employees, US, Tech | 200+/week | 8-12% |
+| 5 | **Wellfound/AngelList** | Startup profiles, job posting signals | 50-100/week | 8-12% |
+| 6 | **Crunchbase** | Recently funded pre-seed/seed | 30-50/week | 10-15% |
+| 7 | **GrowthList.co** | Pre-verified recently funded startups | 50/week | 8-12% |
+| 8 | **GitHub Trending** | Technical founders with popular repos | 20-30/week | 5-10% |
+| 9 | **Twitter/X** | #buildinpublic, #startup communities | 30-50/week | 5-8% |
+| 10 | **小红书** | Chinese-American founder communities | 20-30/week | 10-20% |
+| 11 | **Indie Hackers** | Community members with products | 20-30/week | 8-12% |
+| 12 | **Reddit** | r/startups, r/SaaS, r/EntrepreneurRideAlong | 20-30/week | 3-5% |
+
+### 2.2 Lead Scoring Model v1 (Rule-Based)
+
+```python
+def score_lead(lead: dict) -> int:
+    score = 0
+
+    # Stage signals (max 30)
+    if lead['stage'] == 'mvp': score += 30
+    elif lead['stage'] == 'idea': score += 20
+    elif lead['stage'] == 'seed': score += 15
+
+    # Geo signals (max 20)
+    if lead['geo'].startswith('US'): score += 20
+    elif lead['geo'] in ['UK', 'CA', 'AU']: score += 10
+
+    # Vertical fit (max 15)
+    hot_verticals = ['AI', 'SaaS', 'fintech', 'devtools', 'consumer']
+    if any(v in lead.get('tags', []) for v in hot_verticals): score += 15
+
+    # Recency signals (max 15)
+    if lead.get('recently_funded'): score += 15
+    elif lead.get('recently_launched'): score += 10
+
+    # Engagement signals (max 10)
+    if lead.get('has_pitch_video_elsewhere'): score += 10
+    elif lead.get('active_on_social'): score += 5
+
+    # Source quality (max 10)
+    source_scores = {'referral': 10, 'producthunt': 8, 'yc': 8, 'apollo': 5}
+    score += source_scores.get(lead['source'], 3)
+
+    return min(score, 100)
+```
+
+### 2.3 Lead Enrichment Pipeline
+
+```
+Raw Lead (name + company)
+    │
+    ├─→ Apollo.io API → email, LinkedIn, company size, funding
+    ├─→ Company website → about page scrape → founder bio, product stage
+    ├─→ Crunchbase API → funding history, investors
+    ├─→ LinkedIn (manual check) → recent activity, post frequency
+    │
+    └─→ ENRICHED LEAD → Score → Classify → Route to Outreach Queue
+```
+
+---
+
+## 3. MODULE BREAKDOWN
+
+### Module A — 小红书 Topic Engine (选题)
+
+**Agent Prompt Pattern:**
+```
+You are a 小红书 content strategist for PitchTok.
+ICP: US-based early-stage founders (especially Chinese-American),
+     building AI/SaaS/consumer products, open to VC investment.
+Product: TikTok-style platform where founders upload 1-3 min pitch videos
+         and investors swipe to discover deals.
+
+Given these trending topics/competitor notes: {competitor_data}
+Generate a weekly content slate:
+- 10 topic ideas with hooks
+- Score each by: ICP_match (1-5), novelty (1-5), CTA_fit (1-5), effort (1-5)
+- Select top 5
+- For each: title, hook (3 variants), 6-beat outline, CTA
+
+Output as JSON matching this schema: {schema}
+```
+
+**Weekly Output**: 5 ready-to-produce content briefs per week
+
+### Module B — Script Generator (脚本)
+
+Each content brief → full production pack:
+- 15-30s script (short version) + 45-60s script (long version)
+- Shot list with B-roll suggestions
+- On-screen text overlays
+- Caption + hashtags (8-12 tags)
+- Cover text recommendation
+- First comment text
+- DM follow-up template (for engagers)
+
+**Quality Gates (Automated)**:
+```python
+QUALITY_CHECKS = [
+    {"name": "no_vague_claims", "prompt": "Does this contain vague claims like 'best' or 'amazing' without specifics? YES/NO"},
+    {"name": "clear_cta", "prompt": "Is there a clear call-to-action? YES/NO"},
+    {"name": "native_feel", "prompt": "Does this read like native 小红书 content (short lines, punchy, not corporate)? YES/NO"},
+    {"name": "under_word_limit", "check": lambda s: len(s.split()) <= 300},
+    {"name": "has_emoji_hooks", "check": lambda s: any(c in s for c in '🔥💡✨🚀')},
+]
+```
+
+### Module C — Publishing Workflow (发布)
+
+**Reality**: Manual posting to avoid platform violations.
+
+Dashboard shows "Ready-to-Post Pack" with copy buttons:
+- Caption (one-click copy)
+- Hashtags (one-click copy)
+- Cover text (one-click copy)
+- First comment (one-click copy)
+- Posting checklist (time, tags verified, cover image ready)
+- Schedule reminder (push notification / Slack alert)
+
+### Module D — Analytics Recap (数据复盘)
+
+**Data Ingestion** (since no API):
+- User uploads screenshots or CSV exports
+- Agent parses via vision model (Claude) or structured extraction
+- Stores in `content.metrics` JSONB field
+
+**Weekly Report** (auto-generated):
+```
+📊 小红书 Weekly Report (Week 7)
+━━━━━━━━━━━━━━━━━━━━━━━
+TOP 3 WINNERS:
+1. "3分钟搞定pitch video" — 12.4K views, 340 saves, 28 DMs
+   Why: Template-based CTA + pain point hook
+2. ...
+
+BOTTOM 3:
+1. "融资新趋势" — 890 views, 12 saves
+   Why: Too generic, no personal angle
+
+NEXT WEEK EXPERIMENTS:
+- Test: Personal story hooks vs. data-driven hooks
+- Test: Morning (8am) vs. evening (8pm) posting
+```
+
+### Module E — DM Assistant (DM建联)
+
+**NOT a bot**. Agent drafts, human sends.
+
+```
+OPENER TEMPLATE:
+"Hi {name}! 看到你的{product_name}项目，{specific_compliment}。
+我们在做一个帮founders用短视频pitch给投资人的平台，
+很多{similar_vertical}的founder已经在用了。
+想了解下你有兴趣试试吗？🙌"
+
+FOLLOW-UP 1 (Day 3):
+"Hi! 上次聊到{product_name}，我们这周有{X}位投资人
+在平台上活跃，很多在看{vertical}方向。
+如果有兴趣，可以先上传一个1-3分钟的pitch video试试 🎬"
+
+FOLLOW-UP 2 (Day 7):
+"最后打扰一下！我们有个founder社群，
+每周分享fundraising tips。不管要不要上传视频，
+欢迎加入 👋 {community_link}"
+```
+
+---
+
+## 4. LINKEDIN COLD START (Compliance-Safe)
+
+### 4.1 Content Ops (3 posts/week)
+
+**Content Pillars:**
+1. **Founder Value Posts** — Tips on pitching, fundraising, getting investor attention
+2. **Build-in-Public** — PitchTok product updates, user milestones
+3. **Case Studies** — "This founder got 3 investor meetings in 1 week using video pitching"
+
+**Each Post Gets:**
+- 3 hook variants (Agent generates, you pick)
+- Short version (< 200 words) + Long version (< 500 words)
+- Comment bait question
+- 3 relevant hashtags
+
+### 4.2 Cold Outreach Queue (Manual Send)
+
+**Founder Lane:**
+```
+CONNECTION NOTE (≤300 chars):
+"Hi {first_name} — saw {company} on {source}. Building something
+similar to what investors are actively looking for on PitchTok.
+Would love to connect and share what's working for {vertical} founders."
+
+DM 1 (after connect, Day 1):
+"Thanks for connecting, {first_name}! Quick question —
+have you considered using short video to pitch investors?
+We're seeing {vertical} founders get 3-5x more investor
+attention with 90-second pitch clips vs. cold decks.
+Happy to share what's working if interested."
+
+DM 2 (Day 4):
+"Hey {first_name} — just wanted to follow up. We have
+{X} active investors on PitchTok this week specifically
+looking at {vertical}. Takes 5 min to upload a video.
+Want me to send the link?"
+
+BREAKUP (Day 8):
+"Last note from me! If timing isn't right, totally get it.
+Here's our founder community link if you ever want to
+explore: {link}. Rooting for {company} either way! 🚀"
+```
+
+**Investor Lane:**
+```
+"Hi {name} — we curate short pitch videos from vetted
+{vertical} founders. Think TikTok meets deal flow.
+Would you be interested in a weekly digest of the
+top 5 pitches? Zero commitment, just great founders."
+```
+
+### 4.3 Daily Workflow
+- Agent shows 20 profiles to contact (pre-researched, scored)
+- You send manually (30-60 min/day)
+- After each action: one-click outcome logging (positive/neutral/negative)
+- Agent learns which profiles/messages convert best
+
+---
+
+## 5. EMAIL AUTOMATION (Fully Automated Channel)
+
+### 5.1 Deliverability Setup (Week 1 Blocker)
+
+```
+CHECKLIST:
+□ Dedicated subdomain: mail.pitchtok.com
+□ SPF record: v=spf1 include:sendgrid.net ~all
+□ DKIM: 2048-bit key via SendGrid
+□ DMARC: v=DMARC1; p=none; rua=mailto:dmarc@pitchtok.com
+□ Return-Path alignment
+□ Unsubscribe header (RFC 8058 one-click)
+□ Physical mailing address in footer
+□ CAN-SPAM compliant opt-out (process within 10 days)
+```
+
+### 5.2 Warmup Schedule
+
+| Week | Daily Volume | Notes |
+|------|-------------|-------|
+| 1 | 10-20 emails | Send to engaged contacts only |
+| 2 | 30-50 | Mix of warm + cold |
+| 3 | 50-100 | Monitor bounce rate < 2% |
+| 4 | 100-200 | Full cold outreach begins |
+| 5+ | 200-500 | Scale if reputation holds |
+
+### 5.3 Email Sequences
+
+**Sequence A (Direct Pitch):**
+```
+EMAIL 1 (Day 0):
+Subject A: "Quick question about {company_name}"
+Subject B: "Can we feature {company_name} to investors this week?"
+
+Body:
+"Hi {first_name},
+
+I came across {company_name} on {source} — {specific_compliment}.
+
+We built PitchTok, where founders upload 90-second pitch
+videos and investors swipe to discover startups (think TikTok
+for deal flow). {X} investors are actively browsing this week.
+
+Would you be open to uploading a quick video? Takes < 5 min.
+
+{your_name}"
+
+EMAIL 2 (Day 3):
+Subject: "Re: Quick question about {company_name}"
+"Hey {first_name} — just bumping this. We had {X} founders
+get investor meetings last week through video pitches.
+Happy to show you examples if helpful."
+
+EMAIL 3 (Day 7):
+Subject: "Last try — {first_name}"
+"Final follow-up! If PitchTok isn't the right fit,
+no worries at all. But if you're raising or plan to —
+video pitches are getting 3-5x more investor eyeballs
+than cold decks right now. Link: {signup_link}"
+```
+
+### 5.4 A/B Test Framework
+
+**Top 5 Variables to Test First:**
+1. Subject line (question vs. statement vs. name-drop)
+2. Personalization depth (1 line vs. 3 lines)
+3. CTA type (direct ask vs. soft ask vs. social proof)
+4. Send time (Tue 10am vs. Thu 2pm)
+5. Sequence length (2 emails vs. 3 emails vs. 4 emails)
+
+**Minimum sample**: 100 per variant for email open rates, 200 for reply rates.
+
+---
+
+## 6. SECURITY & COMPLIANCE GUARDRAILS
+
+### 6.1 Non-Negotiable Rules
+
+```python
+GUARDRAILS = {
+    "max_emails_per_day": 50,  # During warmup, increases per schedule
+    "max_linkedin_actions_per_day": 30,  # Manual only
+    "require_human_approval": [
+        "send_email_batch",
+        "export_lead_data",
+        "any_phone_action",
+        "send_more_than_100_emails"
+    ],
+    "forbidden_actions": [
+        "auto_dm_linkedin",
+        "auto_connect_linkedin",
+        "auto_comment_linkedin",
+        "scrape_linkedin_profiles",
+        "auto_post_xhs",
+        "store_passwords_in_code"
+    ],
+    "allowed_actions": [
+        "generate_draft",
+        "send_email_via_sendgrid",
+        "create_content_brief",
+        "score_lead",
+        "enrich_lead_via_apollo",
+        "schedule_reminder",
+        "generate_report"
+    ]
+}
+```
+
+### 6.2 Secret Management
+- All API keys in `.env` file (never in code, never in prompts)
+- Use `python-dotenv` for loading
+- Rotate keys monthly
+- Separate keys for dev/staging/prod
+
+### 6.3 Email Compliance
+- CAN-SPAM: Physical address + unsubscribe in every email
+- GDPR: Don't email EU contacts without consent basis
+- CCPA: Honor "do not sell" requests from California
+- Auto-stop on: bounce, unsubscribe, negative reply, opt-out keyword
+
+### 6.4 LLM Security
+- Never pass PII (emails, phone numbers) into LLM prompts
+- Use placeholder tokens: `{first_name}`, `{company}` — substitute after generation
+- Validate all LLM outputs against schema before storing
+- Rate-limit LLM API calls
+
+---
+
+## 7. DASHBOARD (Next.js)
+
+### 7.1 Pages
+
+1. **Dashboard Home** — KPI cards, pipeline funnel, today's tasks
+2. **Content Queue** — XHS/LinkedIn content with status, copy buttons, schedule
+3. **Outreach Queue** — Today's 20 LinkedIn profiles, message drafts, outcome buttons
+4. **Email Campaigns** — Active sequences, A/B test results, reply rates
+5. **Lead Pipeline** — Kanban board (New → Qualified → Contacted → Replied → Booked → Uploaded)
+6. **Analytics** — Weekly report, experiment results, channel performance
+7. **Settings** — API keys, team members, scoring rules, templates
+
+### 7.2 Top 10 KPIs
+
+| KPI | Target (Month 1) | Target (Month 3) |
+|-----|-------------------|-------------------|
+| New leads discovered/week | 100 | 500 |
+| Qualified leads/week | 40 | 200 |
+| Emails sent/week | 200 | 1,000 |
+| Email reply rate | 8% | 12% |
+| LinkedIn connections/week | 50 | 100 |
+| LinkedIn reply rate | 15% | 20% |
+| Meetings booked/week | 5 | 25 |
+| Video uploads/week | 2 | 15 |
+| XHS content posted/week | 5 | 7 |
+| Founder activation rate | 5% | 12% |
+
+---
+
+## 8. FOUR-WEEK IMPLEMENTATION PLAN
+
+### Week 1 — Foundations
+
+| Day | Deliverable |
+|-----|-------------|
+| Mon | Supabase project + all 4 tables + RLS policies |
+| Mon | SendGrid account + domain auth (SPF/DKIM/DMARC) |
+| Tue | Next.js project scaffold + Tailwind + shadcn/ui |
+| Tue | Dashboard layout: sidebar + 7 page stubs |
+| Wed | CrewAI project setup + 5 agent definitions |
+| Wed | Apollo.io API integration (lead search + enrichment) |
+| Thu | Content Agent v1: topic generator (XHS) |
+| Thu | Lead scoring function v1 |
+| Fri | Email Agent v1: personalized email draft generator |
+| Fri | Basic lead pipeline page (Kanban) |
+
+**Week 1 Exit Criteria**: Can search Apollo for founders, score them, generate email drafts, see them in dashboard.
+
+### Week 2 — Email Engine + A/B Testing
+
+| Day | Deliverable |
+|-----|-------------|
+| Mon | SendGrid integration: send emails via API |
+| Mon | Email sequence engine (3-email drip with delays) |
+| Tue | Variant tracking: A/B subject lines + body |
+| Tue | Reply detection (SendGrid webhooks / inbound parse) |
+| Wed | Follow-up scheduler with stop rules (reply/bounce/unsub) |
+| Wed | Email warmup: start sending 10-20/day |
+| Thu | Experiment tracking table + basic results page |
+| Thu | Outreach queue page (today's contacts) |
+| Fri | Email campaign dashboard (sent/opened/replied stats) |
+| Fri | Integration testing: full email flow end-to-end |
+
+**Week 2 Exit Criteria**: Can send A/B tested email sequences, track replies, auto-stop on bounce/reply, see results in dashboard.
+
+### Week 3 — XHS Workflow + Analytics
+
+| Day | Deliverable |
+|-----|-------------|
+| Mon | Content Agent v2: full script generator + quality gates |
+| Mon | "Ready-to-post pack" UI with copy buttons |
+| Tue | Content calendar page (weekly view) |
+| Tue | DM template generator (opener + 2 follow-ups) |
+| Wed | Analytics ingestion: screenshot upload + parsing |
+| Wed | Weekly metrics report generator |
+| Thu | LinkedIn Content Agent: post generator (3/week) |
+| Thu | LinkedIn outreach queue (20 profiles/day view) |
+| Fri | Outcome logging (one-click: positive/neutral/negative) |
+| Fri | Weekly experiment review page |
+
+**Week 3 Exit Criteria**: Full XHS content pipeline (topic → script → post pack → analytics), LinkedIn content + outreach queue working.
+
+### Week 4 — Lead Scoring + Polish + Launch
+
+| Day | Deliverable |
+|-----|-------------|
+| Mon | Lead scoring model v1 (rule-based, see Section 2.2) |
+| Mon | Multi-source lead import (Product Hunt, Crunchbase, manual CSV) |
+| Tue | Message template library (browse, edit, clone) |
+| Tue | Personalization snippet engine |
+| Wed | Dashboard home: KPI cards + funnel visualization |
+| Wed | Slack/notification integration for daily reminders |
+| Thu | Security audit: all guardrails enforced |
+| Thu | Performance testing: 500 leads, 200 emails |
+| Fri | Documentation + team training |
+| Fri | **v1 LAUNCH** |
+
+**Week 4 Exit Criteria**: Production system handling 200+ emails/week, 5 XHS posts/week, 20 LinkedIn outreaches/day, full analytics dashboard, all security guardrails active.
+
+---
+
+## 9. DAILY OPERATING LOOP (Post-Launch)
+
+### Daily (60-120 min)
+```
+08:00 — Review overnight email replies (agent pre-classifies)
+08:30 — Approve today's email batch (agent shows draft + recipients)
+09:00 — Review & post XHS content (copy from dashboard)
+09:30 — LinkedIn: send 20 connections/DMs (from queue)
+10:00 — Log outcomes for yesterday's outreach
+10:30 — Review new leads scored by agent
+```
+
+### Weekly (90 min, Friday)
+```
+- Run experiment review (which messages/content converted)
+- Update ICP rules + scoring weights
+- Approve next week's content slate (agent pre-generated)
+- Review pipeline: how many at each stage
+- Set next week's A/B test hypotheses
+```
+
+---
+
+## 10. COST ESTIMATE (Monthly)
+
+| Item | Cost |
+|------|------|
+| Supabase (Pro) | $25 |
+| Vercel (Pro) | $20 |
+| Railway (Python agents) | $5-20 |
+| SendGrid (Essentials) | $20 |
+| Apollo.io (Basic) | $49 |
+| Claude API | $50-100 |
+| OpenAI API (fallback) | $20-30 |
+| Redis (Upstash) | $0-10 |
+| **Total** | **~$200-275/month** |
+
+**Leaner option** (from Senior Engineer agent): ~$135/month using Apollo.io free tier and optimized API usage.
+
+---
+
+## APPENDIX A — OpenClaw Deep Dive
+
+### What OpenClaw Is
+- **Free, open-source autonomous AI agent** by Peter Steinberger (157K+ GitHub stars)
+- Local-first execution with persistent memory (Markdown files)
+- 5,705+ skills on ClawHub marketplace
+- Connects via WhatsApp, Telegram, Discord, Slack, iMessage
+- Model-agnostic (Claude, GPT, local models)
+
+### Architecture
+- **Brain**: LLM-powered reasoning engine (TypeScript/Node.js 22+)
+- **Hands**: Execution environment (shell, files, browser)
+- **Gateway**: WebSocket control plane
+- **`soul.md`**: Agent personality/goals
+- **`skill.md`**: Individual skill instructions
+
+### Marketing Capabilities
+- Competitor analysis: 6-8 hours saved per cycle
+- Content repurposing: 1 blog → 12 pieces
+- Email generation: 30 variations in 30 minutes
+- Social proof collection: 5-10 pieces weekly
+- Pre-event networking intelligence
+
+### Key Takeaways for GrowthOps Agent
+1. **Replicate**: Local-first execution, persistent memory, skill marketplace, webhook triggers
+2. **Improve upon**: Security (42K+ exposed panels), ease of setup, domain-specific intelligence, compliance guardrails, analytics feedback loops
+
+### Sources
+- [OpenClaw GitHub](https://github.com/openclaw/openclaw)
+- [OpenClaw Marketing Playbook](https://marketingagent.blog/2026/01/31/how-to-use-openclaw-ai-for-marketing-in-2026-a-complete-playbook/)
+- [DigitalOcean: What is OpenClaw](https://www.digitalocean.com/resources/articles/what-is-openclaw)
+- [CNBC: OpenClaw Rise](https://www.cnbc.com/2026/02/02/openclaw-open-source-ai-agent-rise-controversy-clawdbot-moltbot-moltbook.html)
+
+---
+
+## APPENDIX B — Marketing Tools Intelligence
+
+### LinkedIn Safety Limits (Critical Numbers)
+
+| Action | Safe Limit |
+|--------|-----------|
+| Connection requests | 80/week (no Sales Nav), 100-200/week (with) |
+| Messages to connections | 150/day |
+| Messages to non-connections | 10/week |
+| Profile views | 500/day free, 2,000/day premium |
+| Acceptance rate threshold | Must stay above 30% or risk restriction |
+
+### 小红书 Content Rules
+- Posts must be **60%+ original** for algorithmic promotion
+- Algorithm uses **weighted contribution model** rewarding consistency
+- Position startup content as **lifestyle content** (office tours, team stories, day-in-the-life)
+
+### 小红书 AI Tools
+
+| Tool | Use |
+|------|-----|
+| **洪书智语 (Hongshu Zhiyu)** | Copy generation, 15M+ popular copy library |
+| **Reditor Editor** | Note creation, formatting, content checking |
+| **XHSPlus** | Analytics and strategy optimization |
+| **数图宝 (Shutu Bao)** | Bulk graphic + text generation |
+
+### Email Auth Requirements (2025-2026)
+- Google, Yahoo, Microsoft Outlook all mandate SPF + DKIM + DMARC
+- Authenticated senders are **2.7x more likely** to reach inbox
+- DMARC rollout: `p=none` → `p=quarantine` → `p=reject`
+
+### Recommended Tool Stack Addition
+
+| Layer | Primary | Alternative |
+|-------|---------|-------------|
+| LinkedIn compliance | **Cognism** | Closely |
+| XHS content | **洪书智语** + Reditor | XHSPlus |
+| Lead scoring | **Apollo.io** (275M+ contacts) | Warmly |
+| Workflow glue | **n8n** or **Make** | Gumloop |
+
+### Sources
+- [LinkedIn Automation Limits 2026](https://konnector.ai/linkedin-automation-2026/)
+- [Email Deliverability SPF/DKIM/DMARC](https://www.egenconsulting.com/blog/email-deliverability-2026.html)
+- [Xiaohongshu Strategy Guide](https://marketingtochina.com/xiaohongshu-little-red-book-the-definitive-guide-for-advanced-marketers/)
+
+---
+
+## APPENDIX C — Founder Discovery Deep Dive
+
+### API-Based Founder Pipeline
+
+```
+[Product Hunt API] ──┐
+[Crunchbase API]  ───┤
+[GitHub API]      ───┤──→ [Collection Layer] ──→ [Apollo.io Enrichment] ──→ [Scoring] ──→ [Outreach Queue]
+[Twitter/X API]   ───┤
+[Reddit API]      ───┤
+[Hacker News API] ───┘
+```
+
+### API Endpoints
+
+| Source | Endpoint | Auth | Rate Limit | Cost |
+|--------|----------|------|------------|------|
+| **Product Hunt** | `api.producthunt.com/v2/api/graphql` | OAuth2 | 450/15min | Free |
+| **Crunchbase** | `api.crunchbase.com/api/v4/searches/organizations` | API key | Plan-dependent | From $49/mo |
+| **GitHub** | `api.github.com/search/users` | PAT | 5,000/hr | Free |
+| **Twitter/X** | `api.twitter.com/2/tweets/search/recent` | Bearer | Tier-dependent | From $100/mo |
+| **Reddit** | `oauth.reddit.com/r/startups/search` | OAuth2 | 60/min | Free |
+| **Hacker News** | `hacker-news.firebaseio.com/v0/` | None | Generous | Free |
+
+### Search Queries
+
+```python
+# GitHub: Find US founders
+"/search/users?q=type:user+location:US+repos:>5+followers:>10"
+
+# Twitter: Real-time founder signals
+"#buildinpublic OR #startup OR 'just launched' -is:retweet lang:en"
+
+# Reddit: Founders seeking visibility
+"/r/startups/search?q=flair:feedback OR flair:launch"
+```
+
+### Aggregation Tools
+
+| Tool | What It Does | Pricing |
+|------|-------------|---------|
+| **Clay** | No-code lead lists from 75+ data sources | From $149/mo |
+| **Apify** | Pre-built scrapers for PH, Twitter, Reddit, GitHub | Pay per usage |
+| **Phantombuster** | LinkedIn, Twitter, PH automation | From $69/mo |
+| **Bardeen.ai** | Browser automation for scraping workflows | Free tier |
+
+### Three-Phase Strategy
+
+**Phase 1 (Week 1-2)**: Post in r/startups, Indie Hackers, HN; scrape Product Hunt API; monitor #buildinpublic
+**Phase 2 (Week 3-4)**: Set up Clay/Apollo; Hunter.io for emails; cold email via SendGrid; partner with accelerators
+**Phase 3 (Month 2+)**: Cron jobs pulling from all 6 APIs daily; auto-enrich + score; trigger outreach for score > 60
+
+### Communities to Join
+
+| Community | Platform | Signal Quality |
+|-----------|----------|---------------|
+| Startup School | Discord (YC) | Very high |
+| On Deck Founders | Slack | Very high |
+| South Park Commons | Slack | Very high |
+| Pioneer | Web | High |
+| Indie Hackers | Forum | High |
+
+### Sources
+- [Crunchbase API](https://data.crunchbase.com/docs)
+- [Product Hunt API](https://api.producthunt.com/v2/docs)
+- [GitHub REST API](https://docs.github.com/en/rest)
+- [Apollo.io](https://www.apollo.io/)
+- [Clay](https://www.clay.com/)
+
+---
+
+## APPENDIX D — AI Agent Architecture Deep Dive
+
+### Framework Recommendation: Two-Phase
+
+| Phase | Framework | Why |
+|-------|-----------|-----|
+| **Phase 1 (MVP)** | **CrewAI** | Fastest time-to-demo, YAML config, role-based agents |
+| **Phase 2 (Prod)** | **LangGraph** | Stateful graphs, conditional branching, LangSmith observability, HITL checkpoints |
+
+### Content Pipeline with Quality Gates
+
+```
+Input (brief) → [Draft Agent] → [Eval Agent] → Pass/Fail
+                                      ↓ if fail (max 3 loops)
+                               [Revision Agent]
+                                      ↓ if confidence < 0.85
+                               [Human Review Queue]
+                                      ↓
+                               Published
+```
+
+### Lead Scoring: Hybrid
+
+- **Structured signals** (XGBoost): firmographics, engagement, page visits
+- **Unstructured signals** (LLM): reply sentiment, social post intent, embedding similarity
+- **Ensemble**: Score > 80 → sales routing; 50-80 → nurture; < 50 → awareness
+
+### Human-in-the-Loop Patterns
+
+| Trigger | Pattern |
+|---------|---------|
+| LLM confidence < threshold | Confidence-based escalation |
+| Send to >1000 recipients | Approval gate |
+| First N outputs of new agent | Canary deployment |
+| Every 50th output | Statistical audit |
+| User thumbs-down | Feedback loop |
+
+### pgvector for Self-Improving Discovery
+
+```sql
+ALTER TABLE leads ADD COLUMN embedding vector(1536);
+
+-- Find leads similar to best-converting founders
+SELECT * FROM leads
+ORDER BY embedding <=> (
+  SELECT AVG(embedding) FROM leads WHERE status = 'uploaded'
+) LIMIT 20;
+```
+
+### Cost Optimization
+
+| Task Type | Model | Cost |
+|-----------|-------|------|
+| Content drafts, analysis | Claude Sonnet | ~$3/M input |
+| Lead classification | Claude Haiku | ~$0.25/M input |
+| Email subject lines | Haiku (batch) | Cheapest |
+| Strategy, experiment analysis | Claude Opus | Use sparingly |
+
+### Sources
+- [LangGraph vs CrewAI vs AutoGen](https://www.datacamp.com/tutorial/crewai-vs-langgraph-vs-autogen)
+- [Agent Orchestration 2026](https://iterathon.tech/blog/ai-agent-orchestration-frameworks-2026)
+- [Agentic Workflow Architectures](https://www.stack-ai.com/blog/the-2026-guide-to-agentic-workflow-architectures)
+- [HITL Best Practices](https://www.permit.io/blog/human-in-the-loop-for-ai-agents-best-practices-frameworks-use-cases-and-demo)
+
+---
+
+## APPENDIX E — Security & Compliance Deep Dive
+
+### 8-Week Security Timeline
+
+| Week | Focus | Key Deliverables |
+|------|-------|-----------------|
+| 1 | Secret Management | Vault/Secrets Manager, `.env` → `.gitignore`, RBAC |
+| 2 | Email Deliverability | SPF/DKIM/DMARC on `outreach.pitchtok.com`, unsubscribe endpoint |
+| 3 | Rate Limiting | Redis rate limiter, warmup schedule (5/day start), approval gates |
+| 4 | GDPR/CCPA | PII encryption (Fernet), data deletion endpoints, 2yr retention |
+| 5 | LLM Security | Input sanitization, placeholder personalization, output validation |
+| 6 | Platform Compliance | LinkedIn draft watermarks, XHS content validation |
+| 7 | Audit Logging | Append-only audit table, monitoring alerts |
+| 8 | Security Audit | OWASP Top 10, bandit, trufflehog, penetration testing |
+
+### PII-Safe LLM Pattern
+
+```python
+# Generate with placeholders — NEVER send real PII to LLM
+template = llm.generate(founder_name="[FOUNDER_NAME]", ...)
+personalized = template.replace("[FOUNDER_NAME]", real_name)
+```
+
+### Email Warmup (Conservative)
+
+```
+Week 1: 5/day → Week 2: 10/day → Week 3: 20/day → Week 4: 35/day
+Week 5: 50/day → Week 6: 75/day → Week 7: 100/day → Week 8: 150/day
+```
+
+### Red Flags → Immediate Pause
+- Bounce rate >10%
+- Complaint rate >0.1%
+- Any LinkedIn account restriction
+- DMARC alignment failures
+
+### Ongoing Cadence
+- **Monthly**: DMARC reports, bounce review, API key rotation
+- **Quarterly**: Security audit, penetration test, dependency scan
+- **Annually**: Legal review, LIA update, DPA renewal
+
+---
+
+## APPENDIX F — Growth Hacker's Conversion Playbook
+
+### Channel Conversion Ranking
+
+| Tier | Channel | Reply Rate | Upload Rate | CAC |
+|------|---------|-----------|-------------|-----|
+| **1** | VC/Angel Referrals | 60-80% | 20-35% | $50-150 |
+| **1** | Founder Communities | 35-50% | 20-35% | $200-400 |
+| **2** | LinkedIn (targeted) | 15-25% | 8-15% | $80-120 |
+| **2** | Email (enriched) | 8-15% | 8-15% | $40-80 |
+| **3** | 小红书 | 2-5% DM | 3-7% | $150-300 |
+| **3** | Twitter/X | 5-12% | 3-7% | $200-500 |
+| **Avoid** | Reddit, Facebook, Cold calling | <3% | <1% | $500+ |
+
+### The Email Sequence That Actually Converts
+
+**Email 1 (Day 0)** — Pattern Interrupt:
+> "Hi {{FirstName}}, are you actively fundraising for {{Company}}? Upload a 60-second pitch video, we'll show it to 200+ VCs. Zero cost. Reply 'yes' and I'll send you the link."
+
+**Email 2 (Day 3)** — Social Proof:
+> "47 founders uploaded this week. 5 got investor intros already. Still open for {{Company}}."
+
+**Email 3 (Day 7)** — Breakup:
+> "Last email - closing this batch Friday. If you know another founder fundraising, forward this."
+
+### Most Predictive Lead Scoring Signals
+
+| Signal | Points |
+|--------|--------|
+| Replied "yes"/"interested" | +40 |
+| Clicked upload link | +35 |
+| Asked clarifying question | +30 |
+| Company raised <$500K | +12 |
+| Founded last 6 months | +12 |
+| Active on social 3+/wk | +8 |
+| Company raised >$5M | -15 |
+| >10K LinkedIn followers | -8 |
+
+### Content Calendar
+
+| Day | LinkedIn | 小红书 |
+|-----|----------|--------|
+| **Mon** | Tactical "How to" thread | 60-75s tutorial video |
+| **Wed** | Hot take / debate | Image carousel |
+| **Fri** | Case study | Founder success story |
+
+### Growth Milestones
+
+| Month | Outreach/Day | Uploads/Wk | CAC |
+|-------|-------------|------------|-----|
+| 1 | 100+ | 5-10 | $200-400 |
+| 2 | 300+ | 15-20 | $120-200 |
+| 3 | 500+ | 25-35 | $85-120 |
+| 4+ | 800+ | 40-60 | $60-85 |
+
+### 小红书 Content Hooks (Chinese-American Founders)
+
+1. "我在30天内pitch了50个美国VC - 这5个错误让我浪费了3个月"
+2. "为什么你的pitch deck在美国VC那里没有回音?"
+3. "YC面试官告诉我:60秒pitch比20页deck更有效"
+4. "从零到$2M seed round - 我用了这个pitch框架"
+5. "美国早期VC最想看到的3个数据 (90%的创始人都错了)"
+
+### Weekly Report Template
+
+```
+📊 OVERVIEW
+| Metric              | This Week | Last Week | Target |
+|---------------------|-----------|-----------|--------|
+| Videos Uploaded      | {{X}}     | {{Y}}     | 25     |
+| Blended CAC          | ${{X}}   | ${{Y}}    | $85    |
+| Outreach Volume      | {{X}}    | {{Y}}     | 1000   |
+| Overall Conversion   | {{X%}}   | {{Y%}}    | 5%     |
+
+🚀 WINS: {{top 3}}
+🔴 PROBLEMS: {{top 2 with root cause}}
+📈 CHANNEL BREAKDOWN: Email / LinkedIn / 小红书 / Referrals
+🧪 EXPERIMENTS: Running / Completed / Queued
+📅 NEXT WEEK PRIORITIES: 1 / 2 / 3
+```
+
+### Breaking Point
+> At 50+ uploads/week, you can't personally respond to all DMs. Hire a part-time SDR.
+
+---
+
+## Sources (All Agents Combined)
+
+### OpenClaw & Architecture
+- [OpenClaw GitHub](https://github.com/openclaw/openclaw)
+- [OpenClaw Architecture Overview](https://ppaolo.substack.com/p/openclaw-system-architecture-overview)
+- [OpenClaw Marketing Playbook](https://marketingagent.blog/2026/01/31/how-to-use-openclaw-ai-for-marketing-in-2026-a-complete-playbook/)
+- [DigitalOcean: What is OpenClaw](https://www.digitalocean.com/resources/articles/what-is-openclaw)
+- [CNBC: OpenClaw Rise](https://www.cnbc.com/2026/02/02/openclaw-open-source-ai-agent-rise-controversy-clawdbot-moltbot-moltbook.html)
+
+### AI Frameworks
+- [LangGraph vs CrewAI vs AutoGen](https://www.datacamp.com/tutorial/crewai-vs-langgraph-vs-autogen)
+- [Agent Orchestration 2026 Guide](https://iterathon.tech/blog/ai-agent-orchestration-frameworks-2026)
+- [Top AI Agent Frameworks 2026](https://medium.com/@iimoyjv0493b/top-9-ai-agent-frameworks-in-2026-3d95383b8146)
+
+### Lead Discovery & Enrichment
+- [Apollo.io Review 2026](https://lagrowthmachine.com/apollo-io-review/)
+- [Recently Funded Startups Database](https://growthlist.co/funded-startups/)
+- [AI Startup Scouting Tools](https://qubit.capital/blog/ai-startup-scouting-tools)
+- [Lead Enrichment Tools 2026](https://www.default.com/post/lead-enrichment-tools)
+
+### Marketing & Email
+- [LinkedIn Automation Limits 2026](https://konnector.ai/linkedin-automation-2026/)
+- [Email Deliverability SPF/DKIM/DMARC](https://www.egenconsulting.com/blog/email-deliverability-2026.html)
+- [Xiaohongshu Strategy Guide](https://marketingtochina.com/xiaohongshu-little-red-book-the-definitive-guide-for-advanced-marketers/)
+- [AI Marketing Tools 2026](https://www.marketermilk.com/blog/ai-marketing-tools)
+- [HITL AI Best Practices](https://www.permit.io/blog/human-in-the-loop-for-ai-agents-best-practices-frameworks-use-cases-and-demo)

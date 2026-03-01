@@ -1,0 +1,62 @@
+ ⨯ ./src/components/MovementGuidance.tsx
+Error:
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\MovementGuidance.tsx:386:1]
+ 386 │   }, [correctionKeyframe, interpolation, currentPose]);
+ 387 │
+ 388 │   return (
+ 389 │     <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+     ·      ───
+ 390 │       {/* Header */}
+ 391 │       {correctionKeyframe && (
+ 392 │         <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/MovementGuidance.tsx
+./src/app/analytics/page.tsx
+ ⨯ ./src/components/MovementGuidance.tsx
+Error:
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\MovementGuidance.tsx:386:1]
+ 386 │   }, [correctionKeyframe, interpolation, currentPose]);
+ 387 │
+ 388 │   return (
+ 389 │     <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+     ·      ───
+ 390 │       {/* Header */}
+ 391 │       {correctionKeyframe && (
+ 392 │         <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/MovementGuidance.tsx
+./src/app/analytics/page.tsx
+ ⨯ ./src/components/MovementGuidance.tsx
+Error:
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\components\MovementGuidance.tsx:386:1]
+ 386 │   }, [correctionKeyframe, interpolation, currentPose]);
+ 387 │
+ 388 │   return (
+ 389 │     <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+     ·      ───
+ 390 │       {/* Header */}
+ 391 │       {correctionKeyframe && (
+ 392 │         <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/MovementGuidance.tsx
+./src/app/analytics/page.tsx
+ GET /analytics 500 in 4935ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 500 in 16ms

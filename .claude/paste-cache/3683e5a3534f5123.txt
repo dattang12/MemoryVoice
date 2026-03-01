@@ -1,0 +1,103 @@
+3D Pose View Bug Analysis & Solutions
+File: src/components/PoseSandbox3D.tsx
+
+BUG 1: Canvas Only Shows ~1/3 of Container Height (Half-Screen Issue)
+Root Cause
+The CanvasErrorBoundary class component wraps its children in a plain <div> with no height, causing the R3F Canvas to collapse.
+Line 52 — the render method of CanvasErrorBoundary:
+tsxreturn <div key={this.state.errorKey}>{this.props.children}</div>;
+```
+
+This creates the following DOM hierarchy:
+```
+div.h-[450px]           → 450px (explicit height ✅)
+  └── div (ErrorBoundary wrapper) → NO height set ❌ collapses!
+       └── div (R3F root, style="height:100%") → 100% of nothing = ~150px
+            └── canvas → ~150px
+The R3F <Canvas> internally creates a div with height: 100%, but since its parent (the ErrorBoundary wrapper div) has no explicit height, 100% collapses to the content's intrinsic height (~150px instead of 450px).
+Fix
+Change line 52 from:
+tsxreturn <div key={this.state.errorKey}>{this.props.children}</div>;
+To:
+tsxreturn <div key={this.state.errorKey} className="h-full">{this.props.children}</div>;
+Alternatively, you can use inline style:
+tsxreturn <div key={this.state.errorKey} style={{ height: '100%' }}>{this.props.children}</div>;
+This makes the ErrorBoundary wrapper div inherit the full 450px height from its parent, allowing the R3F Canvas to fill the entire container.
+
+BUG 2: Skeleton Lines Not Correctly Connected
+This is actually two sub-problems:
+Sub-Problem A: CorrectionArrows (blue lines) are visually broken
+Root Cause: The CorrectionArrow component (lines 321-344) renders an arrowHelper positioned at the midpoint between the two joints, extending only half the distance (length / 2) in the from→to direction. This means:
+
+The arrow starts at the midpoint (center of the gap between skeletons), not at the user's joint
+The arrow only covers the second half of the path (midpoint → target joint)
+The first half (user joint → midpoint) is completely invisible
+This creates confusing blue lines that appear to float disconnected in space
+
+Lines 340-341:
+tsx<group position={midpoint}>
+  <arrowHelper args={[direction, new THREE.Vector3(0, 0, 0), length / 2, 0x00a0ff, 0.05, 0.03]} />
+</group>
+Fix for Sub-Problem A
+Replace the entire CorrectionArrow component (lines 321-344) with a version that draws a full line from source to target using drei's Line:
+tsxfunction CorrectionArrow({ from, to }: CorrectionArrowProps) {
+  return (
+    <Line
+      points={[from, to]}
+      color="#00a0ff"
+      lineWidth={2}
+      dashed
+      dashSize={0.05}
+      gapSize={0.03}
+    />
+  );
+}
+Or if you still want an arrowhead, position the arrow at the from point with the full length:
+tsxfunction CorrectionArrow({ from, to }: CorrectionArrowProps) {
+  const direction = useMemo(() => {
+    const dir = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+    return dir.normalize();
+  }, [from, to]);
+
+  const length = useMemo(() => {
+    return new THREE.Vector3(...from).distanceTo(new THREE.Vector3(...to));
+  }, [from, to]);
+
+  return (
+    <group position={from}>
+      <arrowHelper args={[direction, new THREE.Vector3(0, 0, 0), length, 0x00a0ff, 0.08, 0.04]} />
+    </group>
+  );
+}
+Sub-Problem B: Correct pose skeleton missing bone connections on one side
+Root Cause: The landmarksTo3D function (line 221) filters out landmarks with visibility <= 0.3. The correct/target pose data has several landmarks with very low visibility (R Elbow: 0.057, R Wrist: 0.041, R Knee: 0.296, etc.), causing 7 out of 18 bone connections to be dropped — the entire right arm and right leg appear as disconnected dots.
+Line 221:
+tsxif (lm && lm.visibility > 0.3) {
+Fix for Sub-Problem B
+Lower the visibility threshold for the correct/target pose, or use a different threshold parameter:
+Option 1 (Recommended): Add a visibilityThreshold parameter to landmarksTo3D:
+tsxfunction landmarksTo3D(
+  landmarks: PoseLandmark[],
+  scale: number = 2,
+  visibilityThreshold: number = 0.3
+): Map<number, [number, number, number]> {
+  const positions = new Map<number, [number, number, number]>();
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i];
+    if (lm && lm.visibility > visibilityThreshold) {
+      const x = (lm.x - 0.5) * scale;
+      const y = -(lm.y - 0.5) * scale;
+      const z = -lm.z * scale;
+      positions.set(i, [x, y, z]);
+    }
+  }
+  return positions;
+}
+Then in SkeletonMesh, call it with a lower threshold for the correct pose:
+tsxconst positions = useMemo(() => landmarksTo3D(landmarks, 2, 0.01), [landmarks]);
+Option 2 (Simpler): Just lower the global threshold from 0.3 to 0.05:
+tsxif (lm && lm.visibility > 0.05) {
+
+Summary of All Changes
+LineCurrent CodeFix52return <div key={this.state.errorKey}>{this.props.children}</div>;Add className="h-full" to the div221if (lm && lm.visibility > 0.3)Lower to 0.05 or add a configurable parameter321-344CorrectionArrow using midpoint + half-length arrowHelperPosition arrow at from with full length, or replace with drei <Line>
+These three changes will fix both the half-screen rendering and the broken skeleton line connections.

@@ -1,0 +1,311 @@
+     1→// Database types - supports both old and new schema
+     2→export interface Session {
+     3→  id: string;
+     4→  user_id: string;
+     5→  // Old schema
+     6→  mode?: string;
+     7→  started_at?: string;
+     8→  ended_at?: string | null;
+     9→  score_summary?: ScoreSummary;
+    10→  // New schema (from supabase-migration-v2)
+    11→  type?: 'analytics' | 'practice' | 'strategy';
+    12→  created_at: string;
+    13→  video_path?: string;
+    14→  video_url?: string;
+    15→  filename?: string;
+    16→  duration_seconds?: number;
+    17→  overall_score?: number;
+    18→  summary?: ScoreSummary;
+    19→  pose_data?: any[];
+    20→  frame_count?: number;
+    21→  // v3 enhanced schema
+    22→  status?: 'processing' | 'ready' | 'error';
+    23→  match_format?: 'singles' | 'doubles';
+    24→  event_type?: 'MS' | 'WS' | 'MD' | 'WD' | 'XD';
+    25→  selected_tracks?: number[];
+    26→  summary_score?: number;
+    27→  skill_level?: 'beginner' | 'intermediate' | 'advanced';
+    28→  rules_version?: string;
+    29→  tracks_data?: PlayerTrackData[];
+    30→}
+    31→
+    32→export interface ScoreSummary {
+    33→  green_count?: number;
+    34→  green_frames?: number;
+    35→  red_count?: number;
+    36→  red_frames?: number;
+    37→  total_frames: number;
+    38→  average_score?: number;
+    39→  green_ratio?: number;
+    40→  drill_id?: string;
+    41→  drill_type?: string;
+    42→  metrics_avg?: PoseMetrics;
+    43→  shot_count?: number;
+    44→  error_count?: number;
+    45→  feedback?: any;
+    46→}
+    47→
+    48→export interface AnalysisResult {
+    49→  id: string;
+    50→  user_id: string;
+    51→  video_path: string;
+    52→  result_json: AnalysisResultJson | null;
+    53→  status: 'processing' | 'completed' | 'error';
+    54→  created_at: string;
+    55→}
+    56→
+    57→export interface AnalysisResultJson {
+    58→  top_issues: Issue[];
+    59→  drills: Drill[];
+    60→  technique_summary: string;
+    61→  strategy_summary: string;
+    62→  training_plan: TrainingPlanItem[];
+    63→  drill_visuals?: string[]; // URLs to generated drill images
+    64→}
+    65→
+    66→export interface Issue {
+    67→  id: string;
+    68→  title: string;
+    69→  severity: 'high' | 'medium' | 'low';
+    70→  description: string;
+    71→  affected_metrics: string[];
+    72→}
+    73→
+    74→export interface Drill {
+    75→  id: string;
+    76→  name: string;
+    77→  description: string;
+    78→  duration_minutes: number;
+    79→  target_metrics: string[];
+    80→  instructions: string[];
+    81→}
+    82→
+    83→export interface TrainingPlanItem {
+    84→  day: number;
+    85→  focus: string;
+    86→  drills: string[];
+    87→  duration_minutes: number;
+    88→}
+    89→
+    90→export interface RacketFavorite {
+    91→  id: string;
+    92→  user_id: string;
+    93→  racket_id: string;
+    94→  created_at: string;
+    95→}
+    96→
+    97→// Pose estimation types
+    98→export interface PoseMetrics {
+    99→  elbow_angle: number;
+   100→  knee_angle: number;
+   101→  stance_width_norm: number;
+   102→  shoulder_hip_rotation_proxy: number;
+   103→  timestamp?: number;
+   104→}
+   105→
+   106→export interface PoseLandmark {
+   107→  x: number;
+   108→  y: number;
+   109→  z: number;
+   110→  visibility: number;
+   111→}
+   112→
+   113→// API types
+   114→export interface TickRequest {
+   115→  metrics_snapshot: PoseMetrics;
+   116→  drill_id?: string;
+   117→  session_id?: string;
+   118→}
+   119→
+   120→export interface TickResponse {
+   121→  cue: string;
+   122→  focus_metric: string;
+   123→  green_thresholds: {
+   124→    [key: string]: { min: number; max: number };
+   125→  };
+   126→  is_green: boolean;
+   127→}
+   128→
+   129→export interface RacketRecommendRequest {
+   130→  level: 'beginner' | 'intermediate' | 'advanced';
+   131→  weaknesses: string[];
+   132→  style_pref?: 'power' | 'control' | 'all-round';
+   133→}
+   134→
+   135→export interface Racket {
+   136→  id: string;
+   137→  name: string;
+   138→  brand: string;
+   139→  price_band: 'budget' | 'mid-range' | 'premium';
+   140→  price_range: string;
+   141→  play_style: string[];
+   142→  skill_level: string[];
+   143→  weight: string;
+   144→  balance: string;
+   145→  flexibility: string;
+   146→  description: string;
+   147→  image_url: string;
+   148→  ebay_search_query: string;
+   149→}
+   150→
+   151→export interface RacketRecommendation extends Racket {
+   152→  match_score: number;
+   153→  match_reason: string;
+   154→}
+   155→
+   156→// Chart data types
+   157→export interface ChartDataPoint {
+   158→  date: string;
+   159→  score: number;
+   160→  greenRatio?: number;
+   161→  checkIns?: number;
+   162→}
+   163→
+   164→// User profile
+   165→export interface UserProfile {
+   166→  id: string;
+   167→  email: string;
+   168→  created_at: string;
+   169→}
+   170→
+   171→// ============================================
+   172→// V3 Enhanced Types
+   173→// ============================================
+   174→
+   175→// Session assets for persistent storage
+   176→export interface SessionAsset {
+   177→  id: string;
+   178→  session_id: string;
+   179→  kind: 'video' | 'analysis_json' | 'pose_json' | 'keyframe1' | 'keyframe2' | 'keyframe3' | 'trajectory_json' | 'trajectory_video' | 'tracks_thumbnail';
+   180→  storage_path: string;
+   181→  storage_bucket: string;
+   182→  metadata?: Record<string, any>;
+   183→  created_at: string;
+   184→}
+   185→
+   186→// Player track data for multi-person tracking
+   187→export interface PlayerTrackData {
+   188→  track_id: number;
+   189→  thumbnail_url?: string;
+   190→  bbox_samples: BoundingBoxSample[];
+   191→  side?: 'near' | 'far';
+   192→  is_selected: boolean;
+   193→  confidence_avg: number;
+   194→  frame_count: number;
+   195→}
+   196→
+   197→export interface BoundingBoxSample {
+   198→  frame: number;
+   199→  x: number;
+   200→  y: number;
+   201→  w: number;
+   202→  h: number;
+   203→  confidence?: number;
+   204→}
+   205→
+   206→// Strategy mode types
+   207→export interface StrategyResult {
+   208→  id: string;
+   209→  session_id: string;
+   210→  original_trajectory: TrajectoryPoint[];
+   211→  refined_trajectory: TrajectoryPoint[];
+   212→  coaching_points: string[];
+   213→  court_homography?: number[][];
+   214→  shuttle_detections?: ShuttleDetection[];
+   215→  created_at: string;
+   216→}
+   217→
+   218→export interface TrajectoryPoint {
+   219→  x: number;
+   220→  y: number;
+   221→  timestamp: number;
+   222→  court_x?: number; // Court-mapped x coordinate (0-1)
+   223→  court_y?: number; // Court-mapped y coordinate (0-1)
+   224→}
+   225→
+   226→export interface ShuttleDetection {
+   227→  frame: number;
+   228→  x: number;
+   229→  y: number;
+   230→  confidence: number;
+   231→}
+   232→
+   233→// Banded scoring types
+   234→export type ScoreBand = 'green' | 'yellow' | 'red' | 'unknown';
+   235→
+   236→export interface BandedScore {
+   237→  band: ScoreBand;
+   238→  value: number;
+   239→  confidence: number;
+   240→  feedback?: string;
+   241→}
+   242→
+   243→export interface ScoringRulesConfig {
+   244→  version: string;
+   245→  skill_bands: {
+   246→    beginner: SkillBandConfig;
+   247→    intermediate: SkillBandConfig;
+   248→    advanced: SkillBandConfig;
+   249→  };
+   250→  confidence_threshold: number;
+   251→  phase_rules: Record<string, PhaseRule>;
+   252→}
+   253→
+   254→export interface SkillBandConfig {
+   255→  green_tolerance: number; // Percentage wider than ideal
+   256→  yellow_tolerance: number; // Percentage wider than green
+   257→}
+   258→
+   259→export interface PhaseRule {
+   260→  name: string;
+   261→  applicable_metrics: string[];
+   262→  thresholds: Record<string, { min: number; max: number }>;
+   263→}
+   264→
+   265→// Multi-pose detection result
+   266→export interface MultiPoseResult {
+   267→  poses: DetectedPose[];
+   268→  timestamp: number;
+   269→}
+   270→
+   271→export interface DetectedPose {
+   272→  track_id: number;
+   273→  landmarks: PoseLandmark[];
+   274→  bbox: { x: number; y: number; w: number; h: number };
+   275→  confidence: number;
+   276→}
+   277→
+   278→// Event type labels
+   279→export const EVENT_TYPE_LABELS: Record<string, string> = {
+   280→  MS: "Men's Singles",
+   281→  WS: "Women's Singles",
+   282→  MD: "Men's Doubles",
+   283→  WD: "Women's Doubles",
+   284→  XD: 'Mixed Doubles',
+   285→};
+   286→
+   287→// 3D Skeleton animation types
+   288→export interface SkeletonKeyframe {
+   289→  label: string;
+   290→  landmarks: { x: number; y: number; z: number }[];
+   291→  timestamp: number;
+   292→}
+   293→
+   294→export interface AnimatedDrill {
+   295→  id: string;
+   296→  name: string;
+   297→  phases: DrillPhase[];
+   298→  loop: boolean;
+   299→  duration_ms: number;
+   300→}
+   301→
+   302→export interface DrillPhase {
+   303→  name: string;
+   304→  keyframes: SkeletonKeyframe[];
+   305→  duration_ms: number;
+   306→}
+   307→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

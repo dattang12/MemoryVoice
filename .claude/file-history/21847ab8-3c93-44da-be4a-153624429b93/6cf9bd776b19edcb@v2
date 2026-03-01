@@ -1,0 +1,126 @@
+---
+name: growthops-xhs-content
+description: >
+  小红书 content automation: topic selection, script writing, caption/hashtag generation,
+  ready-to-post packs, and DM templates. Use when asked to "create XHS content", "小红书运营",
+  "选题", "写脚本", "小红书发布", "generate xiaohongshu post", or any 小红书 content task.
+  Does NOT auto-post (platform rules forbid it). Creates ready-to-copy content packs.
+tools: Bash
+metadata: {"openclaw":{"emoji":"📕"}}
+---
+
+# 小红书 Content Engine
+
+## What You Do
+Generate complete 小红书 content: topics, scripts, captions, hashtags, DM templates. Output ready-to-post content packs that the human copies and posts manually.
+
+## Topic Generation (选题)
+
+### ICP for Content
+- US-based early-stage founders (especially Chinese-American)
+- Building AI/SaaS/consumer products
+- Open to VC investment
+- Pain points: fundraising, pitching, getting investor attention
+
+### Topic Formula
+[Specific Number] + [Relatable Founder Pain] + [Unexpected Insight]
+
+### Proven Hook Templates (adapt these)
+1. "我在30天内pitch了50个美国VC - 这5个错误让我浪费了3个月"
+2. "为什么你的pitch deck在美国VC那里没有回音?"
+3. "YC面试官告诉我:60秒pitch比20页deck更有效"
+4. "从零到$2M seed round - 我用了这个pitch框架"
+5. "美国早期VC最想看到的3个数据 (90%的创始人都错了)"
+6. "我是怎么用一个60秒视频拿到投资人intro的"
+7. "Founder必看:这个pitch结构让投资人10秒内被吸引"
+8. "美国创业融资最大的误区 - 99%的中国founder都踩过"
+
+### Weekly Content Slate
+Generate 10 topics, score each by:
+- ICP match (1-5)
+- Novelty (1-5)
+- CTA suitability (1-5)
+- Production effort (1-5)
+
+Select top 5 for the week.
+
+## Script Generation (脚本)
+
+### Short Video Script (15-30s)
+```
+[0-3s] HOOK: Bold statement or question
+[3-15s] PROBLEM: Amplify the pain point
+[15-25s] INSIGHT: The key takeaway
+[25-30s] CTA: "DM我'pitch'获取完整模版"
+```
+
+### Long Video Script (45-60s)
+```
+[0-5s] HOOK: Pattern interrupt
+[5-20s] PAIN: Show you understand their struggle
+[20-45s] FRAMEWORK: 3-point insight with examples
+[45-55s] PROOF: Social proof ("47 founders used this")
+[55-60s] CTA: "评论'模版'我发给你" or "DM我了解更多"
+```
+
+## Ready-to-Post Pack
+
+Save to `workspace/xhs/content-packs/YYYY-MM-DD-{topic-slug}.md`:
+
+```markdown
+# 小红书 Content Pack — {Date}
+
+## Topic: {topic title}
+
+## Caption (直接复制)
+{caption text, 200-500 characters}
+
+## Hashtags (直接复制)
+#{tag1} #{tag2} #{tag3} ... (8-12 tags max)
+
+## Cover Text
+{3-6 word text overlay for cover image}
+
+## First Comment (发完帖子立刻评论)
+{summary + resource link + CTA}
+
+## Script
+{full script}
+
+## Shot List
+1. {shot description}
+2. {shot description}
+...
+
+## DM Template (有人评论/点赞后发)
+{personalized DM opener}
+
+## Posting Checklist
+- [ ] Video recorded and edited
+- [ ] Cover image with text overlay ready
+- [ ] Caption copied
+- [ ] Hashtags copied
+- [ ] Post published
+- [ ] First comment posted within 30 seconds
+- [ ] Set timer to reply to comments for 2 hours
+```
+
+## Quality Checks (Run Before Finalizing)
+- [ ] No vague claims ("best", "amazing") without specifics
+- [ ] Clear CTA present
+- [ ] Feels native (short lines, punchy, not corporate)
+- [ ] Under 500 characters for caption
+- [ ] 8-12 hashtags (not more)
+- [ ] No external links in caption (links go in first comment or bio)
+- [ ] Content is 60%+ original
+
+## Posting Schedule
+- 3x per week: Monday, Wednesday, Friday
+- Morning US time (8-10am) = Evening China time
+- Space posts at least 24 hours apart
+
+## Content Pillars (Rotate)
+1. **Fundraising Tactics** (40%) — pitch tips, VC insights
+2. **Founder Stories** (25%) — rejection, imposter syndrome
+3. **Market Insights** (20%) — what VCs fund in 2026
+4. **PitchTok Product** (15%) — success stories, platform features

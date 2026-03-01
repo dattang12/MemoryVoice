@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "default": {
+      "provider": "anthropic",
+      "apiKey": "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"
+    }
+  },
+  "active": "default"
+}

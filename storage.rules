@@ -1,0 +1,67 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // --------------------------------------------------------
+    // Helper functions
+    // --------------------------------------------------------
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidImageType() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isValidAudioType() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
+    function isUnderSizeLimit(limitMB) {
+      return request.resource.size <= limitMB * 1024 * 1024;
+    }
+
+    // --------------------------------------------------------
+    // Photos: /memories/{memoryId}/photos/{fileName}
+    // Read: public (share-link demo access)
+    // Write: authenticated users, images only, max 10MB
+    // --------------------------------------------------------
+    match /memories/{memoryId}/photos/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated()
+                   && isValidImageType()
+                   && isUnderSizeLimit(10);
+      allow delete: if isAuthenticated();
+    }
+
+    // --------------------------------------------------------
+    // Voice recordings: /memories/{memoryId}/voice/{fileName}
+    // Read: public (share-link demo access)
+    // Write: authenticated users, audio only, max 25MB
+    // --------------------------------------------------------
+    match /memories/{memoryId}/voice/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated()
+                   && isValidAudioType()
+                   && isUnderSizeLimit(25);
+      allow delete: if isAuthenticated();
+    }
+
+    // --------------------------------------------------------
+    // General memory assets: /memories/{memoryId}/{allPaths}
+    // Catch-all for any other memory-scoped uploads
+    // --------------------------------------------------------
+    match /memories/{memoryId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isUnderSizeLimit(10);
+      allow delete: if isAuthenticated();
+    }
+
+    // --------------------------------------------------------
+    // Block everything else
+    // --------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

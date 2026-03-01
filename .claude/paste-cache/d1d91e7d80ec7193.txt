@@ -1,0 +1,98 @@
+You are implementing upgrades for the RallyCoach repo to meet Gemini 3 hackathon requirements. Do not use mock data. Use real data flows end‑to‑end. Make code changes only; no new product ideas. Respect existing architecture and avoid breaking APIs.
+
+Objectives (must all be delivered):
+
+Upgrade to Gemini 3 explicitly
+
+Backend Gemini model is hard-coded to Gemini 2.0; update it to Gemini 3 and confirm the correct model string based on official docs.
+
+Frontend Gemini model constants are also Gemini 2.0; update them to Gemini 3 equivalents.
+
+Update all docs to reflect Gemini 3.
+
+“Wow” multimodal experience (real data only)
+
+Implement real‑time AI commentary during practice mode using actual pose data (no mock data).
+
+Add a reasoning hint for each cue (why the cue was chosen).
+
+Surface commentary + reasoning in the practice UI.
+
+Latency + reasoning transparency
+
+Measure Gemini response latency for live coaching cues and display it in the practice UI.
+
+Ensure reasoning hints are visible next to cues.
+
+Gemini‑3‑centric narrative in docs
+
+Add a “Why Gemini 3” section that explicitly ties: (a) live commentary, (b) structured reasoning, (c) low‑latency benefits.
+
+REAL DATA REQUIREMENT:
+
+Remove or bypass mock data generation in analysis flows. All analytics and practice flows must use actual pose/video data. If a fallback is necessary, it must be clearly labeled as a demo mode and turned off by default.
+
+Files you must modify:
+
+Backend Gemini config: backend/gemini_client.py (update model endpoint).
+
+Frontend Gemini config: rallycoach/src/lib/gemini.ts (update FLASH/PRO/IMAGE models).
+
+Practice UI: rallycoach/src/app/practice/page.tsx (display commentary, reasoning, latency).
+
+Live coaching schema + prompt: rallycoach/src/lib/gemini.ts (extend response schema).
+
+Analysis flow to remove mock data: rallycoach/src/app/api/analysis/start/route.ts (stop generating mock metrics; use real pipeline).
+
+Docs: README.md and rallycoach/README.md (update Gemini 3 narrative + model names).
+
+Constraints:
+
+No mock data for production/default flows.
+
+Don’t remove features.
+
+Ensure Gemini 3 model names are valid (verify with official docs).
+
+Keep TypeScript types consistent with schema updates.
+
+📌 Finest Implementation Plan (explicit, real‑data compliant)
+Phase 1 — Gemini 3 Model Upgrade (Backend + Frontend + Docs)
+Why: Current code and docs explicitly reference Gemini 2.0 models.
+Where:
+
+backend/gemini_client.py: update GEMINI_API_URL model endpoint from gemini-2.0-flash to Gemini 3.
+
+rallycoach/src/lib/gemini.ts: update FLASH_MODEL, PRO_MODEL, IMAGE_MODEL.
+
+README.md and rallycoach/README.md: change all Gemini 2.0 mentions to Gemini 3 and add a brief rationale for Gemini 3 use.
+
+Phase 2 — Replace Mock Data With Real Data
+Why: The analysis endpoint currently generates mock metrics; this violates your “REAL NOT MOCK DATA” requirement.
+Where:
+
+rallycoach/src/app/api/analysis/start/route.ts: remove mock metrics generation and wire to real video/pose pipeline (download video, extract frames, compute pose metrics) so analysis is real by default.
+
+Phase 3 — “Wow” Real‑Time Commentary (Practice Mode)
+Why: The practice mode already delivers a live cue but not multimodal “commentary.”
+Where:
+
+rallycoach/src/lib/gemini.ts: extend tickResponseSchema to include commentary + reason, update prompt accordingly.
+
+rallycoach/src/app/practice/page.tsx: render commentary and reasoning on screen alongside cue and focus metric.
+
+Phase 4 — Latency + Reasoning Transparency
+Why: Hackathon asks for low latency + enhanced reasoning.
+Where:
+
+rallycoach/src/lib/gemini.ts: measure request duration per cue and return it.
+
+rallycoach/src/app/practice/page.tsx: display latency prominently near the cue display.
+
+Phase 5 — Gemini 3 Narrative
+Why: Docs currently imply Gemini 2.0 and simulated analysis; must align with Gemini 3 and real‑data flow.
+Where:
+
+README.md: add “Why Gemini 3” with bullet mapping to live commentary, structured reasoning, and low latency.
+
+rallycoach/README.md: update “Gemini Models Used” to Gemini 3 and explain real‑data flow

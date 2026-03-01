@@ -1,0 +1,57 @@
+[
+  {
+    "content": "Install Tailwind CSS v4 and configure Vite",
+    "status": "completed",
+    "activeForm": "Installing Tailwind CSS v4 and configuring Vite"
+  },
+  {
+    "content": "Add Google Fonts to index.html",
+    "status": "completed",
+    "activeForm": "Adding Google Fonts to index.html"
+  },
+  {
+    "content": "Create design tokens in index.css",
+    "status": "completed",
+    "activeForm": "Creating design tokens in index.css"
+  },
+  {
+    "content": "Create UI components (Button, Card, Input, Badge, Progress)",
+    "status": "completed",
+    "activeForm": "Creating UI components"
+  },
+  {
+    "content": "Create layout components (FloatingBlobs, PageContainer, Header)",
+    "status": "completed",
+    "activeForm": "Creating layout components"
+  },
+  {
+    "content": "Redesign Login page",
+    "status": "completed",
+    "activeForm": "Redesigning Login page"
+  },
+  {
+    "content": "Redesign Upload page",
+    "status": "completed",
+    "activeForm": "Redesigning Upload page"
+  },
+  {
+    "content": "Redesign Dashboard page",
+    "status": "completed",
+    "activeForm": "Redesigning Dashboard page"
+  },
+  {
+    "content": "Redesign LivePractice page",
+    "status": "in_progress",
+    "activeForm": "Redesigning LivePractice page"
+  },
+  {
+    "content": "Redesign ResultsEnhanced page",
+    "status": "pending",
+    "activeForm": "Redesigning ResultsEnhanced page"
+  },
+  {
+    "content": "Update LanguageSelector and App.jsx, cleanup",
+    "status": "pending",
+    "activeForm": "Updating supporting files and cleanup"
+  }
+]

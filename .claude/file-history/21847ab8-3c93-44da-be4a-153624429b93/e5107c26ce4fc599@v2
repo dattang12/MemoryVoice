@@ -1,0 +1,114 @@
+---
+name: growthops-content-repurposer
+description: >
+  Transform one piece of content into multiple platform-specific formats. Use when asked to
+  "repurpose content", "cross-post", "内容分发", "一鱼多吃", "adapt for other platforms",
+  "content recycling", or any content multiplication task.
+tools: Bash
+metadata: {"openclaw":{"emoji":"♻️"}}
+---
+
+# Content Repurposer Skill
+
+## What You Do
+Take one piece of content and transform it into optimized versions for every relevant platform. One input → 6-8 platform-specific outputs.
+
+## Repurposing Matrix
+
+### Input: LinkedIn Post
+Output:
+1. **Twitter/X thread** (5-8 tweets)
+2. **小红书 post** (translated + adapted)
+3. **Email newsletter snippet** (2-3 paragraphs)
+4. **Reddit post** (r/startups or r/SaaS format)
+5. **Indie Hackers post** (community format)
+6. **Blog post outline** (expand to 800-1200 words)
+
+### Input: 小红书 Post
+Output:
+1. **LinkedIn post** (translated + professional tone)
+2. **Twitter/X post** (condensed, English)
+3. **WeChat article** (expanded)
+4. **即刻 post** (casual Chinese)
+5. **知乎 answer** (find relevant question, answer format)
+
+### Input: Blog Post / Long-form
+Output:
+1. **LinkedIn carousel** (key points as slides)
+2. **Twitter/X thread** (main insights)
+3. **小红书 short video script** (hook + 3 points + CTA)
+4. **Email sequence** (spread insights across 3 emails)
+5. **Quora answers** (answer related questions)
+6. **Product Hunt discussion** (relevant context)
+
+### Input: Founder Success Story
+Output:
+1. **LinkedIn case study post**
+2. **小红书 story post** (emotional, relatable)
+3. **Email social proof block** (2-3 sentences for templates)
+4. **Twitter testimonial thread**
+5. **Blog case study** (full version)
+6. **Video script** (founder interview format)
+
+## Platform Format Rules
+
+### Twitter/X Thread
+- Tweet 1: Hook (the most compelling insight)
+- Tweets 2-7: One point per tweet, short sentences
+- Last tweet: CTA + link
+- Add "🧵" to first tweet
+
+### Reddit Post
+- No self-promotion in title
+- Lead with value/insight
+- Mention PitchTok naturally in context
+- Follow subreddit rules strictly
+
+### Email Snippet
+- Subject line variant
+- 2-3 paragraph extract
+- Clear CTA button text
+
+### 知乎 Answer
+- Find existing question that matches topic
+- Answer format: problem → insight → solution → subtle mention
+- 800-1500 characters
+- No hard selling
+
+### Blog Post
+- SEO-friendly title
+- H2/H3 structure
+- 800-1200 words
+- Include internal links
+- Meta description
+
+## Output Format
+
+Save to `workspace/repurposed/YYYY-MM-DD-{source-slug}/`:
+
+```
+YYYY-MM-DD-{source-slug}/
+├── source.md          # Original content
+├── twitter-thread.md
+├── xhs-post.md
+├── linkedin-post.md
+├── reddit-post.md
+├── email-snippet.md
+├── blog-outline.md
+└── index.md           # Links to all versions + posting schedule
+```
+
+## Scheduling
+- Stagger posts across platforms (don't post everywhere same day)
+- Day 1: Primary platform (where original was posted)
+- Day 2: Twitter/X + 即刻
+- Day 3: LinkedIn + Reddit
+- Day 4: 小红书 (if translated)
+- Day 5: Blog + email newsletter
+
+## Quality Rules
+- Each version must feel native to its platform
+- Never copy-paste across platforms (algorithms penalize)
+- Adapt, don't just translate
+- Each version should be at least 40% different from original
+- Preserve core message and CTA across all versions

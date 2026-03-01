@@ -1,0 +1,24 @@
+total 151
+drwxr-xr-x 1 ASUS 197609     0 Jan 18 23:12 .
+drwxr-xr-x 1 ASUS 197609     0 Jan 25 17:34 ..
+drwxr-xr-x 1 ASUS 197609     0 Jan 25 17:18 .claude
+-rw-r--r-- 1 ASUS 197609   238 Jan 11 14:31 .gitignore
+drwxr-xr-x 1 ASUS 197609     0 Jan 12 00:03 .venv
+drwxr-xr-x 1 ASUS 197609     0 Jan 11 23:59 .vscode
+drwxr-xr-x 1 ASUS 197609     0 Jan 18 22:56 backend
+-rwxr-xr-x 1 ASUS 197609  5001 Jan 11 14:32 check-setup.py
+-rw-r--r-- 1 ASUS 197609 10820 Jan 12 23:13 CODE_CHANGES.md
+-rw-r--r-- 1 ASUS 197609  8498 Jan 12 23:11 FIXES_SUMMARY.md
+-rw-r--r-- 1 ASUS 197609  6638 Jan 18 16:18 IMPLEMENTATION_PLAN.md
+-rw-r--r-- 1 ASUS 197609     0 Jan 24 15:20 nul
+-rw-r--r-- 1 ASUS 197609  8823 Jan 17 23:05 PROJECT_SUMMARY.md
+-rw-r--r-- 1 ASUS 197609  3575 Jan 11 14:34 QUICKSTART.txt
+drwxr-xr-x 1 ASUS 197609     0 Jan 21 21:25 rallycoach
+-rw-r--r-- 1 ASUS 197609  7065 Jan 17 23:04 README.md
+-rw-r--r-- 1 ASUS 197609  5036 Jan 11 15:28 SETUP_GUIDE.md
+-rw-r--r-- 1 ASUS 197609   113 Jan 11 14:31 start-backend.bat
+-rw-r--r-- 1 ASUS 197609    85 Jan 11 14:32 start-frontend.bat
+-rw-r--r-- 1 ASUS 197609 13230 Jan 18 16:19 supabase-migration-v2.sql
+-rw-r--r-- 1 ASUS 197609  3895 Jan 11 14:30 supabase-setup.sql
+drwxr-xr-x 1 ASUS 197609     0 Jan 18 15:00 venv
+-rw-r--r-- 1 ASUS 197609  6992 Jan 12 23:12 VERIFICATION_GUIDE.md

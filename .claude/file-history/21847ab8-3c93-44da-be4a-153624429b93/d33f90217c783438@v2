@@ -1,0 +1,93 @@
+---
+name: growthops-lead-scorer
+description: >
+  Score and classify leads by their likelihood to upload a pitch video. Use when asked to
+  "score leads", "classify leads", "prioritize leads", "lead scoring", "rank founders",
+  "评分", or when new leads are discovered. Assigns 0-100 score and routes to appropriate
+  outreach channel.
+tools: Bash
+metadata: {"openclaw":{"emoji":"📊"}}
+---
+
+# Lead Scoring Skill
+
+## Scoring Rules (0-100 points)
+
+### Positive Signals
+
+**Stage (max 30 pts)**
+- MVP with demo: +30
+- Idea stage with team: +20
+- Seed (raised < $500K): +15
+- Pre-series A: +10
+
+**Geography (max 20 pts)**
+- US (SF/NYC/Austin/Boston): +20
+- US (other cities): +15
+- UK/Canada/Australia: +10
+- Other English-speaking: +5
+
+**Vertical Fit (max 15 pts)**
+- AI/ML, SaaS, DevTools: +15
+- FinTech, HealthTech: +12
+- Consumer, Marketplace: +10
+- Other tech: +5
+
+**Recency (max 15 pts)**
+- Launched in last 30 days: +15
+- Launched in last 90 days: +12
+- Recently funded (last 60 days): +10
+- Founded in last 12 months: +8
+
+**Engagement Signals (max 10 pts)**
+- Already creates video content: +10
+- Active on social (3+ posts/week): +8
+- Has pitch deck publicly shared: +7
+- Active on Product Hunt/HN: +5
+
+**Source Quality (max 10 pts)**
+- Referral: +10
+- Product Hunt maker: +8
+- YC/accelerator: +8
+- Apollo.io search: +5
+- Reddit/Twitter: +3
+
+### Negative Signals
+- Raised > $5M: -20
+- 10K+ LinkedIn followers: -10
+- Explicitly bootstrapped/profitable: -15
+- No company website: -10
+- Last activity > 6 months ago: -8
+- Already on PitchTok: -100 (skip)
+
+## Classification Tiers
+
+**HOT (60-100 pts)** → Personal outreach, priority email, LinkedIn DM
+- Predicted upload rate: 30-50%
+- Action: Send within 24 hours
+
+**WARM (35-59 pts)** → Standard email sequence, add to weekly batch
+- Predicted upload rate: 15-30%
+- Action: Include in next email batch
+
+**COLD (15-34 pts)** → Email only, no manual outreach
+- Predicted upload rate: 5-15%
+- Action: Low priority, email sequence only
+
+**DISQUALIFIED (<15 pts)** → Do not contact
+- Action: Skip, archive
+
+## Output
+
+Update each lead in `workspace/leads/` with:
+```
+- **Score**: {score}/100
+- **Tier**: {HOT/WARM/COLD/DISQUALIFIED}
+- **Routing**: {email+linkedin+dm / email+linkedin / email-only / skip}
+- **Score Breakdown**: Stage({x}) + Geo({x}) + Vertical({x}) + Recency({x}) + Engagement({x}) + Source({x}) - Negatives({x})
+```
+
+## Re-scoring
+- Re-score leads when new data arrives (reply, engagement, funding news)
+- Upgrade tier if: they reply positively (+30), click upload link (+25), visit PitchTok (+15)
+- Downgrade tier if: bounce (-20), negative reply (-15), unsubscribe (-100)

@@ -1,0 +1,21 @@
+supabase.ts:203 TUS upload error: DetailedError: tus: unexpected response while creating upload, originated from request (method: POST, url: https://lrzzoqzwxqmqgdclnvdh.supabase.co/storage/v1/upload/resumable, response code: 413, response text: Maximum size exceeded
+, request id: n/a)
+    at Upload._emitHttpError (upload.js:445:23)
+    at eval (upload.js:572:18)
+window.console.error @ app-index.js:33
+console.error @ hydration-error-info.js:63
+console.error @ index.js:77
+onError @ supabase.ts:203
+_emitError @ upload.js:473
+_emitHttpError @ upload.js:445
+eval @ upload.js:572Understand this error
+page.tsx:1618 Video upload failed: Error: File size exceeds storage limit.
+    at Object.onError (supabase.ts:213:18)
+    at Upload._emitError (upload.js:473:22)
+    at Upload._emitHttpError (upload.js:445:12)
+    at eval (upload.js:572:18)
+window.console.error @ app-index.js:33
+console.error @ hydration-error-info.js:63
+console.error @ index.js:77
+saveAnalysisToDatabase @ page.tsx:1618Understand this error
+5three.module.js:29480 THREE.WebGLRenderer: Context Lost.

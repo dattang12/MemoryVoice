@@ -1,0 +1,51 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/temp/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Videos (large files)
+*.mp4
+*.mov
+*.avi
+
+# Node
+rallycoach/node_modules/
+rallycoach/.next/
+rallycoach/dist/
+rallycoach/.env
+rallycoach/.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Windows reserved names
+nul
+NUL
+**/nul
+**/NUL
+
+# AI tool configs (remove lines below if you want to track these)
+.claude/
+.cursor/
+.codex/
+.opencode/
+.windsurf/
+.gemini/
+.agent/
+.agents/

@@ -1,0 +1,1046 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import DashboardNav from '@/components/DashboardNav';
+import { supabase, uploadPracticeRecording } from '@/lib/supabase';
+import {
+  extractMetrics,
+  drawSkeleton,
+  generateMockMetrics,
+  evaluateMetrics,
+  DEFAULT_THRESHOLDS,
+} from '@/lib/pose-utils';
+import {
+  evaluateForm,
+  DRILLS,
+  FORM_RULES,
+  type EvaluationResult,
+} from '@/lib/rules-engine';
+import type { PoseMetrics, PoseLandmark, TickResponse } from '@/lib/types';
+
+// MediaPipe Tasks Vision types
+type PoseLandmarker = any;
+type FilesetResolver = any;
+
+function PracticeContent() {
+  const searchParams = useSearchParams();
+  const drillId = searchParams.get('drill');
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const lastVideoTimeRef = useRef<number>(-1);
+  // PHASE 1: Track last MediaPipe timestamp to ensure strictly monotonic
+  const lastTimestampMsRef = useRef<number>(-1);
+  const currentLandmarksRef = useRef<PoseLandmark[] | null>(null);
+  // Use ref to avoid stale closure in requestAnimationFrame
+  const isActiveRef = useRef(false);
+  const showSkeletonRef = useRef(true);
+  const useMockDataRef = useRef(false);
+
+  // MediaRecorder refs for session recording
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [isActive, setIsActive] = useState(false);
+  const [isPoseLoaded, setPoseLoaded] = useState(false);
+  const [poseError, setPoseError] = useState<string | null>(null);
+  const [useMockData, setUseMockData] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+
+  const [currentMetrics, setCurrentMetrics] = useState<PoseMetrics | null>(null);
+  const [currentEvaluation, setCurrentEvaluation] = useState<EvaluationResult | null>(null);
+  const [isGreen, setIsGreen] = useState(true);
+  const [coachingCue, setCoachingCue] = useState('Get ready to start!');
+  const [focusMetric, setFocusMetric] = useState('');
+  const [failingRules, setFailingRules] = useState<string[]>([]);
+
+  const [greenCount, setGreenCount] = useState(0);
+  const [redCount, setRedCount] = useState(0);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+
+  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
+
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingEnabled, setRecordingEnabled] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Get drill info if a drill is selected
+  const currentDrill = drillId ? DRILLS[drillId] : null;
+
+  // Keep refs in sync with state to avoid stale closures in requestAnimationFrame
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  useEffect(() => {
+    showSkeletonRef.current = showSkeleton;
+  }, [showSkeleton]);
+
+  useEffect(() => {
+    useMockDataRef.current = useMockData;
+  }, [useMockData]);
+
+  // Initialize MediaPipe Pose Landmarker
+  useEffect(() => {
+    initializePose();
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  const initializePose = async () => {
+    try {
+      // Dynamically import MediaPipe Tasks Vision
+      const vision = await import('@mediapipe/tasks-vision');
+      const { PoseLandmarker, FilesetResolver } = vision;
+
+      // Load the vision WASM files
+      const filesetResolver = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+      );
+
+      // Create the pose landmarker
+      poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      setPoseLoaded(true);
+    } catch (error) {
+      console.error('Failed to load MediaPipe Pose:', error);
+      setPoseError('Pose detection failed to load. Demo mode enabled.');
+      useMockDataRef.current = true;
+      setUseMockData(true);
+      setPoseLoaded(true);
+    }
+  };
+
+  const cleanup = () => {
+    isActiveRef.current = false;
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    if (tickIntervalRef.current) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+    if (poseLandmarkerRef.current) {
+      poseLandmarkerRef.current.close();
+      poseLandmarkerRef.current = null;
+    }
+    stopRecording();
+    stopCamera();
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+        audio: false, // We don't need audio for pose analysis
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      return stream;
+    } catch (error) {
+      console.error('Camera error:', error);
+      setPoseError('Could not access camera. Demo mode enabled.');
+      useMockDataRef.current = true;
+      setUseMockData(true);
+      return null;
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  // Start MediaRecorder to capture the practice session
+  const startRecording = useCallback((stream: MediaStream) => {
+    if (!recordingEnabled || !stream) return;
+
+    try {
+      // Clear previous chunks
+      recordedChunksRef.current = [];
+
+      // Determine supported MIME type
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4';
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 2500000, // 2.5 Mbps
+      });
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Recording stopped, will upload in stopSession
+        console.log('Recording stopped, chunks:', recordedChunksRef.current.length);
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setIsRecording(false);
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(1000); // Collect data every second
+      setIsRecording(true);
+      console.log('Recording started with MIME type:', mimeType);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      setRecordingEnabled(false);
+    }
+  }, [recordingEnabled]);
+
+  // Stop MediaRecorder
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+    }
+  }, []);
+
+  // Upload the recorded video
+  const uploadRecording = useCallback(async (sessionId: string): Promise<boolean> => {
+    if (recordedChunksRef.current.length === 0) {
+      console.log('No recorded chunks to upload');
+      return false;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Determine MIME type from first chunk
+      const mimeType = recordedChunksRef.current[0]?.type || 'video/webm';
+
+      // Assemble the blob from recorded chunks
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+      console.log(`Uploading recording: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+
+      // Upload to Supabase storage
+      const result = await uploadPracticeRecording(
+        blob,
+        user.id,
+        sessionId,
+        mimeType,
+        (progress) => setUploadProgress(progress)
+      );
+
+      if (!result) {
+        throw new Error('Upload failed');
+      }
+
+      // Update session with video metadata
+      const durationSeconds = sessionStartTime
+        ? Math.floor((Date.now() - sessionStartTime.getTime()) / 1000)
+        : 0;
+
+      await supabase
+        .from('sessions')
+        .update({
+          practice_video_path: result.path,
+          practice_video_mime: mimeType,
+          practice_video_duration_sec: durationSeconds,
+          practice_video_size_bytes: result.size,
+        })
+        .eq('id', sessionId);
+
+      console.log('Recording uploaded successfully:', result.path);
+      recordedChunksRef.current = []; // Clear chunks after successful upload
+      return true;
+    } catch (error) {
+      console.error('Failed to upload recording:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      return false;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [sessionStartTime]);
+
+  const processFrame = useCallback(() => {
+    // Use refs to avoid stale closure issues
+    if (!isActiveRef.current) return;
+
+    if (useMockDataRef.current) {
+      // Generate mock data for demo
+      const metrics = generateMockMetrics();
+      setCurrentMetrics(metrics);
+
+      const { isGreen: green } = evaluateMetrics(metrics);
+      setIsGreen(green);
+
+      if (green) {
+        setGreenCount((c) => c + 1);
+        setFailingRules([]);
+      } else {
+        setRedCount((c) => c + 1);
+        setFailingRules(['Demo: Adjust form']);
+      }
+
+      // Draw mock skeleton on canvas
+      if (canvasRef.current && showSkeletonRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#1f2937';
+          ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+          // Draw simple mock skeleton
+          const color = green ? '#22c55e' : '#ef4444';
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3;
+          ctx.fillStyle = color;
+
+          // Simple stick figure
+          const cx = 320;
+          const cy = 200;
+
+          // Head
+          ctx.beginPath();
+          ctx.arc(cx, cy - 60, 20, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Body
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 40);
+          ctx.lineTo(cx, cy + 40);
+          ctx.stroke();
+
+          // Arms
+          ctx.beginPath();
+          ctx.moveTo(cx - 50, cy - 10);
+          ctx.lineTo(cx, cy - 20);
+          ctx.lineTo(cx + 60, cy - 40);
+          ctx.stroke();
+
+          // Legs
+          ctx.beginPath();
+          ctx.moveTo(cx - 30, cy + 100);
+          ctx.lineTo(cx, cy + 40);
+          ctx.lineTo(cx + 30, cy + 100);
+          ctx.stroke();
+        }
+      }
+    } else if (poseLandmarkerRef.current && videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+
+      // Only process if we have a new frame
+      if (video.currentTime !== lastVideoTimeRef.current && ctx) {
+        lastVideoTimeRef.current = video.currentTime;
+
+        try {
+          // PHASE 1 FIX: Ensure timestamps are strictly monotonically increasing
+          // to prevent MediaPipe "Packet timestamp mismatch" errors
+          const rawTimestampMs = Math.floor(performance.now());
+          const timestampMs = Math.max(lastTimestampMsRef.current + 1, rawTimestampMs);
+          lastTimestampMsRef.current = timestampMs;
+
+          // Detect pose
+          const results = poseLandmarkerRef.current.detectForVideo(video, timestampMs);
+
+          // Clear canvas (transparent background - video shows through)
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          if (results.landmarks && results.landmarks.length > 0) {
+            const poseLandmarks = results.landmarks[0];
+
+            // Convert to our format
+            const landmarks: PoseLandmark[] = poseLandmarks.map((lm: any) => ({
+              x: lm.x,
+              y: lm.y,
+              z: lm.z,
+              visibility: lm.visibility ?? 1.0,
+            }));
+
+            // Store current landmarks
+            currentLandmarksRef.current = landmarks;
+
+            const metrics = extractMetrics(landmarks);
+            setCurrentMetrics(metrics);
+
+            // Use rules engine for evaluation
+            const drillType = currentDrill?.keyframeType || 'general';
+            const evaluation = evaluateForm(landmarks, drillType, canvas.width);
+            setCurrentEvaluation(evaluation);
+
+            // Update green/red state
+            const green = evaluation.passed;
+            setIsGreen(green);
+
+            // Track failing rules
+            if (evaluation.failedRules.length > 0) {
+              setFailingRules(evaluation.failedRules.map(f => f.feedback));
+              setFocusMetric(evaluation.failedRules[0].rule.name);
+            } else {
+              setFailingRules([]);
+              setFocusMetric('');
+            }
+
+            // Update counts
+            if (green) {
+              setGreenCount((c) => c + 1);
+            } else {
+              setRedCount((c) => c + 1);
+            }
+
+            // Draw skeleton if enabled
+            if (showSkeletonRef.current) {
+              drawSkeleton(ctx, landmarks, green, canvas.width, canvas.height);
+            }
+          }
+        } catch (error) {
+          console.error('Error processing frame:', error);
+        }
+      }
+    }
+
+    // Continue animation loop
+    if (isActiveRef.current) {
+      animationRef.current = requestAnimationFrame(processFrame);
+    }
+  }, [currentDrill]);
+
+  const sendTick = async () => {
+    if (!currentMetrics) return;
+
+    try {
+      const response = await fetch('/api/practice/tick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metrics_snapshot: currentMetrics,
+          drill_id: drillId || undefined,
+          session_id: sessionIdRef.current,
+        }),
+      });
+
+      if (response.ok) {
+        const data: TickResponse = await response.json();
+        setCoachingCue(data.cue);
+        if (data.focus_metric) {
+          setFocusMetric(data.focus_metric);
+        }
+        setIsGreen(data.is_green);
+        if (data.green_thresholds) {
+          setThresholds(data.green_thresholds as typeof DEFAULT_THRESHOLDS);
+        }
+      }
+    } catch (error) {
+      // Use local evaluation if API fails
+      if (currentEvaluation) {
+        if (currentEvaluation.failedRules.length > 0) {
+          setCoachingCue(currentEvaluation.failedRules[0].feedback);
+        } else {
+          setCoachingCue('Great form! Keep it up!');
+        }
+      }
+    }
+  };
+
+  const startSession = async () => {
+    // Create session in database
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: user.id,
+          type: 'practice',
+          // created_at is auto-generated by database
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        sessionIdRef.current = data.id;
+      }
+    }
+
+    // Set ref BEFORE state to ensure processFrame has correct value immediately
+    isActiveRef.current = true;
+    setIsActive(true);
+    setGreenCount(0);
+    setRedCount(0);
+    setSessionStartTime(new Date());
+    setCoachingCue('Let\'s go! Start your movement.');
+    setFailingRules([]);
+    setUploadError(null);
+
+    if (!useMockDataRef.current) {
+      const stream = await startCamera();
+      // Start recording if enabled and stream is available
+      if (stream && recordingEnabled) {
+        startRecording(stream);
+      }
+    }
+
+    // Start frame processing after camera is ready
+    setTimeout(() => {
+      if (isActiveRef.current) {
+        animationRef.current = requestAnimationFrame(processFrame);
+      }
+    }, 100);
+
+    // Start tick interval (every 1 second)
+    tickIntervalRef.current = setInterval(sendTick, 1000);
+  };
+
+  const stopSession = async () => {
+    // Set ref BEFORE state to stop animation loop immediately
+    isActiveRef.current = false;
+    setIsActive(false);
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    if (tickIntervalRef.current) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+
+    // Stop recording first (before stopping camera)
+    stopRecording();
+
+    // Save session summary
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && sessionIdRef.current) {
+      const totalFrames = greenCount + redCount;
+      const avgScore = totalFrames > 0 ? (greenCount / totalFrames) * 100 : 0;
+      const durationSeconds = sessionStartTime ? (Date.now() - sessionStartTime.getTime()) / 1000 : 0;
+
+      await supabase
+        .from('sessions')
+        .update({
+          overall_score: Math.round(avgScore),
+          duration_seconds: durationSeconds,
+          summary: {
+            green_count: greenCount,
+            green_frames: greenCount,
+            red_count: redCount,
+            red_frames: redCount,
+            total_frames: totalFrames,
+            average_score: avgScore,
+            green_ratio: totalFrames > 0 ? greenCount / totalFrames : 0,
+            drill_id: drillId,
+            drill_type: drillId || 'general',
+            duration_seconds: durationSeconds,
+          },
+        })
+        .eq('id', sessionIdRef.current);
+
+      // Upload recording if we have one
+      if (recordedChunksRef.current.length > 0) {
+        await uploadRecording(sessionIdRef.current);
+      }
+    }
+
+    stopCamera();
+
+    setCoachingCue('Great session! Check your stats below.');
+    sessionIdRef.current = null;
+  };
+
+  const getElapsedTime = () => {
+    if (!sessionStartTime) return '0:00';
+    const elapsed = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const totalFrames = greenCount + redCount;
+  const greenRatio = totalFrames > 0 ? ((greenCount / totalFrames) * 100).toFixed(1) : '0';
+
+  return (
+    <div className="min-h-screen app-page">
+      <DashboardNav />
+
+      <main className="ml-64 p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Practice Mode</h1>
+            <p className="text-gray-600 mt-1">
+              {currentDrill
+                ? `Practicing: ${currentDrill.name}`
+                : 'Real-time form coaching with AI feedback'}
+            </p>
+          </div>
+
+          {/* Warning if using mock data */}
+          {poseError && (
+            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <svg
+                  className="w-5 h-5 text-yellow-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <div>
+                  <p className="font-medium text-yellow-700">Demo Mode Active</p>
+                  <p className="text-sm text-yellow-700">
+                    {poseError} Using simulated pose data for demonstration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upload progress/error */}
+          {isUploading && (
+            <div className="mb-6 p-4 bg-primary-500/10 border border-primary-500/20 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500" />
+                <div className="flex-1">
+                  <p className="font-medium text-primary-700">Uploading session recording...</p>
+                  <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {uploadError && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <p className="text-red-700">{uploadError}</p>
+                <button
+                  onClick={() => setUploadError(null)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Video/Canvas Section */}
+            <div className="lg:col-span-2">
+              <div className="bg-gray-900 rounded-xl overflow-hidden">
+                <div className="relative aspect-video">
+                  <video
+                    ref={videoRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ display: useMockData ? 'none' : 'block', zIndex: 1 }}
+                    playsInline
+                    muted
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    width={640}
+                    height={480}
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    style={{ display: showSkeleton ? 'block' : 'none', zIndex: 2 }}
+                  />
+
+                  {/* Recording indicator */}
+                  {isRecording && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500 text-white px-3 py-1 rounded-full z-10">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      <span className="text-xs font-medium">REC</span>
+                    </div>
+                  )}
+
+                  {/* Status overlay */}
+                  {isActive && (
+                    <div className="absolute top-4 left-4 right-16 flex justify-between items-start">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`w-3 h-3 rounded-full ${
+                            isGreen ? 'bg-accent-green' : 'bg-accent-red'
+                          } animate-pulse`}
+                        ></div>
+                        <span className="text-white text-sm font-medium">
+                          {isGreen ? 'Good Form' : 'Adjust Form'}
+                        </span>
+                      </div>
+                      <div className="text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+                        {getElapsedTime()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Failing rules indicator */}
+                  {isActive && failingRules.length > 0 && (
+                    <div className="absolute top-14 left-4 bg-red-500/90 text-white px-3 py-2 rounded-lg max-w-xs">
+                      <p className="text-xs font-medium mb-1">Failing:</p>
+                      {failingRules.slice(0, 2).map((rule, i) => (
+                        <p key={i} className="text-sm">{rule}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Coaching cue */}
+                  {isActive && (
+                    <div
+                      className={`absolute bottom-4 left-4 right-4 p-4 rounded-lg ${
+                        isGreen ? 'bg-accent-green/90' : 'bg-accent-red/90'
+                      }`}
+                    >
+                      <p className="text-white font-medium text-center">
+                        {coachingCue}
+                      </p>
+                      {focusMetric && (
+                        <p className="text-white/80 text-sm text-center mt-1">
+                          Focus: {focusMetric.replace(/_/g, ' ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Start prompt */}
+                  {!isActive && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="text-center">
+                        <div className="w-20 h-20 bg-primary-500 rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-primary-600 transition"
+                             onClick={isPoseLoaded ? startSession : undefined}>
+                          <svg
+                            className="w-10 h-10 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-white font-medium">
+                          {isPoseLoaded
+                            ? 'Click to start practice'
+                            : 'Loading pose detection...'}
+                        </p>
+                        {recordingEnabled && (
+                          <p className="text-white/60 text-sm mt-2">
+                            Your session will be recorded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Controls */}
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {isActive ? (
+                      <button
+                        onClick={stopSession}
+                        disabled={isUploading}
+                        className="px-8 py-3 bg-accent-red text-white rounded-lg font-medium hover:bg-red-600 transition disabled:opacity-50"
+                      >
+                        Stop Session
+                      </button>
+                    ) : (
+                      <button
+                        onClick={startSession}
+                        disabled={!isPoseLoaded || isUploading}
+                        className="px-8 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPoseLoaded ? 'Start Practice' : 'Loading...'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Recording toggle */}
+                    <label className="flex items-center gap-2 text-white text-sm">
+                      <input
+                        type="checkbox"
+                        checked={recordingEnabled}
+                        onChange={(e) => setRecordingEnabled(e.target.checked)}
+                        disabled={isActive}
+                        className="rounded"
+                      />
+                      Record Session
+                    </label>
+
+                    {/* Show skeleton toggle */}
+                    <label className="flex items-center gap-2 text-white text-sm">
+                      <input
+                        type="checkbox"
+                        checked={showSkeleton}
+                        onChange={(e) => {
+                          showSkeletonRef.current = e.target.checked;
+                          setShowSkeleton(e.target.checked);
+                        }}
+                        className="rounded"
+                      />
+                      Show Skeleton
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Drill info card */}
+              {currentDrill && (
+                <div className="mt-6 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-semibold text-gray-900 mb-3">{currentDrill.name}</h3>
+                  <p className="text-gray-600 text-sm mb-4">{currentDrill.description}</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-900">Steps:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+                      {currentDrill.steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                  {currentDrill.tips.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {currentDrill.tips.map((tip, i) => (
+                        <span key={i} className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded">
+                          {tip}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Stats Sidebar */}
+            <div className="space-y-6">
+              {/* Session Stats */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="font-semibold text-gray-900 mb-4">Session Stats</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Green Frames</span>
+                    <span className="font-bold text-accent-green">{greenCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Red Frames</span>
+                    <span className="font-bold text-accent-red">{redCount}</span>
+                  </div>
+                  <div className="h-px bg-gray-200"></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Green Ratio</span>
+                    <span className="font-bold text-gray-900">{greenRatio}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      className="bg-accent-green rounded-full h-3 transition-all"
+                      style={{ width: `${greenRatio}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Metrics */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="font-semibold text-gray-900 mb-4">Current Metrics</h3>
+                {currentMetrics ? (
+                  <div className="space-y-3">
+                    <MetricRow
+                      label="Elbow Angle"
+                      value={currentMetrics.elbow_angle}
+                      unit="°"
+                      min={thresholds.elbow_angle.min}
+                      max={thresholds.elbow_angle.max}
+                    />
+                    <MetricRow
+                      label="Knee Angle"
+                      value={currentMetrics.knee_angle}
+                      unit="°"
+                      min={thresholds.knee_angle.min}
+                      max={thresholds.knee_angle.max}
+                    />
+                    <MetricRow
+                      label="Stance Width"
+                      value={currentMetrics.stance_width_norm}
+                      unit=""
+                      min={thresholds.stance_width_norm.min}
+                      max={thresholds.stance_width_norm.max}
+                    />
+                    <MetricRow
+                      label="Rotation"
+                      value={currentMetrics.shoulder_hip_rotation_proxy}
+                      unit=""
+                      min={thresholds.shoulder_hip_rotation_proxy.min}
+                      max={thresholds.shoulder_hip_rotation_proxy.max}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">
+                    Start a session to see metrics
+                  </p>
+                )}
+              </div>
+
+              {/* Score */}
+              {currentEvaluation && (
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-semibold text-gray-900 mb-2">Form Score</h3>
+                  <div className="text-4xl font-bold text-primary-500">
+                    {currentEvaluation.score.toFixed(0)}%
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {currentEvaluation.passedRules.length} of {currentEvaluation.passedRules.length + currentEvaluation.failedRules.length} checks passing
+                  </p>
+                </div>
+              )}
+
+              {/* Tips */}
+              <div className="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-2xl p-6 border border-primary-100">
+                <h3 className="font-semibold text-gray-900 mb-3">Quick Tips</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-start space-x-2">
+                    <span className="text-primary-500">•</span>
+                    <span>Stand 6-8 feet from your camera</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <span className="text-primary-500">•</span>
+                    <span>Ensure good lighting on your body</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <span className="text-primary-500">•</span>
+                    <span>Wear fitted clothing for better tracking</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <span className="text-primary-500">•</span>
+                    <span>Keep your full body in frame</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// Metric row component
+function MetricRow({
+  label,
+  value,
+  unit,
+  min,
+  max,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  min: number;
+  max: number;
+}) {
+  const isInRange = value >= min && value <= max;
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600 text-sm">{label}</span>
+      <div className="flex items-center space-x-2">
+        <span
+          className={`font-mono text-sm ${
+            isInRange ? 'text-accent-green' : 'text-accent-red'
+          }`}
+        >
+          {value.toFixed(1)}
+          {unit}
+        </span>
+        <div
+          className={`w-2 h-2 rounded-full ${
+            isInRange ? 'bg-accent-green' : 'bg-accent-red'
+          }`}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
+// Loading fallback
+function PracticeLoading() {
+  return (
+    <div className="min-h-screen app-page">
+      <DashboardNav />
+      <main className="ml-64 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+            <div className="bg-gray-200 rounded-xl aspect-video"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// Export with Suspense boundary
+export default function PracticePage() {
+  return (
+    <Suspense fallback={<PracticeLoading />}>
+      <PracticeContent />
+    </Suspense>
+  );
+}

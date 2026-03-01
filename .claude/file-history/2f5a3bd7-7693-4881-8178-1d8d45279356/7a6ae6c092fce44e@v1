@@ -1,0 +1,297 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+
+// Shuttlecock Logo SVG
+const ShuttlecockLogo = () => (
+  <svg viewBox="0 0 32 32" fill="none" className="w-8 h-8">
+    {/* Cork base */}
+    <circle cx="16" cy="22" r="6" className="fill-shuttle-cork" />
+    {/* Feathers */}
+    <path
+      d="M16 4 L18 16 L16 18 L14 16 Z"
+      className="fill-white"
+    />
+    <path
+      d="M10 8 L14 17 L16 18 L12 15 Z"
+      className="fill-white opacity-90"
+    />
+    <path
+      d="M22 8 L18 17 L16 18 L20 15 Z"
+      className="fill-white opacity-90"
+    />
+    <path
+      d="M7 12 L13 17 L16 18 L10 14 Z"
+      className="fill-white opacity-80"
+    />
+    <path
+      d="M25 12 L19 17 L16 18 L22 14 Z"
+      className="fill-white opacity-80"
+    />
+    {/* Shuttle trail effect */}
+    <ellipse cx="16" cy="2" rx="2" ry="1" className="fill-primary-400 opacity-60" />
+  </svg>
+);
+
+// Racket icon for nav
+const RacketIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+    <ellipse cx="12" cy="9" rx="7" ry="8" strokeLinecap="round" />
+    <line x1="12" y1="17" x2="12" y2="23" strokeLinecap="round" />
+    <line x1="9" y1="6" x2="15" y2="6" strokeLinecap="round" opacity="0.5" />
+    <line x1="9" y1="9" x2="15" y2="9" strokeLinecap="round" opacity="0.5" />
+    <line x1="9" y1="12" x2="15" y2="12" strokeLinecap="round" opacity="0.5" />
+    <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" opacity="0.5" />
+  </svg>
+);
+
+const navItems = [
+  {
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+        />
+      </svg>
+    ),
+    description: 'Overview',
+  },
+  {
+    name: 'Analytics',
+    href: '/analytics',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+    description: 'Video Analysis',
+  },
+  {
+    name: 'Practice',
+    href: '/practice',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+    description: 'Live Coaching',
+  },
+  {
+    name: 'Strategy',
+    href: '/strategy',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+        />
+      </svg>
+    ),
+    description: 'Rally Tactics',
+  },
+  {
+    name: 'History',
+    href: '/history',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+    description: 'Past Sessions',
+  },
+  {
+    name: 'Racket',
+    href: '/racket',
+    icon: <RacketIcon className="w-5 h-5" />,
+    description: 'Gear Finder',
+  },
+];
+
+interface DashboardNavProps {
+  onMobileToggle?: () => void;
+  isMobileOpen?: boolean;
+}
+
+export default function DashboardNav({ onMobileToggle, isMobileOpen: externalMobileOpen }: DashboardNavProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [internalMobileOpen, setInternalMobileOpen] = useState(false);
+
+  // Use external state if provided, otherwise use internal state
+  const isMobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : internalMobileOpen;
+  const handleToggle = onMobileToggle || (() => setInternalMobileOpen(!internalMobileOpen));
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+  };
+
+  return (
+    <>
+      {/* Mobile Menu Button - Only visible on small screens */}
+      <button
+        onClick={handleToggle}
+        className="fixed top-4 left-4 z-50 p-2.5 bg-white rounded-xl shadow-lg lg:hidden hover:bg-gray-50 transition-all border border-gray-100"
+        aria-label="Toggle navigation menu"
+      >
+        <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isMobileOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
+
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          onClick={handleToggle}
+        />
+      )}
+
+      {/* Navigation Sidebar */}
+      <nav
+        className={`fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-100 flex flex-col z-50 transform transition-transform duration-300 lg:translate-x-0 shadow-xl lg:shadow-none ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Logo Section */}
+        <div className="p-5 border-b border-gray-100">
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-court-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+              <ShuttlecockLogo />
+            </div>
+            <div>
+              <span className="font-bold text-xl text-gray-900 block leading-tight">RallyCoach</span>
+              <span className="text-xs text-gray-500">AI Badminton Coach</span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Court Line Divider */}
+        <div className="court-line-divider mx-4 my-2" />
+
+        {/* Navigation Items */}
+        <div className="flex-1 px-3 py-2 overflow-y-auto">
+          <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Training</p>
+          <ul className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href ||
+                (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setInternalMobileOpen(false)}
+                    className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-gradient-to-r from-primary-50 to-court-50 text-primary-600 nav-active-indicator'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <span className={`flex-shrink-0 ${isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                      {item.icon}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium block">{item.name}</span>
+                      <span className={`text-xs ${isActive ? 'text-primary-400' : 'text-gray-400'}`}>
+                        {item.description}
+                      </span>
+                    </div>
+                    {isActive && (
+                      <span className="w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {/* Court Line Divider */}
+        <div className="court-line-divider mx-4 my-2" />
+
+        {/* Quick Stats / Coach Tip */}
+        <div className="px-4 py-3">
+          <div className="coach-tip p-3 rounded-lg">
+            <p className="text-xs font-medium text-primary-700 mb-1">Coach Tip</p>
+            <p className="text-xs text-gray-600">Practice consistency beats intensity. Train daily for best results.</p>
+          </div>
+        </div>
+
+        {/* Logout Section */}
+        <div className="p-3 border-t border-gray-100">
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-3 px-3 py-2.5 w-full text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group"
+          >
+            <svg
+              className="w-5 h-5 group-hover:text-red-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            <span className="font-medium">Log out</span>
+          </button>
+        </div>
+      </nav>
+    </>
+  );
+}
+
+// Mobile Nav Wrapper Component for pages
+export function MobileNavWrapper({ children }: { children: React.ReactNode }) {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <DashboardNav
+        onMobileToggle={() => setIsMobileOpen(!isMobileOpen)}
+        isMobileOpen={isMobileOpen}
+      />
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
+        {children}
+      </main>
+    </div>
+  );
+}

@@ -1,0 +1,486 @@
+'use client';
+
+import { useRef, useState, useMemo, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Text, Line } from '@react-three/drei';
+import * as THREE from 'three';
+import type { TrajectoryPoint } from '@/lib/types';
+import {
+  COURT_SPEC,
+  normalizedTo3D,
+} from '@/lib/courtSpec';
+
+// ============================================
+// PHASE 4: 3D Court Visualization with Playback Engine Integration
+// ============================================
+
+interface CourtTrajectory3DProps {
+  originalTrajectory: TrajectoryPoint[];
+  refinedTrajectory: TrajectoryPoint[];
+  showOriginal: boolean;
+  showRefined: boolean;
+  animationProgress: number;
+  isPlaying: boolean;
+  timeScale?: number; // Speed multiplier: 0.25, 0.5, 1, 2
+}
+
+// Use shared court spec for all dimensions
+const COURT_LENGTH = COURT_SPEC.length;
+const COURT_WIDTH = COURT_SPEC.width;
+const SINGLES_WIDTH = COURT_SPEC.singlesWidth;
+const NET_HEIGHT = COURT_SPEC.netHeightPosts;
+
+// Pseudo-3D height curve based on shot type heuristic
+function calculateHeight(
+  startY: number,
+  endY: number,
+  t: number,
+  shotIndex: number
+): number {
+  // Determine shot type based on court position change
+  const deltaY = Math.abs(endY - startY);
+
+  // Higher arc for clears (long shots), lower for drives and drops
+  let maxHeight = 1.5; // Default medium height
+  if (deltaY > 0.5) {
+    // Long shot - clear
+    maxHeight = 3.5;
+  } else if (deltaY < 0.2) {
+    // Short shot - drop or net
+    maxHeight = 1.0;
+  }
+
+  // Parabolic arc with some variation
+  const arc = Math.sin(t * Math.PI);
+  return arc * maxHeight + 0.3; // Minimum height above net
+}
+
+// Ball component that follows trajectory - uses refs for smooth animation
+function Ball({
+  trajectory,
+  progress,
+  color,
+  show,
+}: {
+  trajectory: TrajectoryPoint[];
+  progress: number;
+  color: string;
+  show: boolean;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const progressRef = useRef(progress);
+
+  // Update progress ref
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useFrame(() => {
+    if (!meshRef.current || !show || trajectory.length < 2) return;
+
+    const currentProgress = progressRef.current;
+
+    // Calculate current position along trajectory
+    const totalPoints = trajectory.length;
+    const currentIndex = Math.min(
+      Math.floor(currentProgress * totalPoints),
+      totalPoints - 1
+    );
+    const nextIndex = Math.min(currentIndex + 1, totalPoints - 1);
+    const localT = (currentProgress * totalPoints) % 1;
+
+    const p1 = trajectory[currentIndex];
+    const p2 = trajectory[nextIndex];
+
+    // Convert normalized coordinates to 3D scene coordinates
+    const pos1 = normalizedTo3D(p1.x, p1.y);
+    const pos2 = normalizedTo3D(p2.x, p2.y);
+
+    // Interpolate position
+    const x = THREE.MathUtils.lerp(pos1.x, pos2.x, localT);
+    const z = THREE.MathUtils.lerp(pos1.z, pos2.z, localT);
+    const y = calculateHeight(p1.y, p2.y, localT, currentIndex);
+
+    meshRef.current.position.set(x, y, z);
+  });
+
+  if (!show) return null;
+
+  return (
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.1, 16, 16]} />
+      <meshStandardMaterial color={color} />
+    </mesh>
+  );
+}
+
+// Trajectory path visualization - uses memoization for performance
+function TrajectoryPath({
+  trajectory,
+  progress,
+  color,
+  show,
+}: {
+  trajectory: TrajectoryPoint[];
+  progress: number;
+  color: string;
+  show: boolean;
+}) {
+  const points = useMemo(() => {
+    if (!show || trajectory.length < 2) return [];
+
+    const result: THREE.Vector3[] = [];
+    const visiblePoints = Math.ceil(progress * trajectory.length);
+
+    for (let i = 0; i < Math.min(visiblePoints, trajectory.length); i++) {
+      const p = trajectory[i];
+      const nextP = trajectory[Math.min(i + 1, trajectory.length - 1)];
+
+      // Convert normalized coordinates to 3D scene coordinates
+      const pos = normalizedTo3D(p.x, p.y);
+      const nextPos = normalizedTo3D(nextP.x, nextP.y);
+
+      // Add multiple points along each segment for smooth curve
+      for (let t = 0; t < 1; t += 0.1) {
+        const x = THREE.MathUtils.lerp(pos.x, nextPos.x, t);
+        const z = THREE.MathUtils.lerp(pos.z, nextPos.z, t);
+        const y = calculateHeight(p.y, nextP.y, t, i);
+        result.push(new THREE.Vector3(x, y, z));
+      }
+    }
+
+    return result;
+  }, [trajectory, progress, show]);
+
+  if (!show || points.length < 2) return null;
+
+  return (
+    <Line
+      points={points}
+      color={color}
+      lineWidth={3}
+      dashed
+      dashSize={0.3}
+      gapSize={0.1}
+    />
+  );
+}
+
+// Court plane with lines - BWF standard badminton court
+function Court() {
+  // Helper to convert court meters (0,0 at bottom-left) to 3D scene coords (centered)
+  const toScene = (meterX: number, meterY: number): [number, number, number] => {
+    return [
+      meterX - COURT_WIDTH / 2,  // X: centered
+      0,                          // Y: at ground level
+      meterY - COURT_LENGTH / 2, // Z: centered (Y meter = Z scene)
+    ];
+  };
+
+  // Key positions in meters
+  const halfW = COURT_WIDTH;
+  const halfL = COURT_LENGTH;
+  const singlesLeft = COURT_SPEC.singlesLeftX;
+  const singlesRight = COURT_SPEC.singlesRightX;
+  const netY = COURT_SPEC.netY;
+  const nearShortService = COURT_SPEC.nearShortServiceY;
+  const farShortService = COURT_SPEC.farShortServiceY;
+  const nearLongService = COURT_SPEC.nearLongServiceY;
+  const farLongService = COURT_SPEC.farLongServiceY;
+  const centerX = COURT_SPEC.centerX;
+
+  return (
+    <group>
+      {/* Court surface */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <planeGeometry args={[COURT_WIDTH, COURT_LENGTH]} />
+        <meshStandardMaterial color="#15803d" side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Court lines */}
+      <group position={[0, 0.01, 0]}>
+        {/* Outer boundary (doubles court) */}
+        <Line
+          points={[
+            toScene(0, 0),
+            toScene(halfW, 0),
+            toScene(halfW, halfL),
+            toScene(0, halfL),
+            toScene(0, 0),
+          ]}
+          color="white"
+          lineWidth={2}
+        />
+
+        {/* Singles sidelines */}
+        <Line
+          points={[toScene(singlesLeft, 0), toScene(singlesLeft, halfL)]}
+          color="white"
+          lineWidth={1}
+        />
+        <Line
+          points={[toScene(singlesRight, 0), toScene(singlesRight, halfL)]}
+          color="white"
+          lineWidth={1}
+        />
+
+        {/* Net line (horizontal across center) */}
+        <Line
+          points={[toScene(0, netY), toScene(halfW, netY)]}
+          color="white"
+          lineWidth={2}
+        />
+
+        {/* Short service lines */}
+        <Line
+          points={[toScene(0, nearShortService), toScene(halfW, nearShortService)]}
+          color="white"
+          lineWidth={1}
+        />
+        <Line
+          points={[toScene(0, farShortService), toScene(halfW, farShortService)]}
+          color="white"
+          lineWidth={1}
+        />
+
+        {/* Doubles long service lines */}
+        <Line
+          points={[toScene(0, nearLongService), toScene(halfW, nearLongService)]}
+          color="white"
+          lineWidth={1}
+        />
+        <Line
+          points={[toScene(0, farLongService), toScene(halfW, farLongService)]}
+          color="white"
+          lineWidth={1}
+        />
+
+        {/* Center line - only in service box areas */}
+        {/* Near side: from baseline (y=0) to near short service line */}
+        <Line
+          points={[toScene(centerX, 0), toScene(centerX, nearShortService)]}
+          color="white"
+          lineWidth={1}
+        />
+        {/* Far side: from far short service line to far baseline */}
+        <Line
+          points={[toScene(centerX, farShortService), toScene(centerX, halfL)]}
+          color="white"
+          lineWidth={1}
+        />
+      </group>
+    </group>
+  );
+}
+
+// Net
+function Net() {
+  return (
+    <group position={[0, NET_HEIGHT / 2, 0]}>
+      {/* Net posts */}
+      <mesh position={[-COURT_WIDTH / 2 - 0.2, 0, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, NET_HEIGHT, 8]} />
+        <meshStandardMaterial color="#333" />
+      </mesh>
+      <mesh position={[COURT_WIDTH / 2 + 0.2, 0, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, NET_HEIGHT, 8]} />
+        <meshStandardMaterial color="#333" />
+      </mesh>
+
+      {/* Net mesh (simplified) */}
+      <mesh>
+        <planeGeometry args={[COURT_WIDTH + 0.4, NET_HEIGHT]} />
+        <meshStandardMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Top rope */}
+      <mesh position={[0, NET_HEIGHT / 2, 0]}>
+        <boxGeometry args={[COURT_WIDTH + 0.4, 0.02, 0.02]} />
+        <meshStandardMaterial color="#333" />
+      </mesh>
+    </group>
+  );
+}
+
+// Animation controller component - handles time updates using refs to avoid stale closures
+function AnimationController({
+  isPlaying,
+  timeScale,
+  onProgressUpdate,
+  initialProgress,
+}: {
+  isPlaying: boolean;
+  timeScale: number;
+  onProgressUpdate: (progress: number) => void;
+  initialProgress: number;
+}) {
+  const progressRef = useRef(initialProgress);
+  const isPlayingRef = useRef(isPlaying);
+  const timeScaleRef = useRef(timeScale);
+
+  // Keep refs in sync with props
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    timeScaleRef.current = timeScale;
+  }, [timeScale]);
+
+  useEffect(() => {
+    progressRef.current = initialProgress;
+  }, [initialProgress]);
+
+  useFrame((state, delta) => {
+    if (!isPlayingRef.current) return;
+
+    // Update progress based on delta time and timeScale
+    // Full loop is 10 seconds at 1x speed
+    const increment = (delta * timeScaleRef.current) / 10;
+    progressRef.current += increment;
+
+    // Loop back to start
+    if (progressRef.current >= 1) {
+      progressRef.current = 0;
+    }
+
+    // Notify parent (throttled to avoid excessive updates)
+    onProgressUpdate(progressRef.current);
+  });
+
+  return null;
+}
+
+// Main 3D Scene
+function Scene({
+  originalTrajectory,
+  refinedTrajectory,
+  showOriginal,
+  showRefined,
+  animationProgress,
+  isPlaying,
+  timeScale = 1,
+}: CourtTrajectory3DProps) {
+  // Local progress state for smooth animation
+  const [localProgress, setLocalProgress] = useState(animationProgress);
+
+  // Sync with external progress when it changes significantly
+  useEffect(() => {
+    const diff = Math.abs(localProgress - animationProgress);
+    if (diff > 0.1 || !isPlaying) {
+      setLocalProgress(animationProgress);
+    }
+  }, [animationProgress, isPlaying, localProgress]);
+
+  return (
+    <>
+      {/* Animation Controller - manages time updates without causing re-renders */}
+      <AnimationController
+        isPlaying={isPlaying}
+        timeScale={timeScale}
+        onProgressUpdate={setLocalProgress}
+        initialProgress={animationProgress}
+      />
+
+      {/* Lighting */}
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <directionalLight position={[-10, 10, -5]} intensity={0.4} />
+
+      {/* Court */}
+      <Court />
+
+      {/* Net */}
+      <Net />
+
+      {/* Trajectories */}
+      <TrajectoryPath
+        trajectory={originalTrajectory}
+        progress={localProgress}
+        color="#ef4444"
+        show={showOriginal}
+      />
+      <TrajectoryPath
+        trajectory={refinedTrajectory}
+        progress={localProgress}
+        color="#22c55e"
+        show={showRefined}
+      />
+
+      {/* Balls */}
+      <Ball
+        trajectory={originalTrajectory}
+        progress={localProgress}
+        color="#ef4444"
+        show={showOriginal}
+      />
+      <Ball
+        trajectory={refinedTrajectory}
+        progress={localProgress}
+        color="#22c55e"
+        show={showRefined}
+      />
+
+      {/* Camera controls */}
+      <OrbitControls
+        enablePan={true}
+        enableZoom={true}
+        enableRotate={true}
+        minDistance={5}
+        maxDistance={25}
+        target={[0, 1, 0]}
+      />
+    </>
+  );
+}
+
+// Error boundary wrapper to prevent blank screens
+function ErrorFallback() {
+  return (
+    <div className="w-full h-[500px] bg-gray-900 rounded-lg flex items-center justify-center">
+      <div className="text-center text-white">
+        <p className="text-lg font-medium mb-2">3D View Unavailable</p>
+        <p className="text-sm text-gray-400">Please try switching to 2D view</p>
+      </div>
+    </div>
+  );
+}
+
+// Export the main component with error handling
+export default function CourtTrajectory3D(props: CourtTrajectory3DProps) {
+  const [hasError, setHasError] = useState(false);
+
+  // Reset error state when props change
+  useEffect(() => {
+    setHasError(false);
+  }, [props.showOriginal, props.showRefined]);
+
+  if (hasError) {
+    return <ErrorFallback />;
+  }
+
+  return (
+    <div className="w-full h-[500px] bg-gray-900 rounded-lg overflow-hidden">
+      <Canvas
+        camera={{
+          position: [0, 10, 12],
+          fov: 50,
+          near: 0.1,
+          far: 100,
+        }}
+        onCreated={(state) => {
+          // Ensure proper WebGL context handling
+          state.gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        }}
+        onError={() => setHasError(true)}
+      >
+        <Scene {...props} />
+      </Canvas>
+    </div>
+  );
+}

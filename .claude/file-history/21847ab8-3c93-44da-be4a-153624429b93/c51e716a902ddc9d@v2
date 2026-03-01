@@ -1,0 +1,139 @@
+---
+name: growthops-dm-outreach
+description: >
+  Generate DM outreach drafts for Twitter/X, Reddit, Indie Hackers, Product Hunt,
+  Discord, and Slack communities. Use when asked to "DM founders", "send DMs",
+  "community outreach", "社群运营", "私信", or any direct message outreach task.
+  Generates drafts only — human sends manually on platforms that prohibit automation.
+tools: Bash
+metadata: {"openclaw":{"emoji":"💬"}}
+---
+
+# DM Outreach Skill
+
+## What You Do
+Generate personalized DM drafts for multiple platforms. Human copies and sends manually. Track responses and optimize templates.
+
+## CRITICAL RULES
+- **NEVER automate DM sending** on platforms that prohibit it (Twitter, Reddit, Discord, Slack communities)
+- Generate drafts only — human sends manually
+- Respect platform rate limits and community rules
+- Never spam — personalize every message
+
+## Platform Templates
+
+### Twitter/X DM
+```
+Hey {first_name} — saw your tweet about {topic}. We built
+PitchTok where founders record 90-sec pitch videos and
+investors discover them (like TikTok for deal flow).
+
+{X} {vertical} founders got investor intros last week.
+Would you be open to trying it? Takes < 5 min.
+```
+
+### Reddit DM
+```
+Hi {username} — saw your post in r/{subreddit} about {topic}.
+Really cool what you're building with {company}.
+
+Quick question: have you tried video pitching? We're seeing
+founders get 3-5x more investor attention with 90-second
+pitch clips vs cold emails/decks. Happy to share what's
+working in {vertical} if interested.
+
+No pressure either way — rooting for you!
+```
+
+### Product Hunt Comment + DM
+```
+Comment (public): "Love the concept! The {specific_feature}
+is really clever. Curious how you're approaching {relevant_topic}?"
+
+DM (after engagement): "Hey {name} — congrats on the launch!
+Since you're clearly getting traction, have you thought about
+fundraising? We have {X} investors on PitchTok actively
+looking at {vertical} startups this week."
+```
+
+### Discord/Slack Community
+```
+Hey {name}! Saw your intro in #{channel}. {company} sounds
+really interesting — especially the {specific_detail}.
+
+We're building PitchTok (short video pitches for investors)
+and seeing some cool traction with {vertical} founders.
+Would love to connect if you're open to it.
+```
+
+### Indie Hackers
+```
+Hey {name} — congrats on {milestone} with {product}!
+Really impressive growth.
+
+Quick thought: if you're thinking about raising, we've
+been seeing founders get way more investor attention with
+90-second pitch videos vs traditional decks. Happy to
+share what's working if you're curious.
+```
+
+## Outreach Queue
+
+Save daily queue to `workspace/dm-outreach/YYYY-MM-DD.md`:
+
+```markdown
+# DM Outreach Queue — {Date}
+
+## Twitter/X (max 10 DMs/day)
+### 1. @{handle} — {Company}
+- Context: {why they're a fit}
+- Draft: "{personalized message}"
+- Status: [ ] Sent / [ ] Replied
+
+## Reddit (max 5 DMs/day)
+### 1. u/{username} — {Company}
+- Post: {link to their post}
+- Draft: "{personalized message}"
+- Status: [ ] Sent / [ ] Replied
+
+## Product Hunt (max 5/day)
+### 1. {Maker Name} — {Product}
+- Launch: {link}
+- Comment draft: "{comment}"
+- DM draft: "{dm}"
+- Status: [ ] Commented / [ ] DM Sent / [ ] Replied
+
+## Discord/Slack (max 5/day)
+### 1. {Name} — {Community}
+- Channel: #{channel}
+- Draft: "{message}"
+- Status: [ ] Sent / [ ] Replied
+```
+
+## Personalization Rules
+1. Always reference something specific (their post, product, tweet)
+2. Never use generic openers ("Hope you're doing well")
+3. Keep under 150 words
+4. One clear CTA per message
+5. Sound human, not like a template
+6. Match the platform's tone (casual on Reddit, professional on LinkedIn)
+
+## Response Handling
+When someone replies positively:
+- Move to HOT lead tier
+- Send PitchTok signup link
+- Follow up in 2 days if no signup
+
+When someone replies negatively:
+- Add to suppression list for that platform
+- Thank them, do not argue
+- Never contact again on that platform
+
+## Daily Limits
+| Platform | Max DMs/Day | Max Comments/Day |
+|----------|-------------|------------------|
+| Twitter/X | 10 | 20 |
+| Reddit | 5 | 10 |
+| Product Hunt | 5 | 15 |
+| Discord | 5 | 10 |
+| Indie Hackers | 5 | 10 |

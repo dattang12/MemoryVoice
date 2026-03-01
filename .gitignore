@@ -1,0 +1,123 @@
+# ============================================================
+# MemoryBridge .gitignore
+# ============================================================
+
+# ------------------------------------------------------------
+# Secrets — NEVER commit these
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+serviceAccount.json
+*.key
+*.pem
+*.p12
+credentials.json
+google-services.json
+
+# ------------------------------------------------------------
+# Node / Frontend
+# ------------------------------------------------------------
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+*.tsbuildinfo
+
+# ------------------------------------------------------------
+# Python / Backend
+# ------------------------------------------------------------
+__pycache__/
+backend/__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+backend/.venv/
+venv/
+env/
+ENV/
+.Python
+
+# Distribution / build
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# ------------------------------------------------------------
+# Testing & Coverage
+# ------------------------------------------------------------
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.hypothesis/
+reports/
+junit.xml
+
+# Mypy / type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+
+# ------------------------------------------------------------
+# Firebase
+# ------------------------------------------------------------
+.firebase/
+firebase-debug.log
+ui-debug.log
+firestore-debug.log
+database-debug.log
+pubsub-debug.log
+storage.rules.backup
+
+# ------------------------------------------------------------
+# Operating System
+# ------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ------------------------------------------------------------
+# IDEs and Editors
+# ------------------------------------------------------------
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+.cursor/
+
+# ------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------
+# Misc
+# ------------------------------------------------------------
+*.bak
+*.tmp
+*.temp
+.cache/

@@ -1,0 +1,557 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect } from 'react';
+     4→import Link from 'next/link';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { User } from '@supabase/supabase-js';
+     7→
+     8→export default function LandingPage() {
+     9→  const [user, setUser] = useState<User | null>(null);
+    10→
+    11→  useEffect(() => {
+    12→    supabase.auth.getUser().then(({ data: { user } }) => {
+    13→      setUser(user);
+    14→    });
+    15→  }, []);
+    16→
+    17→  const scrollToSection = (id: string) => {
+    18→    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    19→  };
+    20→
+    21→  return (
+    22→    <div className="min-h-screen bg-white">
+    23→      {/* Navigation */}
+    24→      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+    25→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    26→          <div className="flex justify-between items-center h-16">
+    27→            <div className="flex items-center space-x-2">
+    28→              <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+    29→                <span className="text-white font-bold text-lg">R</span>
+    30→              </div>
+    31→              <span className="font-bold text-xl text-gray-900">RallyCoach</span>
+    32→            </div>
+    33→
+    34→            <div className="hidden md:flex items-center space-x-8">
+    35→              <button
+    36→                onClick={() => scrollToSection('analytics-section')}
+    37→                className="text-gray-600 hover:text-primary-500 transition"
+    38→              >
+    39→                Analytics
+    40→              </button>
+    41→              <button
+    42→                onClick={() => scrollToSection('practice-section')}
+    43→                className="text-gray-600 hover:text-primary-500 transition"
+    44→              >
+    45→                Practice
+    46→              </button>
+    47→              <button
+    48→                onClick={() => scrollToSection('racket-section')}
+    49→                className="text-gray-600 hover:text-primary-500 transition"
+    50→              >
+    51→                Racket
+    52→              </button>
+    53→            </div>
+    54→
+    55→            <div className="flex items-center space-x-4">
+    56→              {user ? (
+    57→                <Link
+    58→                  href="/dashboard"
+    59→                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+    60→                >
+    61→                  Dashboard
+    62→                </Link>
+    63→              ) : (
+    64→                <>
+    65→                  <Link
+    66→                    href="/login"
+    67→                    className="text-gray-600 hover:text-gray-900 transition"
+    68→                  >
+    69→                    Log in
+    70→                  </Link>
+    71→                  <Link
+    72→                    href="/signup"
+    73→                    className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+    74→                  >
+    75→                    Sign up
+    76→                  </Link>
+    77→                </>
+    78→              )}
+    79→            </div>
+    80→          </div>
+    81→        </div>
+    82→      </nav>
+    83→
+    84→      {/* Hero Section */}
+    85→      <section className="pt-32 pb-20 px-4">
+    86→        <div className="max-w-7xl mx-auto text-center">
+    87→          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+    88→            Your AI-Powered
+    89→            <br />
+    90→            <span className="gradient-text">Badminton Coach</span>
+    91→          </h1>
+    92→          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
+    93→            Analyze your technique, practice with real-time feedback, and get
+    94→            personalized equipment recommendations. All powered by advanced AI.
+    95→          </p>
+    96→          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+    97→            <Link
+    98→              href="/signup"
+    99→              className="px-8 py-4 bg-primary-500 text-white rounded-xl font-semibold hover:bg-primary-600 transition shadow-lg shadow-primary-500/25"
+   100→            >
+   101→              Start Training Free
+   102→            </Link>
+   103→            <button
+   104→              onClick={() => scrollToSection('features-section')}
+   105→              className="px-8 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-gray-400 transition"
+   106→            >
+   107→              Learn More
+   108→            </button>
+   109→          </div>
+   110→        </div>
+   111→
+   112→        {/* Hero Image Placeholder */}
+   113→        <div className="max-w-5xl mx-auto mt-16">
+   114→          <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl p-8 shadow-xl">
+   115→            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+   116→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   117→                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
+   118→                  <svg
+   119→                    className="w-6 h-6 text-primary-500"
+   120→                    fill="none"
+   121→                    stroke="currentColor"
+   122→                    viewBox="0 0 24 24"
+   123→                  >
+   124→                    <path
+   125→                      strokeLinecap="round"
+   126→                      strokeLinejoin="round"
+   127→                      strokeWidth={2}
+   128→                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+   129→                    />
+   130→                  </svg>
+   131→                </div>
+   132→                <h3 className="font-semibold text-gray-900 mb-2">Video Analysis</h3>
+   133→                <p className="text-gray-600 text-sm">
+   134→                  Upload your gameplay videos for detailed AI analysis
+   135→                </p>
+   136→              </div>
+   137→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   138→                <div className="w-12 h-12 bg-accent-green/20 rounded-lg flex items-center justify-center mb-4">
+   139→                  <svg
+   140→                    className="w-6 h-6 text-accent-green"
+   141→                    fill="none"
+   142→                    stroke="currentColor"
+   143→                    viewBox="0 0 24 24"
+   144→                  >
+   145→                    <path
+   146→                      strokeLinecap="round"
+   147→                      strokeLinejoin="round"
+   148→                      strokeWidth={2}
+   149→                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+   150→                    />
+   151→                  </svg>
+   152→                </div>
+   153→                <h3 className="font-semibold text-gray-900 mb-2">Live Coaching</h3>
+   154→                <p className="text-gray-600 text-sm">
+   155→                  Real-time feedback as you practice your form
+   156→                </p>
+   157→              </div>
+   158→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   159→                <div className="w-12 h-12 bg-accent-yellow/20 rounded-lg flex items-center justify-center mb-4">
+   160→                  <svg
+   161→                    className="w-6 h-6 text-accent-yellow"
+   162→                    fill="none"
+   163→                    stroke="currentColor"
+   164→                    viewBox="0 0 24 24"
+   165→                  >
+   166→                    <path
+   167→                      strokeLinecap="round"
+   168→                      strokeLinejoin="round"
+   169→                      strokeWidth={2}
+   170→                      d="M13 10V3L4 14h7v7l9-11h-7z"
+   171→                    />
+   172→                  </svg>
+   173→                </div>
+   174→                <h3 className="font-semibold text-gray-900 mb-2">Smart Gear</h3>
+   175→                <p className="text-gray-600 text-sm">
+   176→                  Personalized racket recommendations for your style
+   177→                </p>
+   178→              </div>
+   179→            </div>
+   180→          </div>
+   181→        </div>
+   182→      </section>
+   183→
+   184→      {/* Features Section */}
+   185→      <section id="features-section" className="py-20 px-4 bg-gray-50">
+   186→        <div className="max-w-7xl mx-auto">
+   187→          <div className="text-center mb-16">
+   188→            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+   189→              Everything You Need to Improve
+   190→            </h2>
+   191→            <p className="text-gray-600 max-w-2xl mx-auto">
+   192→              Powered by Google Gemini AI for intelligent coaching insights
+   193→            </p>
+   194→          </div>
+   195→
+   196→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+   197→            {[
+   198→              {
+   199→                icon: '🎯',
+   200→                title: 'Pose Analysis',
+   201→                description:
+   202→                  'MediaPipe-powered skeleton tracking analyzes your form in real-time',
+   203→              },
+   204→              {
+   205→                icon: '🤖',
+   206→                title: 'AI Coaching',
+   207→                description:
+   208→                  'Gemini AI provides instant feedback and long-term training plans',
+   209→              },
+   210→              {
+   211→                icon: '📊',
+   212→                title: 'Progress Tracking',
+   213→                description:
+   214→                  'Visualize your improvement over time with detailed analytics',
+   215→              },
+   216→              {
+   217→                icon: '🏸',
+   218→                title: 'Drill Library',
+   219→                description:
+   220→                  'Access targeted drills to address your specific weaknesses',
+   221→              },
+   222→              {
+   223→                icon: '🎾',
+   224→                title: 'Gear Matching',
+   225→                description:
+   226→                  'Find the perfect racket based on your playing style and level',
+   227→              },
+   228→              {
+   229→                icon: '📱',
+   230→                title: 'Works Anywhere',
+   231→                description:
+   232→                  'Practice at home with just your webcam - no special equipment needed',
+   233→              },
+   234→            ].map((feature, i) => (
+   235→              <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
+   236→                <div className="text-3xl mb-4">{feature.icon}</div>
+   237→                <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
+   238→                <p className="text-gray-600">{feature.description}</p>
+   239→              </div>
+   240→            ))}
+   241→          </div>
+   242→        </div>
+   243→      </section>
+   244→
+   245→      {/* Analytics Section */}
+   246→      <section id="analytics-section" className="py-20 px-4">
+   247→        <div className="max-w-7xl mx-auto">
+   248→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+   249→            <div>
+   250→              <div className="inline-block px-4 py-1 bg-primary-100 text-primary-600 rounded-full text-sm font-medium mb-4">
+   251→                Video Analytics
+   252→              </div>
+   253→              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+   254→                Deep Dive Into Your Technique
+   255→              </h2>
+   256→              <p className="text-gray-600 mb-6">
+   257→                Upload your gameplay or practice videos and let our AI analyze every
+   258→                aspect of your form. Get detailed feedback on:
+   259→              </p>
+   260→              <ul className="space-y-3">
+   261→                {[
+   262→                  'Swing mechanics and racket path',
+   263→                  'Footwork and stance positioning',
+   264→                  'Body rotation and weight transfer',
+   265→                  'Shot timing and preparation',
+   266→                ].map((item, i) => (
+   267→                  <li key={i} className="flex items-center space-x-3">
+   268→                    <svg
+   269→                      className="w-5 h-5 text-accent-green"
+   270→                      fill="none"
+   271→                      stroke="currentColor"
+   272→                      viewBox="0 0 24 24"
+   273→                    >
+   274→                      <path
+   275→                        strokeLinecap="round"
+   276→                        strokeLinejoin="round"
+   277→                        strokeWidth={2}
+   278→                        d="M5 13l4 4L19 7"
+   279→                      />
+   280→                    </svg>
+   281→                    <span className="text-gray-700">{item}</span>
+   282→                  </li>
+   283→                ))}
+   284→              </ul>
+   285→              <Link
+   286→                href={user ? '/analytics' : '/signup'}
+   287→                className="inline-block mt-8 px-6 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+   288→              >
+   289→                Analyze Your Video
+   290→              </Link>
+   291→            </div>
+   292→            <div className="bg-gray-100 rounded-2xl p-8">
+   293→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   294→                <div className="flex items-center justify-between mb-4">
+   295→                  <span className="font-medium text-gray-900">Analysis Results</span>
+   296→                  <span className="text-sm text-accent-green">Complete</span>
+   297→                </div>
+   298→                <div className="space-y-4">
+   299→                  <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+   300→                    <p className="font-medium text-red-800 text-sm">High Priority</p>
+   301→                    <p className="text-red-700 text-sm">Elbow drops too low during backhand</p>
+   302→                  </div>
+   303→                  <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+   304→                    <p className="font-medium text-yellow-800 text-sm">Medium Priority</p>
+   305→                    <p className="text-yellow-700 text-sm">Stance could be wider for stability</p>
+   306→                  </div>
+   307→                  <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+   308→                    <p className="font-medium text-green-800 text-sm">Looking Good</p>
+   309→                    <p className="text-green-700 text-sm">Excellent body rotation on clears</p>
+   310→                  </div>
+   311→                </div>
+   312→              </div>
+   313→            </div>
+   314→          </div>
+   315→        </div>
+   316→      </section>
+   317→
+   318→      {/* Practice Section */}
+   319→      <section id="practice-section" className="py-20 px-4 bg-gray-50">
+   320→        <div className="max-w-7xl mx-auto">
+   321→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+   322→            <div className="order-2 lg:order-1 bg-gray-900 rounded-2xl p-4">
+   323→              <div className="aspect-video bg-gray-800 rounded-xl relative overflow-hidden">
+   324→                <div className="absolute inset-0 flex items-center justify-center">
+   325→                  <div className="text-center">
+   326→                    <div className="w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mx-auto mb-4">
+   327→                      <svg
+   328→                        className="w-8 h-8 text-white"
+   329→                        fill="none"
+   330→                        stroke="currentColor"
+   331→                        viewBox="0 0 24 24"
+   332→                      >
+   333→                        <path
+   334→                          strokeLinecap="round"
+   335→                          strokeLinejoin="round"
+   336→                          strokeWidth={2}
+   337→                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+   338→                        />
+   339→                      </svg>
+   340→                    </div>
+   341→                    <p className="text-gray-400">Webcam Preview</p>
+   342→                  </div>
+   343→                </div>
+   344→                {/* Skeleton overlay preview */}
+   345→                <svg
+   346→                  className="absolute inset-0 w-full h-full opacity-50"
+   347→                  viewBox="0 0 100 100"
+   348→                  preserveAspectRatio="none"
+   349→                >
+   350→                  <line
+   351→                    x1="45"
+   352→                    y1="25"
+   353→                    x2="55"
+   354→                    y2="25"
+   355→                    stroke="#22c55e"
+   356→                    strokeWidth="0.5"
+   357→                  />
+   358→                  <line
+   359→                    x1="50"
+   360→                    y1="25"
+   361→                    x2="50"
+   362→                    y2="45"
+   363→                    stroke="#22c55e"
+   364→                    strokeWidth="0.5"
+   365→                  />
+   366→                  <line
+   367→                    x1="45"
+   368→                    y1="45"
+   369→                    x2="55"
+   370→                    y2="45"
+   371→                    stroke="#22c55e"
+   372→                    strokeWidth="0.5"
+   373→                  />
+   374→                  <line
+   375→                    x1="45"
+   376→                    y1="45"
+   377→                    x2="40"
+   378→                    y2="65"
+   379→                    stroke="#22c55e"
+   380→                    strokeWidth="0.5"
+   381→                  />
+   382→                  <line
+   383→                    x1="55"
+   384→                    y1="45"
+   385→                    x2="60"
+   386→                    y2="65"
+   387→                    stroke="#22c55e"
+   388→                    strokeWidth="0.5"
+   389→                  />
+   390→                </svg>
+   391→              </div>
+   392→              <div className="flex items-center justify-between mt-4 px-2">
+   393→                <div className="flex items-center space-x-2">
+   394→                  <div className="w-3 h-3 bg-accent-green rounded-full animate-pulse"></div>
+   395→                  <span className="text-gray-400 text-sm">Live</span>
+   396→                </div>
+   397→                <div className="text-right">
+   398→                  <p className="text-accent-green font-medium">Good Form!</p>
+   399→                  <p className="text-gray-500 text-sm">Keep your elbow steady</p>
+   400→                </div>
+   401→              </div>
+   402→            </div>
+   403→            <div className="order-1 lg:order-2">
+   404→              <div className="inline-block px-4 py-1 bg-accent-green/20 text-accent-green rounded-full text-sm font-medium mb-4">
+   405→                Practice Mode
+   406→              </div>
+   407→              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+   408→                Real-Time Form Coaching
+   409→              </h2>
+   410→              <p className="text-gray-600 mb-6">
+   411→                Practice your swings with instant visual feedback. Our pose detection
+   412→                tracks your body position and provides live coaching cues:
+   413→              </p>
+   414→              <ul className="space-y-3">
+   415→                {[
+   416→                  'Green skeleton overlay when form is correct',
+   417→                  'Red indicators highlight areas to improve',
+   418→                  'Voice-style text cues guide your movements',
+   419→                  'Track green/red ratio to see consistency',
+   420→                ].map((item, i) => (
+   421→                  <li key={i} className="flex items-center space-x-3">
+   422→                    <svg
+   423→                      className="w-5 h-5 text-accent-green"
+   424→                      fill="none"
+   425→                      stroke="currentColor"
+   426→                      viewBox="0 0 24 24"
+   427→                    >
+   428→                      <path
+   429→                        strokeLinecap="round"
+   430→                        strokeLinejoin="round"
+   431→                        strokeWidth={2}
+   432→                        d="M5 13l4 4L19 7"
+   433→                      />
+   434→                    </svg>
+   435→                    <span className="text-gray-700">{item}</span>
+   436→                  </li>
+   437→                ))}
+   438→              </ul>
+   439→              <Link
+   440→                href={user ? '/practice' : '/signup'}
+   441→                className="inline-block mt-8 px-6 py-3 bg-accent-green text-white rounded-lg font-medium hover:bg-green-600 transition"
+   442→              >
+   443→                Start Practicing
+   444→              </Link>
+   445→            </div>
+   446→          </div>
+   447→        </div>
+   448→      </section>
+   449→
+   450→      {/* Racket Section */}
+   451→      <section id="racket-section" className="py-20 px-4">
+   452→        <div className="max-w-7xl mx-auto">
+   453→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+   454→            <div>
+   455→              <div className="inline-block px-4 py-1 bg-accent-yellow/20 text-yellow-700 rounded-full text-sm font-medium mb-4">
+   456→                Racket Finder
+   457→              </div>
+   458→              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+   459→                Find Your Perfect Racket
+   460→              </h2>
+   461→              <p className="text-gray-600 mb-6">
+   462→                Based on your skill level, playing style, and areas you want to
+   463→                improve, we recommend rackets that match your needs:
+   464→              </p>
+   465→              <ul className="space-y-3">
+   466→                {[
+   467→                  'Recommendations based on your weakness analysis',
+   468→                  'Compare weight, balance, and flexibility',
+   469→                  'Save favorites for later reference',
+   470→                  'Direct links to purchase options',
+   471→                ].map((item, i) => (
+   472→                  <li key={i} className="flex items-center space-x-3">
+   473→                    <svg
+   474→                      className="w-5 h-5 text-accent-yellow"
+   475→                      fill="none"
+   476→                      stroke="currentColor"
+   477→                      viewBox="0 0 24 24"
+   478→                    >
+   479→                      <path
+   480→                        strokeLinecap="round"
+   481→                        strokeLinejoin="round"
+   482→                        strokeWidth={2}
+   483→                        d="M5 13l4 4L19 7"
+   484→                      />
+   485→                    </svg>
+   486→                    <span className="text-gray-700">{item}</span>
+   487→                  </li>
+   488→                ))}
+   489→              </ul>
+   490→              <Link
+   491→                href={user ? '/racket' : '/signup'}
+   492→                className="inline-block mt-8 px-6 py-3 bg-accent-yellow text-gray-900 rounded-lg font-medium hover:bg-yellow-400 transition"
+   493→              >
+   494→                Find Your Racket
+   495→              </Link>
+   496→            </div>
+   497→            <div className="grid grid-cols-2 gap-4">
+   498→              {['Astrox 88D', 'Nanoflare 800', 'Arcsaber 11', 'Thruster F'].map(
+   499→                (name, i) => (
+   500→                  <div key={i} className="bg-gray-50 rounded-xl p-4">
+   501→                    <div className="bg-gray-200 rounded-lg h-32 mb-3 flex items-center justify-center">
+   502→                      <span className="text-4xl">🏸</span>
+   503→                    </div>
+   504→                    <p className="font-medium text-gray-900 text-sm">{name}</p>
+   505→                    <p className="text-gray-500 text-xs">
+   506→                      {i % 2 === 0 ? 'Power' : 'Speed'} Style
+   507→                    </p>
+   508→                  </div>
+   509→                )
+   510→              )}
+   511→            </div>
+   512→          </div>
+   513→        </div>
+   514→      </section>
+   515→
+   516→      {/* CTA Section */}
+   517→      <section className="py-20 px-4 gradient-bg">
+   518→        <div className="max-w-3xl mx-auto text-center">
+   519→          <h2 className="text-3xl font-bold text-white mb-4">
+   520→            Ready to Elevate Your Game?
+   521→          </h2>
+   522→          <p className="text-primary-100 mb-8">
+   523→            Join thousands of players improving their badminton skills with AI coaching
+   524→          </p>
+   525→          <Link
+   526→            href="/signup"
+   527→            className="inline-block px-8 py-4 bg-white text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition"
+   528→          >
+   529→            Get Started Free
+   530→          </Link>
+   531→        </div>
+   532→      </section>
+   533→
+   534→      {/* Footer */}
+   535→      <footer className="py-12 px-4 bg-gray-900">
+   536→        <div className="max-w-7xl mx-auto">
+   537→          <div className="flex flex-col md:flex-row justify-between items-center">
+   538→            <div className="flex items-center space-x-2 mb-4 md:mb-0">
+   539→              <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+   540→                <span className="text-white font-bold text-lg">R</span>
+   541→              </div>
+   542→              <span className="font-bold text-xl text-white">RallyCoach</span>
+   543→            </div>
+   544→            <p className="text-gray-500 text-sm">
+   545→              Powered by Google Gemini AI and MediaPipe
+   546→            </p>
+   547→          </div>
+   548→        </div>
+   549→      </footer>
+   550→    </div>
+   551→  );
+   552→}
+   553→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

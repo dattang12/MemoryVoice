@@ -1,0 +1,106 @@
+---
+name: growthops-analytics
+description: >
+  Track and analyze marketing metrics, KPIs, and conversion funnels. Use when asked to
+  "check metrics", "show analytics", "conversion rate", "看数据", "数据复盘",
+  "funnel analysis", "performance review", or any analytics/reporting task.
+tools: Bash
+metadata: {"openclaw":{"emoji":"📈"}}
+---
+
+# Analytics Skill
+
+## What You Do
+Aggregate, track, and analyze all GrowthOps metrics. Maintain dashboards, calculate conversion rates, identify trends, and surface actionable insights.
+
+## Core KPIs
+
+### Acquisition Funnel
+```
+Leads Found → Emails Sent → Opens → Replies → Signups → Videos Uploaded
+```
+
+Track weekly:
+| Metric | This Week | Last Week | Change | Target |
+|--------|-----------|-----------|--------|--------|
+| New Leads Found | | | | 100/wk |
+| Emails Sent | | | | 200/wk |
+| Email Open Rate | | | | >40% |
+| Email Reply Rate | | | | >8% |
+| Positive Replies | | | | >50% of replies |
+| PitchTok Signups | | | | 20/wk |
+| Videos Uploaded | | | | 10/wk |
+| Lead-to-Upload Rate | | | | >5% |
+
+### Channel Metrics
+Track per channel (email, LinkedIn, XHS, referral, events):
+- Leads generated
+- Cost per lead (time spent)
+- Conversion rate to signup
+- Conversion rate to video upload
+
+### Content Metrics
+- XHS: views, likes, comments, saves, DMs received per post
+- LinkedIn: impressions, engagement rate, connection acceptance rate
+- Email: open rate, click rate, reply rate, bounce rate, unsubscribe rate
+
+## Data Sources
+
+Read from workspace files:
+- `workspace/email/sent-log.md` — email metrics
+- `workspace/email/ab-results.md` — A/B test results
+- `workspace/leads/` — lead counts and scores
+- `workspace/linkedin/outreach-queue/` — LinkedIn outreach outcomes
+- `workspace/xhs/content-packs/` — XHS post tracking
+- `workspace/analytics/` — aggregated dashboards
+
+## Weekly Dashboard
+
+Save to `workspace/analytics/weekly/YYYY-WW.md`:
+
+```markdown
+# GrowthOps Weekly Dashboard — Week {WW}, {YYYY}
+
+## Executive Summary
+{2-3 sentence summary of performance}
+
+## Funnel
+{funnel metrics table}
+
+## Channel Performance
+{per-channel breakdown}
+
+## Top Performing Content
+1. {best post/email with metrics}
+2. {second best}
+3. {third best}
+
+## A/B Test Results
+{summary of completed tests}
+
+## Insights & Recommendations
+1. {actionable insight}
+2. {actionable insight}
+3. {actionable insight}
+
+## Next Week Priorities
+1. {priority based on data}
+2. {priority}
+3. {priority}
+```
+
+## Cohort Analysis
+
+Track monthly cohorts:
+- Month leads were found → % that signed up → % that uploaded video
+- Time from first contact to video upload (average days)
+- Which source produces highest-quality leads
+
+## Alerts
+
+Flag when:
+- Email bounce rate > 5% (domain reputation risk)
+- Open rate drops below 25% (subject line or deliverability issue)
+- No new leads found for 3+ days
+- Upload rate drops below 3%
+- Any channel conversion drops >30% week-over-week

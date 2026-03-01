@@ -1,0 +1,105 @@
+---
+name: growthops-translator
+description: >
+  Auto-translate and localize content across platforms and languages. Use when asked to
+  "translate", "翻译", "localize", "adapt content", "cross-post", "转发到其他平台",
+  or any translation/localization task. Handles EN↔CN and adapts tone for each platform.
+tools: Bash
+metadata: {"openclaw":{"emoji":"🌐"}}
+---
+
+# Translator Skill
+
+## What You Do
+Translate and culturally adapt marketing content between English and Chinese, and reformat content for different platforms while preserving meaning, tone, and effectiveness.
+
+## Translation Pairs
+
+### English → Chinese (简体中文)
+- LinkedIn posts → 小红书 posts
+- Email templates → WeChat/小红书 DM templates
+- Blog posts → 知乎/公众号 articles
+- Product Hunt copy → 即刻/V2EX posts
+
+### Chinese → English
+- 小红书 high-performing posts → LinkedIn/Twitter posts
+- Chinese founder testimonials → English case studies
+- Chinese market insights → English blog content
+
+## Platform Adaptation Rules
+
+### LinkedIn → 小红书
+- Remove corporate tone, add casual energy
+- Break long paragraphs into 1-2 line chunks
+- Add emoji sparingly (1-2 per post, not every line)
+- Replace hashtags with 小红书 tags (8-12)
+- Add cover text suggestion (3-6 words)
+- Keep under 500 characters for caption
+- Adapt CTA: "DM me" → "评论'模版'我发给你" or "DM我'pitch'"
+
+### 小红书 → LinkedIn
+- Add professional context
+- Structure with clear sections
+- Use data points and specifics
+- English hashtags (3-5 only)
+- CTA: comment-based or "DM me"
+
+### Email → DM
+- Shorten to <150 words
+- Remove formal greeting/closing
+- Make CTA conversational
+- Remove unsubscribe footer (not needed in DM)
+
+## Translation Quality Rules
+
+1. **Never literal translate** — adapt idioms and cultural references
+2. **Preserve the hook** — the first line must still stop scrolling
+3. **Match platform conventions**:
+   - 小红书: 短句、换行多、口语化、有emoji
+   - LinkedIn: Professional, data-driven, structured
+   - Twitter: Punchy, <280 chars, thread-friendly
+4. **Keep numbers and stats** — they translate universally
+5. **Adapt social proof** — use relevant examples for each audience
+6. **Preserve CTA intent** — adapt the format, not the goal
+
+## Output Format
+
+Save to `workspace/translations/YYYY-MM-DD-{source}-to-{target}.md`:
+
+```markdown
+# Translation: {Source Platform} → {Target Platform}
+- **Original Language**: {EN/CN}
+- **Target Language**: {EN/CN}
+- **Date**: {date}
+
+## Original
+{original content}
+
+## Translation
+{translated and adapted content}
+
+## Adaptation Notes
+- {what was changed and why}
+```
+
+## Batch Translation
+When given multiple pieces of content:
+1. Translate all in one pass
+2. Maintain consistent terminology across pieces
+3. Save each to separate files
+4. Create index in `workspace/translations/index.md`
+
+## Key Terminology (Consistent Across All Content)
+
+| English | 中文 |
+|---------|------|
+| PitchTok | PitchTok |
+| pitch video | pitch视频 / 短视频pitch |
+| investor | 投资人 |
+| founder | 创始人 |
+| startup | 初创公司 / 创业公司 |
+| seed round | 种子轮 |
+| deal flow | 项目流 / deal flow |
+| upload | 上传 |
+| venture capital / VC | 风投 / VC |
+| early-stage | 早期 |

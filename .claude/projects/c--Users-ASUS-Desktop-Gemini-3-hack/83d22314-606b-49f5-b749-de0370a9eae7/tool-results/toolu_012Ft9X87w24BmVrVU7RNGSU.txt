@@ -1,0 +1,10 @@
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\pose-utils.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\api\analysis\start\route.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\api\analysis\[id]\route.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\api\practice\tick\route.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\app\api\racket\recommend\route.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\gemini.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\rules-engine.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\types.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\supabase.ts
+c:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach\src\lib\scoring-rules.ts

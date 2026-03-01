@@ -1,0 +1,114 @@
+---
+name: growthops-competitor-monitor
+description: >
+  Track competitor activity, pricing, features, and marketing tactics. Use when asked to
+  "monitor competitors", "竞品分析", "competitive analysis", "what are competitors doing",
+  "track competitors", or any competitive intelligence task.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"🔭"}}
+---
+
+# Competitor Monitor Skill
+
+## What You Do
+Track competitor platforms, their marketing tactics, new features, pricing changes, and user sentiment. Surface actionable insights for PitchTok positioning.
+
+## Competitors to Track
+
+### Direct Competitors (Video Pitch Platforms)
+- Loom for Fundraising
+- Pitch.com
+- DocSend (video features)
+- Slidebean
+- Any new "TikTok for startups" platforms
+
+### Adjacent Competitors (Deal Flow Platforms)
+- AngelList
+- Crunchbase
+- Signal (by NFX)
+- Visible.vc
+- Foundersuite
+- Gust
+
+### Indirect Competitors (Fundraising Tools)
+- Carta
+- Clerky
+- Mercury (banking + community)
+- Stripe Atlas
+
+## What to Monitor
+
+### Weekly Checks
+1. **Product changes**: New features, UI updates, pricing changes
+2. **Marketing**: Blog posts, social media campaigns, ads
+3. **Press**: News articles, funding announcements
+4. **Reviews**: G2, Capterra, Product Hunt reviews
+5. **Social mentions**: Twitter, Reddit, Hacker News discussions
+6. **Job postings**: Hiring signals (growth = scaling, layoffs = trouble)
+
+### How to Monitor
+- Browse competitor websites for changelog/updates
+- Search Twitter: "{competitor} OR @{competitor_handle}"
+- Search Hacker News: "{competitor}" on hn.algolia.com
+- Check Product Hunt for new launches
+- Browse G2/Capterra for new reviews
+- Search Google News: "{competitor} startup"
+
+## Output Format
+
+Save to `workspace/competitors/YYYY-MM-DD-intel.md`:
+
+```markdown
+# Competitive Intelligence — {Date}
+
+## Key Changes This Week
+
+### {Competitor Name}
+- **What Changed**: {description}
+- **Impact on PitchTok**: {low/medium/high}
+- **Our Response**: {recommended action}
+- **Source**: {URL}
+
+## Feature Comparison (Updated)
+| Feature | PitchTok | Competitor A | Competitor B |
+|---------|----------|--------------|--------------|
+| Video pitch | ✅ | ❌ | ✅ |
+| Investor matching | ✅ | ✅ | ❌ |
+| Free for founders | ✅ | ❌ | ✅ |
+| ... | | | |
+
+## Competitor Marketing Tactics
+| Competitor | Tactic | Channel | Est. Effectiveness |
+|-----------|--------|---------|-------------------|
+
+## User Sentiment (From Reviews/Social)
+- Positive: {what users like about competitors}
+- Negative: {what users complain about — opportunity for PitchTok}
+- Requests: {features users want — roadmap input}
+
+## Actionable Insights
+1. {insight + recommended action}
+2. {insight + recommended action}
+```
+
+## Competitive Positioning
+
+### PitchTok Differentiators (Use in All Content)
+1. **Video-first**: Not just a slide uploader, designed for video pitching
+2. **Swipe discovery**: Investors discover founders, not the other way around
+3. **Free for founders**: No paywall to access investors
+4. **Speed**: Upload in 5 min, get seen in hours (vs weeks for cold outreach)
+5. **Social proof built-in**: View counts and engagement visible
+
+### When Competitor Comes Up in Outreach
+Prepare comparison one-liners:
+- vs AngelList: "We focus on video — investors see you, not just your resume"
+- vs DocSend: "Instead of tracking if they opened your deck, know they watched your pitch"
+- vs Cold email: "3-5x more investor attention in 1/10th the time"
+
+## Alerts
+Flag immediately if:
+- Competitor raises funding (changes competitive dynamics)
+- Competitor launches similar feature to PitchTok's core
+- Negative press about PitchTok or category
+- Competitor poaching PitchTok users (detected in social/reviews)

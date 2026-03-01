@@ -1,0 +1,137 @@
+---
+name: growthops-event-hunter
+description: >
+  Find startup events, pitch competitions, demo days, and conferences to source founders.
+  Use when asked to "find events", "找活动", "pitch competition", "demo day", "conference",
+  "hackathon", "meetup", or any event discovery task.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"🎪"}}
+---
+
+# Event Hunter Skill
+
+## What You Do
+Discover upcoming startup events, pitch competitions, demo days, conferences, and hackathons. Extract attendee/speaker lists for founder outreach. Generate event-specific outreach campaigns.
+
+## Event Sources (Search Priority)
+
+### 1. Pitch Competitions & Demo Days
+- Y Combinator Demo Day (batch schedules)
+- TechCrunch Disrupt
+- Launch Festival
+- Startup Battlefield
+- University pitch competitions
+- Local accelerator demo days
+
+### 2. Conferences
+- Web Summit, Collision, SXSW
+- SaaStr Annual
+- TechCrunch Early Stage
+- Founder-focused unconferences
+- Industry-specific conferences (AI, FinTech, HealthTech)
+
+### 3. Hackathons
+- Major League Hacking events
+- Corporate-sponsored hackathons
+- AI/ML hackathons (common source of technical founders)
+
+### 4. Meetups & Local Events
+- Startup Grind chapters
+- Founder meetups in major cities
+- Tech meetup groups
+- Co-working space events
+
+### 5. Online Events
+- Product Hunt launches (daily)
+- Twitter/X Spaces about fundraising
+- LinkedIn Live events
+- Clubhouse rooms (if still active)
+- Discord community events
+
+## How to Search
+
+### Browser-Based Discovery
+- Browse eventbrite.com — search "startup pitch", "demo day", "founder"
+- Browse meetup.com — search startup groups in SF, NYC, Austin, Boston
+- Browse lu.ma — startup and founder events
+- Browse partiful.com — tech community events
+- Check accelerator websites for demo day dates
+
+### Web Search Queries
+```
+"demo day 2026" startup
+"pitch competition" {month} 2026
+startup conference {city} 2026
+founder meetup {city}
+hackathon {vertical} 2026
+```
+
+## Output Format
+
+Save to `workspace/events/YYYY-MM-{month}-events.md`:
+
+```markdown
+# Startup Events — {Month YYYY}
+
+## Upcoming Events
+
+### 1. {Event Name}
+- **Date**: {date}
+- **Location**: {city / online}
+- **Type**: Pitch Competition / Demo Day / Conference / Hackathon / Meetup
+- **URL**: {link}
+- **Estimated Founders**: {N}
+- **Relevant Verticals**: {AI, SaaS, etc.}
+- **Outreach Opportunity**:
+  - [ ] Attendee list available
+  - [ ] Speaker list available
+  - [ ] Can sponsor/partner
+  - [ ] Can attend and network
+- **Action Plan**: {how to leverage this event}
+- **Priority**: HIGH / MEDIUM / LOW
+
+### 2. ...
+```
+
+## Event-Based Outreach
+
+### Pre-Event (1-2 weeks before)
+```
+Subject: "See you at {event}?"
+
+Hi {first_name},
+
+Noticed {company} is presenting at {event}. Congrats!
+
+Quick idea: founders who upload a 90-second pitch video
+to PitchTok before demo days get 5-10x more investor
+pre-meetings. Takes < 5 min.
+
+Want me to send the link?
+
+{sender_name}
+```
+
+### Post-Event (1-2 days after)
+```
+Subject: "Congrats on {event}!"
+
+Hi {first_name},
+
+Great seeing {company} at {event}! {Specific compliment
+about their pitch/presentation}.
+
+If you're looking to extend that momentum — PitchTok
+lets investors who weren't at {event} discover your
+pitch through short video. {X} investors active this week.
+
+Worth a 5-minute try?
+
+{sender_name}
+```
+
+## Weekly Event Scan
+- Every Monday: search for events in the next 4 weeks
+- Add new events to the calendar
+- Generate pre-event outreach for events in 1-2 weeks
+- Generate post-event outreach for events that just ended

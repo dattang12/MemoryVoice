@@ -1,0 +1,113 @@
+     1→import { createClient, SupabaseClient } from '@supabase/supabase-js';
+     2→
+     3→const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+     4→const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+     5→
+     6→// Client-side Supabase client (lazy initialization)
+     7→let _supabase: SupabaseClient | null = null;
+     8→
+     9→export const supabase = (() => {
+    10→  if (!_supabase && supabaseUrl && supabaseAnonKey) {
+    11→    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+    12→  }
+    13→  // Return a mock client if env vars not available (for SSR)
+    14→  if (!_supabase) {
+    15→    return createClient(
+    16→      supabaseUrl || 'https://placeholder.supabase.co',
+    17→      supabaseAnonKey || 'placeholder-key'
+    18→    );
+    19→  }
+    20→  return _supabase;
+    21→})();
+    22→
+    23→// Server-side Supabase client (for API routes)
+    24→export function createServerClient() {
+    25→  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
+    26→  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+    27→
+    28→  if (!url || !key) {
+    29→    throw new Error('Supabase environment variables not configured');
+    30→  }
+    31→
+    32→  return createClient(url, key, {
+    33→    auth: {
+    34→      autoRefreshToken: false,
+    35→      persistSession: false,
+    36→    },
+    37→  });
+    38→}
+    39→
+    40→// Helper to get user from request
+    41→export async function getUserFromRequest(request: Request) {
+    42→  const authHeader = request.headers.get('authorization');
+    43→  if (!authHeader?.startsWith('Bearer ')) {
+    44→    return null;
+    45→  }
+    46→
+    47→  const token = authHeader.split(' ')[1];
+    48→  const serverClient = createServerClient();
+    49→
+    50→  const { data: { user }, error } = await serverClient.auth.getUser(token);
+    51→
+    52→  if (error || !user) {
+    53→    return null;
+    54→  }
+    55→
+    56→  return user;
+    57→}
+    58→
+    59→// Sanitize filename to remove non-ASCII characters for Supabase storage
+    60→function sanitizeFileName(fileName: string): string {
+    61→  // Get file extension
+    62→  const lastDot = fileName.lastIndexOf('.');
+    63→  const ext = lastDot > 0 ? fileName.slice(lastDot) : '';
+    64→  const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
+    65→
+    66→  // Replace non-ASCII characters with empty string, keep alphanumeric, dash, underscore
+    67→  const sanitized = baseName
+    68→    .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII
+    69→    .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace special chars with underscore
+    70→    .replace(/_+/g, '_') // Collapse multiple underscores
+    71→    .replace(/^_|_$/g, '') // Trim underscores from start/end
+    72→    || 'video'; // Default name if nothing remains
+    73→
+    74→  return sanitized + ext;
+    75→}
+    76→
+    77→// Storage helpers
+    78→export async function uploadVideo(file: File, userId: string): Promise<string | null> {
+    79→  // Validate file size before attempting upload (Supabase default limit is 50MB)
+    80→  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    81→  if (file.size > MAX_FILE_SIZE) {
+    82→    console.error('Upload error: File size exceeds 50MB limit');
+    83→    throw new Error('File size exceeds 50MB limit. Please compress your video before uploading.');
+    84→  }
+    85→
+    86→  const sanitizedName = sanitizeFileName(file.name);
+    87→  const fileName = `${userId}/${Date.now()}-${sanitizedName}`;
+    88→
+    89→  const { data, error } = await supabase.storage
+    90→    .from('videos')
+    91→    .upload(fileName, file);
+    92→
+    93→  if (error) {
+    94→    console.error('Upload error:', error);
+    95→    // Provide more specific error messages
+    96→    if (error.message?.includes('exceeded the maximum allowed size')) {
+    97→      throw new Error('File size exceeds storage limit. Please compress your video before uploading.');
+    98→    }
+    99→    throw new Error(`Failed to upload video: ${error.message}`);
+   100→  }
+   101→
+   102→  return data.path;
+   103→}
+   104→
+   105→export function getVideoUrl(path: string): string {
+   106→  const { data } = supabase.storage.from('videos').getPublicUrl(path);
+   107→  return data.publicUrl;
+   108→}
+   109→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

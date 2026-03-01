@@ -1,0 +1,472 @@
+'use client';
+
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import type { PoseLandmark, MistakeEvent, GhostRivalData, JointDeviation } from '@/lib/types';
+import { getGhostPoseAtTime, createContextAwareGhost } from '@/lib/ghost-overlay';
+import { POSE_CONNECTIONS } from '@/lib/pose-utils';
+
+interface CompareModeProps {
+  mistake: MistakeEvent;
+  userPoseAtMistake: PoseLandmark[];
+  ghostData: GhostRivalData;
+  allPoseData: (PoseLandmark[] | null)[];
+  fps: number;
+  onClose: () => void;
+}
+
+interface PoseCanvasProps {
+  landmarks: PoseLandmark[] | null;
+  rotation: { x: number; y: number };
+  onDrag: (deltaX: number, deltaY: number) => void;
+  color: string;
+  label: string;
+  width: number;
+  height: number;
+  highlightJoints?: number[];
+  deviations?: JointDeviation[];
+}
+
+// Joint name mapping for display
+const JOINT_NAMES: Record<number, string> = {
+  0: 'Nose',
+  11: 'L Shoulder',
+  12: 'R Shoulder',
+  13: 'L Elbow',
+  14: 'R Elbow',
+  15: 'L Wrist',
+  16: 'R Wrist',
+  23: 'L Hip',
+  24: 'R Hip',
+  25: 'L Knee',
+  26: 'R Knee',
+  27: 'L Ankle',
+  28: 'R Ankle',
+};
+
+function PoseCanvas({
+  landmarks,
+  rotation,
+  onDrag,
+  color,
+  label,
+  width,
+  height,
+  highlightJoints = [],
+  deviations = [],
+}: PoseCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+
+  // Apply 3D perspective transformation
+  const transformPoint = useCallback(
+    (x: number, y: number, z: number): { x: number; y: number } => {
+      // Center the pose
+      const cx = x - 0.5;
+      const cy = y - 0.5;
+
+      // Apply rotation
+      const cosX = Math.cos(rotation.x);
+      const sinX = Math.sin(rotation.x);
+      const cosY = Math.cos(rotation.y);
+      const sinY = Math.sin(rotation.y);
+
+      // Rotate around Y axis
+      const x1 = cx * cosY - z * sinY;
+      const z1 = cx * sinY + z * cosY;
+
+      // Rotate around X axis
+      const y1 = cy * cosX - z1 * sinX;
+      const z2 = cy * sinX + z1 * cosX;
+
+      // Perspective projection
+      const scale = 1 / (1 + z2 * 0.3);
+      const projX = x1 * scale;
+      const projY = y1 * scale;
+
+      // Convert to canvas coordinates
+      return {
+        x: (projX + 0.5) * width * 0.8 + width * 0.1,
+        y: (projY + 0.5) * height * 0.8 + height * 0.1,
+      };
+    },
+    [rotation, width, height]
+  );
+
+  // Draw the skeleton
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !landmarks) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw connections
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    for (const [start, end] of POSE_CONNECTIONS) {
+      const startLm = landmarks[start];
+      const endLm = landmarks[end];
+
+      if (startLm?.visibility > 0.3 && endLm?.visibility > 0.3) {
+        const p1 = transformPoint(startLm.x, startLm.y, startLm.z);
+        const p2 = transformPoint(endLm.x, endLm.y, endLm.z);
+
+        // Check if either joint has a deviation
+        const startDev = deviations.find((d) => d.jointIndex === start);
+        const endDev = deviations.find((d) => d.jointIndex === end);
+
+        if (startDev?.severity === 'error' || endDev?.severity === 'error') {
+          ctx.strokeStyle = '#ef4444';
+        } else if (startDev?.severity === 'warning' || endDev?.severity === 'warning') {
+          ctx.strokeStyle = '#eab308';
+        } else {
+          ctx.strokeStyle = color;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    }
+
+    // Draw joints
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      if (lm?.visibility > 0.3) {
+        const p = transformPoint(lm.x, lm.y, lm.z);
+
+        const isHighlighted = highlightJoints.includes(i);
+        const deviation = deviations.find((d) => d.jointIndex === i);
+
+        let jointColor = color;
+        let jointRadius = 5;
+
+        if (deviation) {
+          if (deviation.severity === 'error') {
+            jointColor = '#ef4444';
+            jointRadius = 8;
+          } else if (deviation.severity === 'warning') {
+            jointColor = '#eab308';
+            jointRadius = 7;
+          } else {
+            jointColor = '#22c55e';
+          }
+        } else if (isHighlighted) {
+          jointColor = '#f97316';
+          jointRadius = 7;
+        }
+
+        // Glow effect for highlighted joints
+        if (isHighlighted || deviation) {
+          ctx.shadowColor = jointColor;
+          ctx.shadowBlur = 15;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.fillStyle = jointColor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, jointRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+      }
+    }
+  }, [landmarks, rotation, width, height, color, highlightJoints, deviations, transformPoint]);
+
+  // Mouse/touch handlers for rotation
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+
+    const deltaX = e.clientX - lastPos.current.x;
+    const deltaY = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+
+    onDrag(deltaX, deltaY);
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  return (
+    <div className="relative">
+      <div
+        className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold ${
+          label === 'YOUR FORM' ? 'bg-red-500/30 text-red-400' : 'bg-green-500/30 text-green-400'
+        }`}
+      >
+        {label}
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className="cursor-move"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      />
+      {!landmarks && (
+        <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+          No pose data
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CompareMode({
+  mistake,
+  userPoseAtMistake,
+  ghostData,
+  allPoseData,
+  fps,
+  onClose,
+}: CompareModeProps) {
+  const [rotation, setRotation] = useState({ x: 0, y: 0 });
+  const [scrubTime, setScrubTime] = useState(0.5); // Start at middle
+  const [isPlaying, setIsPlaying] = useState(false);
+  const animationRef = useRef<number | null>(null);
+
+  // Get context-aware ghost for this specific mistake
+  const contextGhost = useMemo(() => {
+    if (!ghostData.bestRepWindow) return ghostData;
+
+    // Try to create a context-aware ghost for this mistake type
+    const contextAware = createContextAwareGhost(allPoseData, mistake.type, fps);
+    return contextAware || ghostData;
+  }, [ghostData, allPoseData, mistake.type, fps]);
+
+  // Get ghost pose at current scrub time
+  const ghostPose = useMemo(() => {
+    if (!contextGhost.bestRepWindow) return null;
+
+    const { startTime, endTime } = contextGhost.bestRepWindow;
+    const targetTime = startTime + scrubTime * (endTime - startTime);
+    return getGhostPoseAtTime(contextGhost, targetTime);
+  }, [contextGhost, scrubTime]);
+
+  // Calculate deviations between user and ghost poses
+  const deviations = useMemo((): JointDeviation[] => {
+    if (!userPoseAtMistake || !ghostPose) return [];
+
+    const result: JointDeviation[] = [];
+    const keyJoints = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+
+    for (const idx of keyJoints) {
+      const userJoint = userPoseAtMistake[idx];
+      const ghostJoint = ghostPose[idx];
+
+      if (userJoint?.visibility > 0.5 && ghostJoint?.visibility > 0.5) {
+        // Calculate positional deviation (simplified 2D)
+        const dx = (userJoint.x - ghostJoint.x) * 100;
+        const dy = (userJoint.y - ghostJoint.y) * 100;
+        const deviation = Math.sqrt(dx * dx + dy * dy);
+
+        let severity: 'ok' | 'warning' | 'error' = 'ok';
+        if (deviation > 15) {
+          severity = 'error';
+        } else if (deviation > 8) {
+          severity = 'warning';
+        }
+
+        result.push({
+          jointIndex: idx,
+          jointName: JOINT_NAMES[idx] || `Joint ${idx}`,
+          deviationDeg: deviation,
+          severity,
+        });
+      }
+    }
+
+    return result;
+  }, [userPoseAtMistake, ghostPose]);
+
+  // Playback animation
+  useEffect(() => {
+    if (isPlaying) {
+      const animate = () => {
+        setScrubTime((prev) => {
+          const next = prev + 0.01;
+          if (next >= 1) {
+            setIsPlaying(false);
+            return 1;
+          }
+          return next;
+        });
+        animationRef.current = requestAnimationFrame(animate);
+      };
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying]);
+
+  const handleDrag = useCallback((deltaX: number, deltaY: number) => {
+    setRotation((prev) => ({
+      x: prev.x + deltaY * 0.01,
+      y: prev.y + deltaX * 0.01,
+    }));
+  }, []);
+
+  const errorJoints = deviations.filter((d) => d.severity === 'error');
+  const warningJoints = deviations.filter((d) => d.severity === 'warning');
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6">
+      <div className="bg-slate-900 rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Compare Mode</h2>
+            <p className="text-sm text-slate-400">{mistake.summaryTitle}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-slate-700 rounded-lg"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Side-by-side panels */}
+        <div className="grid grid-cols-2 gap-1 p-1 bg-slate-800">
+          {/* Left: User's Form */}
+          <div className="bg-slate-900 rounded-lg overflow-hidden">
+            <PoseCanvas
+              landmarks={userPoseAtMistake}
+              rotation={rotation}
+              onDrag={handleDrag}
+              color="#ef4444"
+              label="YOUR FORM"
+              width={400}
+              height={350}
+              highlightJoints={mistake.joints}
+              deviations={deviations}
+            />
+          </div>
+
+          {/* Right: Target Form */}
+          <div className="bg-slate-900 rounded-lg overflow-hidden">
+            <PoseCanvas
+              landmarks={ghostPose}
+              rotation={rotation}
+              onDrag={handleDrag}
+              color="#22c55e"
+              label="TARGET FORM"
+              width={400}
+              height={350}
+              highlightJoints={[]}
+              deviations={[]}
+            />
+          </div>
+        </div>
+
+        {/* Deviation Summary */}
+        {(errorJoints.length > 0 || warningJoints.length > 0) && (
+          <div className="px-6 py-3 border-t border-slate-700 bg-slate-800/50">
+            <div className="flex flex-wrap gap-2">
+              {errorJoints.map((d) => (
+                <span key={d.jointIndex} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">
+                  {d.jointName}: {d.deviationDeg.toFixed(0)}% off
+                </span>
+              ))}
+              {warningJoints.map((d) => (
+                <span key={d.jointIndex} className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
+                  {d.jointName}: {d.deviationDeg.toFixed(0)}% off
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Scrub timeline */}
+        <div className="px-6 py-4 border-t border-slate-700">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                if (isPlaying) {
+                  setIsPlaying(false);
+                } else {
+                  if (scrubTime >= 1) setScrubTime(0);
+                  setIsPlaying(true);
+                }
+              }}
+              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+            >
+              {isPlaying ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={scrubTime}
+              onChange={(e) => setScrubTime(parseFloat(e.target.value))}
+              className="flex-1 accent-cyan-500"
+            />
+
+            <span className="text-sm text-slate-400 w-16 text-right font-mono">
+              {Math.round(scrubTime * 100)}%
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-500 mt-2 text-center">
+            Drag either skeleton to rotate both. Use the slider to scrub through the target motion.
+          </p>
+        </div>
+
+        {/* Mistake Details */}
+        <div className="px-6 py-4 border-t border-slate-700 bg-slate-800/30">
+          <h3 className="text-sm font-medium text-slate-300 mb-2">What to Fix</h3>
+          <p className="text-sm text-slate-400">{mistake.description || 'Compare your form to the target and adjust the highlighted joints.'}</p>
+
+          {mistake.fixKeyframes && mistake.fixKeyframes.length > 0 && (
+            <div className="mt-3 flex gap-2">
+              {mistake.fixKeyframes.map((kf, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setScrubTime(idx / (mistake.fixKeyframes!.length - 1 || 1))}
+                  className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300"
+                >
+                  {kf.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

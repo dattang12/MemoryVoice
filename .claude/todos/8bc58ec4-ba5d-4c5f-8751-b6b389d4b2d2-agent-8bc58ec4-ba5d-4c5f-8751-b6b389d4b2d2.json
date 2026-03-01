@@ -1,0 +1,57 @@
+[
+  {
+    "content": "Create implementation plan document",
+    "status": "completed",
+    "activeForm": "Creating implementation plan document"
+  },
+  {
+    "content": "Create Supabase migration scripts for new tables",
+    "status": "completed",
+    "activeForm": "Creating Supabase migration scripts"
+  },
+  {
+    "content": "Build shared pose/overlay utilities module",
+    "status": "completed",
+    "activeForm": "Building shared pose/overlay utilities"
+  },
+  {
+    "content": "Build rules engine for form scoring",
+    "status": "completed",
+    "activeForm": "Building rules engine for form scoring"
+  },
+  {
+    "content": "Implement Practice Mode with live skeleton overlay",
+    "status": "completed",
+    "activeForm": "Implementing Practice Mode overlay"
+  },
+  {
+    "content": "Implement Analytics Mode with video overlay + timestamps",
+    "status": "completed",
+    "activeForm": "Implementing Analytics Mode overlay"
+  },
+  {
+    "content": "Build keyframe generator and drill cards",
+    "status": "completed",
+    "activeForm": "Building keyframe generator and drill cards"
+  },
+  {
+    "content": "Create History page with session listing",
+    "status": "completed",
+    "activeForm": "Creating History page"
+  },
+  {
+    "content": "Update Dashboard with real data aggregation",
+    "status": "completed",
+    "activeForm": "Updating Dashboard with real data"
+  },
+  {
+    "content": "Add unit tests for angle/rule computations",
+    "status": "completed",
+    "activeForm": "Adding unit tests"
+  },
+  {
+    "content": "Update backend API endpoints for new features",
+    "status": "in_progress",
+    "activeForm": "Updating backend API endpoints"
+  }
+]

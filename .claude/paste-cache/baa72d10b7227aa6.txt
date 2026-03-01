@@ -1,0 +1,48 @@
+Issue Summary
+Issue #1: sendTick Never Fires — Stale Closure Bug (CRITICAL)
+Symptom: Zero /api/practice/tick network requests during the entire session. The Gemini 3 Insights card is permanently stuck on "Waiting for Gemini 3 response..."
+Root Cause: Classic React stale closure bug in page.tsx. The sendTick function is defined as:
+sendTick = async () => {
+  if (!currentMetrics) return;  // ← always null in the closure
+  ...
+}
+It's registered via setInterval(sendTick, 1000), but currentMetrics is a React state variable — the interval captures the initial value (null) and never sees updates. The guard if (!currentMetrics) return always exits early.
+Fix: Create a useRef to mirror the currentMetrics state, and use the ref inside sendTick:
+tsxconst currentMetricsRef = useRef(currentMetrics);
+useEffect(() => { currentMetricsRef.current = currentMetrics; }, [currentMetrics]);
+
+// Inside sendTick:
+if (!currentMetricsRef.current) return;
+// Use currentMetricsRef.current instead of currentMetrics everywhere in sendTick
+File: src/app/practice/page.tsx
+
+Issue #2: Backend Returns Empty commentary and reason (CRITICAL)
+Symptom: When I manually called /api/practice/tick, the response returned commentary: "" and reason: "" in 12ms — far too fast for an actual Gemini API call.
+Root Cause: The API route handler (/api/practice/tick) is doing only local rule-based evaluation. It's not actually calling the Gemini 3 Flash API to generate commentary and reasoning. The fields exist in the response schema but are never populated.
+Fix: In the API route (src/app/api/practice/tick/route.ts), add the actual Gemini 3 Flash API call:
+tsconst geminiStart = Date.now();
+const geminiResponse = await callGeminiFlash({
+  metrics_snapshot,
+  focus,
+  // ... context
+});
+const latency_ms = Date.now() - geminiStart;
+
+return NextResponse.json({
+  ...localEvaluation,
+  commentary: geminiResponse.commentary,
+  reason: geminiResponse.reason,
+  latency_ms,  // ← also missing from current response
+});
+
+Issue #3: latency_ms Field Missing from API Response
+Symptom: The API response contains keys cue, focus_metric, green_thresholds, is_green, commentary, reason — but no latency_ms. The frontend has code checking if (data.latency_ms !== undefined) { setLatencyMs(data.latency_ms) } but this never triggers.
+Fix: Add latency_ms to the API response once the Gemini call is implemented (see Issue #2).
+
+Feature-by-Feature Status
+FeatureStatusWhat's ThereWhat's MissingAI Commentary on video❌ NOT WORKINGUI code exists (italic text + reasoning display)Never renders because commentary state is always empty (tick never called + API returns empty)Gemini 3 Insights sidebar⚠️ PARTIALCard renders with title, conditional latency badge code existsStuck on "Waiting..." — no commentary, reasoning, or latency data flows to itLatency badge on cue bar❌ NOT WORKINGUI code exists with green/yellow/red color thresholds (<500ms, <1500ms, >1500ms)latencyMs is always null because latency_ms isn't in API response
+
+Recommended Fix Order
+Step 1 — Fix the stale closure (frontend, page.tsx ~line 977): Add a currentMetricsRef so sendTick can access live metrics inside the interval. This is the blocking issue preventing any Gemini integration from working.
+Step 2 — Implement Gemini 3 Flash call (backend, route.ts): Wire up the actual Gemini API call with the metrics snapshot, capture response time, and return commentary, reason, and latency_ms in the response.
+Step 3 — Verify end-to-end: Once both fixes are in, all three UI features (commentary overlay, sidebar card, latency badge) should light up automatically since the frontend rendering code is already implemented and wired to the correct state variables.

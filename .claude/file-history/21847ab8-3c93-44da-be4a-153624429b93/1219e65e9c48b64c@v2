@@ -1,0 +1,139 @@
+---
+name: growthops-referral-engine
+description: >
+  Design and manage referral programs, viral loops, and word-of-mouth campaigns. Use when
+  asked to "referral program", "推荐计划", "viral loop", "invite friends", "ambassador program",
+  "referral tracking", or any referral/viral growth task.
+tools: Bash
+metadata: {"openclaw":{"emoji":"🔗"}}
+---
+
+# Referral Engine Skill
+
+## What You Do
+Design referral programs, generate referral ask messages, track referral chains, and identify top referrers. Drive organic founder-to-founder growth.
+
+## Referral Programs
+
+### Program 1: Founder Referral
+- **Trigger**: After a founder uploads a video
+- **Ask**: "Know another founder raising? Share PitchTok and both get priority investor visibility."
+- **Incentive**: Featured placement in investor feed for 1 week
+- **Tracking**: Unique referral link per founder
+
+### Program 2: Investor Referral
+- **Trigger**: After an investor watches 5+ pitches
+- **Ask**: "Know a founder who should be on PitchTok?"
+- **Incentive**: Early access to new pitches in their preferred verticals
+- **Tracking**: Investor referral code
+
+### Program 3: Community Ambassador
+- **Trigger**: Founders who actively promote PitchTok
+- **Perks**: Direct intro to top investors, featured founder spotlight
+- **Requirements**: Refer 5+ founders who upload videos
+
+## Referral Ask Messages
+
+### Post-Upload Email (Automated via email-engine)
+```
+Subject: "Your pitch is live! One more thing..."
+
+Hey {first_name},
+
+Your PitchTok video is live and investors are already
+browsing! 🎉
+
+Quick ask: know another founder who's raising?
+Share your referral link and you both get priority
+visibility in the investor feed for a week.
+
+Your link: {referral_link}
+
+Just forward this email or share the link.
+
+{sender_name}
+```
+
+### In-App Prompt (Copy for Product Team)
+```
+"Your pitch video got {X} investor views!
+Share PitchTok with a founder friend →
+Both get 1 week of priority placement."
+[Share Link] [Copy Link] [Maybe Later]
+```
+
+### DM Ask (After Positive Reply)
+```
+Btw — if you know any other founders raising,
+feel free to share PitchTok with them. We give
+both of you priority investor visibility when
+someone joins through your link.
+
+Your link: {referral_link}
+```
+
+## Referral Tracking
+
+Maintain `workspace/referrals/tracker.md`:
+
+```markdown
+# Referral Tracker
+
+## Active Referrers
+| Referrer | Referrals Sent | Signups | Videos Uploaded | Tier |
+|----------|---------------|---------|-----------------|------|
+
+## Referral Chains
+- {Founder A} → {Founder B} → {Founder C} (3-level chain!)
+
+## Top Referrers (This Month)
+1. {name} — {N} successful referrals
+2. {name} — {N} successful referrals
+
+## Program Metrics
+- Total referral links generated: {N}
+- Click-through rate: {%}
+- Signup rate from referral: {%}
+- Video upload rate from referral: {%}
+- Average referral chain depth: {N}
+```
+
+## Viral Loop Design
+
+```
+Founder uploads video
+    → Gets investor views
+    → Gets excited, shares with founder friends
+    → Friends upload videos
+    → More videos attract more investors
+    → More investors attract more founders
+    → Repeat
+```
+
+## Referral Content Templates
+
+### Social Share (For Founders to Post)
+```
+Just uploaded my 90-sec pitch to @PitchTok and already
+got {X} investor views. Way better than cold emailing
+pitch decks. If you're raising, check it out:
+{referral_link}
+```
+
+### Email Forward Template
+```
+Hey — thought you'd be interested in this. I uploaded
+a short pitch video and investors are actually watching.
+Way easier than cold outreach. Here's my link:
+{referral_link}
+```
+
+## Identifying Potential Referrers
+Look for founders who:
+- Reply positively to outreach
+- Upload a video within 24 hours
+- Have large social following (can amplify)
+- Are in active founder communities
+- Have previously referred other products
+
+Flag these in lead records with `referral_potential: high`

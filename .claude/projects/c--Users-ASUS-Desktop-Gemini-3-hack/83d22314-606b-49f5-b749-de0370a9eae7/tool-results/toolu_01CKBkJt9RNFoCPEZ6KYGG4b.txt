@@ -1,0 +1,884 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react';
+     4→import { useParams, useRouter } from 'next/navigation';
+     5→import Link from 'next/link';
+     6→import DashboardNav from '@/components/DashboardNav';
+     7→import DrillCard from '@/components/DrillCard';
+     8→import { TabbedDrillAnimation } from '@/components/Skeleton3D';
+     9→import { EventTypeBadge, MatchFormatBadge } from '@/components/PlayerSelectionModal';
+    10→import { supabase, getVideoUrl, getSignedVideoUrl, videoExists } from '@/lib/supabase';
+    11→import {
+    12→  drawSkeleton,
+    13→  extractMetrics,
+    14→} from '@/lib/pose-utils';
+    15→import {
+    16→  DRILLS,
+    17→  evaluateForm,
+    18→  type EvaluationResult
+    19→} from '@/lib/rules-engine';
+    20→import {
+    21→  evaluateWithBands,
+    22→  evaluateSessionWithValidation,
+    23→  SCORING_LEGEND,
+    24→  type SessionScoringResult,
+    25→} from '@/lib/scoring-rules';
+    26→import type { Session, PoseLandmark, PoseMetrics, StrategyResult } from '@/lib/types';
+    27→
+    28→// ============================================
+    29→// View Details Page - Replay Stored Results
+    30→// ============================================
+    31→
+    32→interface StoredIssue {
+    33→  id: string;
+    34→  code: string;
+    35→  title: string;
+    36→  severity: 'low' | 'medium' | 'high';
+    37→  description?: string;
+    38→  timestamps?: number[];
+    39→  drill?: any;
+    40→}
+    41→
+    42→interface FrameAnalysis {
+    43→  timestamp: number;
+    44→  landmarks: PoseLandmark[] | null;
+    45→  evaluation: EvaluationResult | null;
+    46→  metrics: PoseMetrics | null;
+    47→}
+    48→
+    49→export default function SessionDetailPage() {
+    50→  const params = useParams();
+    51→  const router = useRouter();
+    52→  const sessionId = params.sessionId as string;
+    53→
+    54→  // Session data
+    55→  const [session, setSession] = useState<Session | null>(null);
+    56→  const [issues, setIssues] = useState<StoredIssue[]>([]);
+    57→  const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
+    58→  const [loading, setLoading] = useState(true);
+    59→  const [error, setError] = useState<string | null>(null);
+    60→
+    61→  // Video playback state
+    62→  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    63→  const [videoError, setVideoError] = useState<string | null>(null);
+    64→  const [videoLoading, setVideoLoading] = useState(false);
+    65→  const [poseData, setPoseData] = useState<Array<PoseLandmark[] | null>>([]);
+    66→  const [currentTime, setCurrentTime] = useState(0);
+    67→  const [duration, setDuration] = useState(0);
+    68→  const [isPlaying, setIsPlaying] = useState(false);
+    69→  const [showSkeleton, setShowSkeleton] = useState(true);
+    70→  const [selectedIssue, setSelectedIssue] = useState<StoredIssue | null>(null);
+    71→  // PHASE 3: Session validation state
+    72→  const [sessionScoring, setSessionScoring] = useState<SessionScoringResult | null>(null);
+    73→  const [showDebugPanel, setShowDebugPanel] = useState(false);
+    74→
+    75→  // Banded scoring display
+    76→  const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+    77→  const [currentBandedScore, setCurrentBandedScore] = useState<any>(null);
+    78→
+    79→  // Refs
+    80→  const videoRef = useRef<HTMLVideoElement>(null);
+    81→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    82→  const animationRef = useRef<number | null>(null);
+    83→
+    84→  // Load session data
+    85→  useEffect(() => {
+    86→    if (sessionId) {
+    87→      loadSession(sessionId);
+    88→    }
+    89→  }, [sessionId]);
+    90→
+    91→  const loadSession = async (id: string) => {
+    92→    setLoading(true);
+    93→    setError(null);
+    94→    setVideoError(null);
+    95→    setVideoLoading(true);
+    96→
+    97→    try {
+    98→      // Load session
+    99→      const { data: sessionData, error: sessionError } = await supabase
+   100→        .from('sessions')
+   101→        .select('*')
+   102→        .eq('id', id)
+   103→        .single();
+   104→
+   105→      if (sessionError) throw sessionError;
+   106→
+   107→      setSession(sessionData);
+   108→      setSkillLevel(sessionData.skill_level || 'intermediate');
+   109→
+   110→      // Handle video URL - try multiple approaches
+   111→      await loadVideoUrl(sessionData);
+   112→
+   113→      // Load pose data if available
+   114→      if (sessionData.pose_data) {
+   115→        setPoseData(sessionData.pose_data);
+   116→
+   117→        // PHASE 3: Validate session pose data and compute scoring
+   118→        const scoring = evaluateSessionWithValidation(
+   119→          sessionData.pose_data,
+   120→          sessionData.skill_level || 'intermediate'
+   121→        );
+   122→        setSessionScoring(scoring);
+   123→        console.log('Session scoring:', scoring);
+   124→      }
+   125→
+   126→      // Load issues
+   127→      const { data: issuesData, error: issuesError } = await supabase
+   128→        .from('issues')
+   129→        .select('*')
+   130→        .eq('session_id', id)
+   131→        .order('severity', { ascending: false });
+   132→
+   133→      if (!issuesError && issuesData) {
+   134→        const mappedIssues = issuesData.map((issue: any) => ({
+   135→          id: issue.id,
+   136→          code: issue.code,
+   137→          title: issue.title,
+   138→          severity: issue.severity,
+   139→          description: issue.description,
+   140→          timestamps: issue.timestamps || [],
+   141→          drill: issue.drill || DRILLS[issue.code?.toLowerCase().replace(/_/g, '-')],
+   142→        }));
+   143→        setIssues(mappedIssues);
+   144→        if (mappedIssues.length > 0) {
+   145→          setSelectedIssue(mappedIssues[0]);
+   146→        }
+   147→      }
+   148→
+   149→      // Load strategy results if strategy session
+   150→      if (sessionData.type === 'strategy') {
+   151→        const { data: strategyData } = await supabase
+   152→          .from('strategy_results')
+   153→          .select('*')
+   154→          .eq('session_id', id)
+   155→          .single();
+   156→
+   157→        if (strategyData) {
+   158→          setStrategyResult(strategyData);
+   159→        }
+   160→      }
+   161→    } catch (err) {
+   162→      console.error('Error loading session:', err);
+   163→      setError('Failed to load session. It may have been deleted.');
+   164→    } finally {
+   165→      setLoading(false);
+   166→      setVideoLoading(false);
+   167→    }
+   168→  };
+   169→
+   170→  // Load video URL with fallback approaches
+   171→  const loadVideoUrl = async (sessionData: Session) => {
+   172→    // If no video path or URL stored, video wasn't uploaded
+   173→    if (!sessionData.video_path && !sessionData.video_url) {
+   174→      setVideoError('No video was stored for this session (upload may have failed).');
+   175→      setVideoLoading(false);
+   176→      return;
+   177→    }
+   178→
+   179→    // Try the stored public URL first
+   180→    if (sessionData.video_url) {
+   181→      try {
+   182→        // Test if URL is accessible
+   183→        const response = await fetch(sessionData.video_url, { method: 'HEAD' });
+   184→        if (response.ok) {
+   185→          setVideoUrl(sessionData.video_url);
+   186→          setVideoLoading(false);
+   187→          return;
+   188→        }
+   189→      } catch (e) {
+   190→        console.warn('Public URL not accessible, trying signed URL...');
+   191→      }
+   192→    }
+   193→
+   194→    // Try to get a signed URL if we have the path
+   195→    if (sessionData.video_path) {
+   196→      try {
+   197→        const signedUrl = await getSignedVideoUrl(sessionData.video_path, 3600);
+   198→        if (signedUrl) {
+   199→          setVideoUrl(signedUrl);
+   200→          setVideoLoading(false);
+   201→          return;
+   202→        }
+   203→      } catch (e) {
+   204→        console.warn('Failed to get signed URL:', e);
+   205→      }
+   206→    }
+   207→
+   208→    // If we get here, video is unavailable
+   209→    setVideoError('Video unavailable. The file may have been deleted or the upload failed.');
+   210→    setVideoLoading(false);
+   211→  };
+   212→
+   213→  // Handle video load error
+   214→  const handleVideoError = useCallback(() => {
+   215→    console.error('Video element error: Failed to load video');
+   216→    setVideoError('Failed to load video. The format may not be supported or the file is corrupted.');
+   217→  }, []);
+   218→
+   219→  // Render skeleton overlay
+   220→  const renderFrame = useCallback(() => {
+   221→    if (!videoRef.current || !canvasRef.current) return;
+   222→
+   223→    const video = videoRef.current;
+   224→    const canvas = canvasRef.current;
+   225→    const ctx = canvas.getContext('2d');
+   226→    if (!ctx) return;
+   227→
+   228→    // Resize canvas to match video
+   229→    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+   230→      canvas.width = video.videoWidth || 640;
+   231→      canvas.height = video.videoHeight || 480;
+   232→    }
+   233→
+   234→    // Clear canvas
+   235→    ctx.clearRect(0, 0, canvas.width, canvas.height);
+   236→
+   237→    if (!showSkeleton || poseData.length === 0) return;
+   238→
+   239→    // Find closest frame
+   240→    const frameIndex = Math.floor(video.currentTime * 10); // Assuming 10fps sample rate
+   241→    const landmarks = poseData[Math.min(frameIndex, poseData.length - 1)];
+   242→
+   243→    if (landmarks) {
+   244→      // Use banded scoring
+   245→      const bandedResult = evaluateWithBands(landmarks, skillLevel);
+   246→      setCurrentBandedScore(bandedResult);
+   247→
+   248→      // Choose color based on band
+   249→      const isGreen = bandedResult.overall_band === 'green';
+   250→      const isYellow = bandedResult.overall_band === 'yellow';
+   251→
+   252→      // Draw with appropriate color
+   253→      const color = isGreen ? '#22c55e' : isYellow ? '#eab308' : '#ef4444';
+   254→
+   255→      // Custom draw with banded color
+   256→      ctx.strokeStyle = color;
+   257→      ctx.lineWidth = 3;
+   258→      ctx.fillStyle = color;
+   259→
+   260→      // Draw skeleton connections
+   261→      const POSE_CONNECTIONS = [
+   262→        [7, 2], [2, 0], [0, 5], [5, 8],
+   263→        [11, 12], [11, 23], [12, 24], [23, 24],
+   264→        [11, 13], [13, 15],
+   265→        [12, 14], [14, 16],
+   266→        [23, 25], [25, 27],
+   267→        [24, 26], [26, 28],
+   268→      ];
+   269→
+   270→      for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+   271→        const start = landmarks[startIdx];
+   272→        const end = landmarks[endIdx];
+   273→        if (start && end && start.visibility > 0.5 && end.visibility > 0.5) {
+   274→          ctx.beginPath();
+   275→          ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
+   276→          ctx.lineTo(end.x * canvas.width, end.y * canvas.height);
+   277→          ctx.stroke();
+   278→        }
+   279→      }
+   280→
+   281→      // Draw joints
+   282→      for (const landmark of landmarks) {
+   283→        if (landmark.visibility > 0.5) {
+   284→          ctx.beginPath();
+   285→          ctx.arc(
+   286→            landmark.x * canvas.width,
+   287→            landmark.y * canvas.height,
+   288→            5,
+   289→            0,
+   290→            2 * Math.PI
+   291→          );
+   292→          ctx.fill();
+   293→        }
+   294→      }
+   295→    }
+   296→
+   297→    if (!video.paused) {
+   298→      animationRef.current = requestAnimationFrame(renderFrame);
+   299→    }
+   300→  }, [poseData, showSkeleton, skillLevel]);
+   301→
+   302→  // Handle video time updates
+   303→  const handleTimeUpdate = useCallback(() => {
+   304→    if (videoRef.current) {
+   305→      setCurrentTime(videoRef.current.currentTime);
+   306→      renderFrame();
+   307→    }
+   308→  }, [renderFrame]);
+   309→
+   310→  // Toggle play/pause
+   311→  const togglePlayPause = useCallback(() => {
+   312→    if (videoRef.current) {
+   313→      if (videoRef.current.paused) {
+   314→        videoRef.current.play();
+   315→        setIsPlaying(true);
+   316→        animationRef.current = requestAnimationFrame(renderFrame);
+   317→      } else {
+   318→        videoRef.current.pause();
+   319→        setIsPlaying(false);
+   320→        if (animationRef.current) {
+   321→          cancelAnimationFrame(animationRef.current);
+   322→        }
+   323→      }
+   324→    }
+   325→  }, [renderFrame]);
+   326→
+   327→  // Jump to timestamp
+   328→  const jumpToTimestamp = useCallback((timestamp: number) => {
+   329→    if (videoRef.current) {
+   330→      videoRef.current.currentTime = timestamp;
+   331→      videoRef.current.pause();
+   332→      setIsPlaying(false);
+   333→      setCurrentTime(timestamp);
+   334→      setTimeout(renderFrame, 50);
+   335→    }
+   336→  }, [renderFrame]);
+   337→
+   338→  // Go to next mistake
+   339→  const goToNextMistake = useCallback(() => {
+   340→    const allTimestamps = issues
+   341→      .flatMap((i) => i.timestamps || [])
+   342→      .sort((a, b) => a - b);
+   343→
+   344→    const nextTimestamp = allTimestamps.find((t) => t > currentTime + 0.5);
+   345→    if (nextTimestamp !== undefined) {
+   346→      jumpToTimestamp(nextTimestamp);
+   347→    } else if (allTimestamps.length > 0) {
+   348→      jumpToTimestamp(allTimestamps[0]);
+   349→    }
+   350→  }, [issues, currentTime, jumpToTimestamp]);
+   351→
+   352→  // Handle video loaded
+   353→  const handleLoadedMetadata = useCallback(() => {
+   354→    if (videoRef.current) {
+   355→      setDuration(videoRef.current.duration);
+   356→      setTimeout(renderFrame, 100);
+   357→    }
+   358→  }, [renderFrame]);
+   359→
+   360→  // Format time
+   361→  const formatTime = (seconds: number) => {
+   362→    const mins = Math.floor(seconds / 60);
+   363→    const secs = Math.floor(seconds % 60);
+   364→    return `${mins}:${secs.toString().padStart(2, '0')}`;
+   365→  };
+   366→
+   367→  // Format date
+   368→  const formatDate = (dateString: string) => {
+   369→    return new Date(dateString).toLocaleDateString('en-US', {
+   370→      year: 'numeric',
+   371→      month: 'long',
+   372→      day: 'numeric',
+   373→      hour: '2-digit',
+   374→      minute: '2-digit',
+   375→    });
+   376→  };
+   377→
+   378→  // Cleanup on unmount
+   379→  useEffect(() => {
+   380→    return () => {
+   381→      if (animationRef.current) {
+   382→        cancelAnimationFrame(animationRef.current);
+   383→      }
+   384→    };
+   385→  }, []);
+   386→
+   387→  if (loading) {
+   388→    return (
+   389→      <div className="min-h-screen bg-gray-50">
+   390→        <DashboardNav />
+   391→        <main className="ml-64 p-8">
+   392→          <div className="max-w-7xl mx-auto">
+   393→            <div className="animate-pulse">
+   394→              <div className="h-8 bg-gray-200 rounded w-64 mb-4" />
+   395→              <div className="h-4 bg-gray-200 rounded w-96 mb-8" />
+   396→              <div className="grid grid-cols-3 gap-8">
+   397→                <div className="col-span-2 h-96 bg-gray-200 rounded-xl" />
+   398→                <div className="h-96 bg-gray-200 rounded-xl" />
+   399→              </div>
+   400→            </div>
+   401→          </div>
+   402→        </main>
+   403→      </div>
+   404→    );
+   405→  }
+   406→
+   407→  if (error || !session) {
+   408→    return (
+   409→      <div className="min-h-screen bg-gray-50">
+   410→        <DashboardNav />
+   411→        <main className="ml-64 p-8">
+   412→          <div className="max-w-7xl mx-auto">
+   413→            <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+   414→              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+   415→                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   416→                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+   417→                </svg>
+   418→              </div>
+   419→              <h2 className="text-xl font-semibold text-gray-900 mb-2">Session Not Found</h2>
+   420→              <p className="text-gray-500 mb-6">{error || 'This session could not be loaded.'}</p>
+   421→              <Link
+   422→                href="/history"
+   423→                className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+   424→              >
+   425→                Back to History
+   426→              </Link>
+   427→            </div>
+   428→          </div>
+   429→        </main>
+   430→      </div>
+   431→    );
+   432→  }
+   433→
+   434→  return (
+   435→    <div className="min-h-screen bg-gray-50">
+   436→      <DashboardNav />
+   437→
+   438→      <main className="ml-64 p-8">
+   439→        <div className="max-w-7xl mx-auto">
+   440→          {/* Header */}
+   441→          <div className="mb-6">
+   442→            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+   443→              <Link href="/history" className="hover:text-primary-600">
+   444→                History
+   445→              </Link>
+   446→              <span>/</span>
+   447→              <span className="text-gray-900">Session Details</span>
+   448→            </div>
+   449→
+   450→            <div className="flex items-start justify-between">
+   451→              <div>
+   452→                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+   453→                  {session.type === 'strategy' ? 'Strategy Analysis' :
+   454→                   session.type === 'practice' ? 'Practice Session' : 'Video Analysis'}
+   455→                  {session.match_format && (
+   456→                    <MatchFormatBadge format={session.match_format} />
+   457→                  )}
+   458→                  {session.event_type && (
+   459→                    <EventTypeBadge eventType={session.event_type} />
+   460→                  )}
+   461→                </h1>
+   462→                <p className="text-gray-600 mt-1">
+   463→                  {session.filename && <span className="mr-2">{session.filename}</span>}
+   464→                  {formatDate(session.created_at)}
+   465→                </p>
+   466→              </div>
+   467→
+   468→              {/* Score badge */}
+   469→              {session.overall_score !== undefined && session.overall_score > 0 && (
+   470→                <div className="text-right">
+   471→                  <p className={`text-4xl font-bold ${
+   472→                    session.overall_score >= 80 ? 'text-green-600' :
+   473→                    session.overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+   474→                  }`}>
+   475→                    {Math.round(session.overall_score)}%
+   476→                  </p>
+   477→                  <p className="text-sm text-gray-500">Overall Score</p>
+   478→                </div>
+   479→              )}
+   480→            </div>
+   481→          </div>
+   482→
+   483→          {/* Main content */}
+   484→          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+   485→            {/* Video Player */}
+   486→            <div className="lg:col-span-2 space-y-6">
+   487→              {videoUrl && !videoError ? (
+   488→                <div className="bg-gray-900 rounded-xl overflow-hidden">
+   489→                  <div className="relative aspect-video">
+   490→                    <video
+   491→                      ref={videoRef}
+   492→                      className="absolute inset-0 w-full h-full object-contain"
+   493→                      onTimeUpdate={handleTimeUpdate}
+   494→                      onLoadedMetadata={handleLoadedMetadata}
+   495→                      onEnded={() => setIsPlaying(false)}
+   496→                      onError={handleVideoError}
+   497→                      playsInline
+   498→                    >
+   499→                      <source src={videoUrl} type="video/mp4" />
+   500→                      <source src={videoUrl} type="video/webm" />
+   501→                      <source src={videoUrl} type="video/quicktime" />
+   502→                      Your browser does not support the video tag.
+   503→                    </video>
+   504→                    <canvas
+   505→                      ref={canvasRef}
+   506→                      className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${
+   507→                        showSkeleton ? '' : 'hidden'
+   508→                      }`}
+   509→                    />
+   510→
+   511→                    {/* Banded score indicator */}
+   512→                    {currentBandedScore && (
+   513→                      <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-sm font-medium ${
+   514→                        currentBandedScore.overall_band === 'green' ? 'bg-green-500 text-white' :
+   515→                        currentBandedScore.overall_band === 'yellow' ? 'bg-yellow-500 text-white' :
+   516→                        currentBandedScore.overall_band === 'red' ? 'bg-red-500 text-white' :
+   517→                        'bg-gray-500 text-white'
+   518→                      }`}>
+   519→                        {SCORING_LEGEND[currentBandedScore.overall_band as keyof typeof SCORING_LEGEND]?.label || 'Unknown'}
+   520→                        <span className="ml-2 opacity-75">
+   521→                          {Math.round(currentBandedScore.overall_score)}%
+   522→                        </span>
+   523→                      </div>
+   524→                    )}
+   525→
+   526→                    {/* Time display */}
+   527→                    <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+   528→                      {formatTime(currentTime)} / {formatTime(duration)}
+   529→                    </div>
+   530→                  </div>
+   531→
+   532→                  {/* Controls */}
+   533→                  <div className="p-4 flex items-center justify-between">
+   534→                    <div className="flex items-center gap-2">
+   535→                      <button
+   536→                        onClick={togglePlayPause}
+   537→                        className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+   538→                      >
+   539→                        {isPlaying ? (
+   540→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   541→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+   542→                          </svg>
+   543→                        ) : (
+   544→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   545→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+   546→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+   547→                          </svg>
+   548→                        )}
+   549→                      </button>
+   550→
+   551→                      <button
+   552→                        onClick={goToNextMistake}
+   553→                        disabled={issues.length === 0}
+   554→                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium disabled:opacity-50"
+   555→                      >
+   556→                        Next Mistake
+   557→                      </button>
+   558→                    </div>
+   559→
+   560→                    <div className="flex items-center gap-4">
+   561→                      {/* Skill level selector */}
+   562→                      <select
+   563→                        value={skillLevel}
+   564→                        onChange={(e) => setSkillLevel(e.target.value as any)}
+   565→                        className="text-sm bg-gray-800 text-white border-gray-700 rounded-lg px-2 py-1"
+   566→                      >
+   567→                        <option value="beginner">Beginner</option>
+   568→                        <option value="intermediate">Intermediate</option>
+   569→                        <option value="advanced">Advanced</option>
+   570→                      </select>
+   571→
+   572→                      <label className="flex items-center gap-2 text-white text-sm">
+   573→                        <input
+   574→                          type="checkbox"
+   575→                          checked={showSkeleton}
+   576→                          onChange={(e) => {
+   577→                            setShowSkeleton(e.target.checked);
+   578→                            if (e.target.checked) {
+   579→                              setTimeout(renderFrame, 50);
+   580→                            }
+   581→                          }}
+   582→                          className="rounded"
+   583→                        />
+   584→                        Show Skeleton
+   585→                      </label>
+   586→                    </div>
+   587→                  </div>
+   588→
+   589→                  {/* Timeline */}
+   590→                  <div className="px-4 pb-4">
+   591→                    <input
+   592→                      type="range"
+   593→                      min={0}
+   594→                      max={duration || 100}
+   595→                      step={0.1}
+   596→                      value={currentTime}
+   597→                      onChange={(e) => {
+   598→                        const time = parseFloat(e.target.value);
+   599→                        if (videoRef.current) {
+   600→                          videoRef.current.currentTime = time;
+   601→                          setCurrentTime(time);
+   602→                          setTimeout(renderFrame, 50);
+   603→                        }
+   604→                      }}
+   605→                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+   606→                    />
+   607→                  </div>
+   608→                </div>
+   609→              ) : (
+   610→                <div className="bg-gray-200 rounded-xl aspect-video flex flex-col items-center justify-center p-8">
+   611→                  {videoLoading ? (
+   612→                    <>
+   613→                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-500 mb-4" />
+   614→                      <p className="text-gray-500">Loading video...</p>
+   615→                    </>
+   616→                  ) : (
+   617→                    <>
+   618→                      <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center mb-4">
+   619→                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   620→                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+   621→                        </svg>
+   622→                      </div>
+   623→                      <p className="text-gray-600 font-medium mb-2">Video Unavailable</p>
+   624→                      <p className="text-gray-500 text-sm text-center max-w-md">
+   625→                        {videoError || 'No video was stored for this session. The upload may have failed or the video was deleted.'}
+   626→                      </p>
+   627→                    </>
+   628→                  )}
+   629→                </div>
+   630→              )}
+   631→
+   632→              {/* Scoring Legend */}
+   633→              <div className="bg-white rounded-xl p-4 shadow-sm">
+   634→                <h3 className="font-semibold text-gray-900 mb-3">Scoring Legend</h3>
+   635→                <div className="grid grid-cols-4 gap-3">
+   636→                  {Object.entries(SCORING_LEGEND).map(([key, value]) => (
+   637→                    <div key={key} className="flex items-center gap-2">
+   638→                      <div
+   639→                        className="w-4 h-4 rounded"
+   640→                        style={{ backgroundColor: value.bgColor, borderColor: value.color, borderWidth: 2 }}
+   641→                      />
+   642→                      <div>
+   643→                        <p className="text-sm font-medium" style={{ color: value.color }}>
+   644→                          {value.label}
+   645→                        </p>
+   646→                        <p className="text-xs text-gray-500">{value.description}</p>
+   647→                      </div>
+   648→                    </div>
+   649→                  ))}
+   650→                </div>
+   651→              </div>
+   652→
+   653→              {/* PHASE 3: Debug Panel (dev-only) */}
+   654→              {sessionScoring && (
+   655→                <div className="bg-gray-800 rounded-xl p-4 shadow-sm text-white">
+   656→                  <div className="flex items-center justify-between mb-3">
+   657→                    <h3 className="font-semibold text-gray-100 flex items-center gap-2">
+   658→                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   659→                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+   660→                      </svg>
+   661→                      Analysis Debug
+   662→                    </h3>
+   663→                    <button
+   664→                      onClick={() => setShowDebugPanel(!showDebugPanel)}
+   665→                      className="text-xs text-gray-400 hover:text-white"
+   666→                    >
+   667→                      {showDebugPanel ? 'Hide Details' : 'Show Details'}
+   668→                    </button>
+   669→                  </div>
+   670→
+   671→                  {/* Quick Stats */}
+   672→                  <div className="grid grid-cols-3 gap-3 text-center">
+   673→                    <div className={`p-2 rounded ${sessionScoring.validation.isValid ? 'bg-green-900' : 'bg-red-900'}`}>
+   674→                      <p className="text-xs text-gray-400">Coverage</p>
+   675→                      <p className="text-lg font-bold">
+   676→                        {(sessionScoring.validation.validPoseRatio * 100).toFixed(0)}%
+   677→                      </p>
+   678→                    </div>
+   679→                    <div className={`p-2 rounded ${sessionScoring.validation.avgConfidence >= 0.5 ? 'bg-green-900' : 'bg-yellow-900'}`}>
+   680→                      <p className="text-xs text-gray-400">Avg Confidence</p>
+   681→                      <p className="text-lg font-bold">
+   682→                        {(sessionScoring.validation.avgConfidence * 100).toFixed(0)}%
+   683→                      </p>
+   684→                    </div>
+   685→                    <div className="p-2 rounded bg-gray-700">
+   686→                      <p className="text-xs text-gray-400">Green Frames</p>
+   687→                      <p className="text-lg font-bold text-green-400">
+   688→                        {(sessionScoring.greenFrameRatio * 100).toFixed(0)}%
+   689→                      </p>
+   690→                    </div>
+   691→                  </div>
+   692→
+   693→                  {showDebugPanel && (
+   694→                    <div className="mt-4 space-y-3 text-sm">
+   695→                      {/* Frame Breakdown */}
+   696→                      <div className="bg-gray-700 rounded p-3">
+   697→                        <p className="text-xs text-gray-400 mb-2">Frame Breakdown</p>
+   698→                        <div className="grid grid-cols-4 gap-2 text-xs">
+   699→                          <div>
+   700→                            <p className="text-gray-400">Total</p>
+   701→                            <p className="font-medium">{sessionScoring.validation.totalFrames}</p>
+   702→                          </div>
+   703→                          <div>
+   704→                            <p className="text-gray-400">Valid</p>
+   705→                            <p className="font-medium text-green-400">{sessionScoring.validation.validPoseFrames}</p>
+   706→                          </div>
+   707→                          <div>
+   708→                            <p className="text-gray-400">Low Conf</p>
+   709→                            <p className="font-medium text-yellow-400">{sessionScoring.validation.lowConfidenceFrames}</p>
+   710→                          </div>
+   711→                          <div>
+   712→                            <p className="text-gray-400">No Pose</p>
+   713→                            <p className="font-medium text-red-400">{sessionScoring.validation.noPoseFrames}</p>
+   714→                          </div>
+   715→                        </div>
+   716→                      </div>
+   717→
+   718→                      {/* Band Distribution */}
+   719→                      <div className="bg-gray-700 rounded p-3">
+   720→                        <p className="text-xs text-gray-400 mb-2">Band Distribution</p>
+   721→                        <div className="flex gap-1 h-4 rounded overflow-hidden">
+   722→                          <div
+   723→                            className="bg-green-500"
+   724→                            style={{ width: `${sessionScoring.greenFrameRatio * 100}%` }}
+   725→                            title={`Green: ${(sessionScoring.greenFrameRatio * 100).toFixed(1)}%`}
+   726→                          />
+   727→                          <div
+   728→                            className="bg-yellow-500"
+   729→                            style={{ width: `${sessionScoring.yellowFrameRatio * 100}%` }}
+   730→                            title={`Yellow: ${(sessionScoring.yellowFrameRatio * 100).toFixed(1)}%`}
+   731→                          />
+   732→                          <div
+   733→                            className="bg-red-500"
+   734→                            style={{ width: `${sessionScoring.redFrameRatio * 100}%` }}
+   735→                            title={`Red: ${(sessionScoring.redFrameRatio * 100).toFixed(1)}%`}
+   736→                          />
+   737→                        </div>
+   738→                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+   739→                          <span>Green {(sessionScoring.greenFrameRatio * 100).toFixed(0)}%</span>
+   740→                          <span>Yellow {(sessionScoring.yellowFrameRatio * 100).toFixed(0)}%</span>
+   741→                          <span>Red {(sessionScoring.redFrameRatio * 100).toFixed(0)}%</span>
+   742→                        </div>
+   743→                      </div>
+   744→
+   745→                      {/* Persistent Issues */}
+   746→                      {sessionScoring.persistentIssues.length > 0 && (
+   747→                        <div className="bg-gray-700 rounded p-3">
+   748→                          <p className="text-xs text-gray-400 mb-2">Persistent Issues</p>
+   749→                          <ul className="text-xs space-y-1">
+   750→                            {sessionScoring.persistentIssues.map((issue, i) => (
+   751→                              <li key={i} className="text-yellow-400">• {issue}</li>
+   752→                            ))}
+   753→                          </ul>
+   754→                        </div>
+   755→                      )}
+   756→
+   757→                      {/* Validation Status */}
+   758→                      <div className={`rounded p-3 text-xs ${sessionScoring.canShowGreatForm ? 'bg-green-900' : 'bg-yellow-900'}`}>
+   759→                        <p className="font-medium">
+   760→                          {sessionScoring.canShowGreatForm ? '✓ Can show "Great form!"' : '⚠ Cannot show "Great form!"'}
+   761→                        </p>
+   762→                        <p className="text-gray-300 mt-1">{sessionScoring.displayMessage}</p>
+   763→                      </div>
+   764→                    </div>
+   765→                  )}
+   766→                </div>
+   767→              )}
+   768→
+   769→              {/* Current metrics display */}
+   770→              {currentBandedScore && currentBandedScore.metrics && (
+   771→                <div className="bg-white rounded-xl p-4 shadow-sm">
+   772→                  <h3 className="font-semibold text-gray-900 mb-3">Current Frame Metrics</h3>
+   773→                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   774→                    {Object.entries(currentBandedScore.metrics).map(([key, score]: [string, any]) => (
+   775→                      <div key={key} className={`p-3 rounded-lg ${
+   776→                        SCORING_LEGEND[score.band as keyof typeof SCORING_LEGEND]?.bgColor || 'bg-gray-100'
+   777→                      }`}>
+   778→                        <p className="text-xs text-gray-600 capitalize">{key.replace(/_/g, ' ')}</p>
+   779→                        <p className="text-lg font-semibold" style={{
+   780→                          color: SCORING_LEGEND[score.band as keyof typeof SCORING_LEGEND]?.color
+   781→                        }}>
+   782→                          {typeof score.value === 'number' ? score.value.toFixed(1) : score.value}
+   783→                        </p>
+   784→                        {score.feedback && (
+   785→                          <p className="text-xs text-gray-500 mt-1">{score.feedback}</p>
+   786→                        )}
+   787→                      </div>
+   788→                    ))}
+   789→                  </div>
+   790→                </div>
+   791→              )}
+   792→            </div>
+   793→
+   794→            {/* Issues Panel */}
+   795→            <div className="space-y-4">
+   796→              <h3 className="font-semibold text-gray-900">
+   797→                Detected Issues ({issues.length})
+   798→              </h3>
+   799→
+   800→              {issues.length > 0 ? (
+   801→                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+   802→                  {issues.map((issue, index) => (
+   803→                    <div key={issue.id || index}>
+   804→                      <DrillCard
+   805→                        issue={issue}
+   806→                        onTimestampClick={jumpToTimestamp}
+   807→                        currentTime={currentTime}
+   808→                      />
+   809→                    </div>
+   810→                  ))}
+   811→                </div>
+   812→              ) : sessionScoring?.canShowGreatForm ? (
+   813→                /* PHASE 3: Only show "Great form!" if session validation passed */
+   814→                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800">
+   815→                  <p className="font-medium">Great form!</p>
+   816→                  <p className="text-sm">No major issues detected in this session.</p>
+   817→                </div>
+   818→              ) : sessionScoring && !sessionScoring.validation.isValid ? (
+   819→                /* PHASE 3: Low confidence / coverage warning */
+   820→                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800">
+   821→                  <p className="font-medium">Insufficient Pose Data</p>
+   822→                  <p className="text-sm">{sessionScoring.displayMessage}</p>
+   823→                  <p className="text-xs mt-2 text-yellow-600">
+   824→                    Coverage: {(sessionScoring.validation.validPoseRatio * 100).toFixed(0)}% |
+   825→                    Confidence: {(sessionScoring.validation.avgConfidence * 100).toFixed(0)}%
+   826→                  </p>
+   827→                </div>
+   828→              ) : (
+   829→                /* PHASE 3: Neutral state - good coverage but minor issues */
+   830→                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-gray-700">
+   831→                  <p className="font-medium">Form Analysis Complete</p>
+   832→                  <p className="text-sm">{sessionScoring?.displayMessage || 'Minor adjustments may help improve your form.'}</p>
+   833→                </div>
+   834→              )}
+   835→
+   836→              {/* 3D Animation for selected issue */}
+   837→              {selectedIssue?.drill?.keyframeType && (
+   838→                <div className="mt-4">
+   839→                  <h4 className="font-medium text-gray-900 mb-2">Correct Form</h4>
+   840→                  <TabbedDrillAnimation
+   841→                    drillType={selectedIssue.drill.keyframeType}
+   842→                  />
+   843→                </div>
+   844→              )}
+   845→            </div>
+   846→          </div>
+   847→
+   848→          {/* Strategy Results (if applicable) */}
+   849→          {strategyResult && (
+   850→            <div className="mt-8 space-y-6">
+   851→              <h2 className="text-xl font-bold text-gray-900">Strategy Analysis Results</h2>
+   852→
+   853→              {/* Coaching Points */}
+   854→              {strategyResult.coaching_points && strategyResult.coaching_points.length > 0 && (
+   855→                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   856→                  <div className="p-4 border-b border-gray-200">
+   857→                    <h3 className="font-semibold text-gray-900">Key Tactical Insights</h3>
+   858→                  </div>
+   859→                  <div className="p-6">
+   860→                    <ul className="space-y-4">
+   861→                      {strategyResult.coaching_points.map((point, index) => (
+   862→                        <li key={index} className="flex items-start gap-3">
+   863→                          <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">
+   864→                            {index + 1}
+   865→                          </span>
+   866→                          <p className="text-gray-700">{point}</p>
+   867→                        </li>
+   868→                      ))}
+   869→                    </ul>
+   870→                  </div>
+   871→                </div>
+   872→              )}
+   873→            </div>
+   874→          )}
+   875→        </div>
+   876→      </main>
+   877→    </div>
+   878→  );
+   879→}
+   880→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

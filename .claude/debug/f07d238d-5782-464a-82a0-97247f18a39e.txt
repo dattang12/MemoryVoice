@@ -1,0 +1,167 @@
+2026-02-05T21:26:28.416Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-05T21:26:28.416Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-05T21:26:28.416Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-05T21:26:28.416Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-05T21:26:28.509Z [DEBUG] Using bash path: "C:\Program Files\Git\bin\bash.exe"
+2026-02-05T21:26:28.519Z [DEBUG] Applying permission update: Adding 1 allow rule(s) to destination 'userSettings': ["Bash(dir:*)"]
+2026-02-05T21:26:28.520Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-05T21:26:28.535Z [DEBUG] [ToolSearch:optimistic] mode=tst-auto, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-02-05T21:26:28.535Z [DEBUG] [STARTUP] Running setup()...
+2026-02-05T21:26:28.536Z [DEBUG] Found 0 plugins (0 enabled, 0 disabled)
+2026-02-05T21:26:28.537Z [DEBUG] Loading skills from: managed=C:\ProgramData\ClaudeCode\.claude\skills, user=C:\Users\ASUS\.claude\skills, project=[]
+2026-02-05T21:26:28.538Z [DEBUG] Error log sink initialized
+2026-02-05T21:26:28.547Z [DEBUG] getPluginSkills: Processing 0 enabled plugins
+2026-02-05T21:26:28.547Z [DEBUG] Total plugin skills loaded: 0
+2026-02-05T21:26:28.547Z [DEBUG] Total plugin commands loaded: 0
+2026-02-05T21:26:28.547Z [DEBUG] Registered 0 hooks from 0 plugins
+2026-02-05T21:26:28.569Z [DEBUG] Loaded 0 unique skills (managed: 0, user: 0, project: 0, legacy commands: 0)
+2026-02-05T21:26:28.569Z [DEBUG] [STARTUP] setup() completed in 34ms
+2026-02-05T21:26:28.569Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-02-05T21:26:28.570Z [DEBUG] getSkills returning: 0 skill dir commands, 0 plugin skills, 1 bundled skills
+2026-02-05T21:26:28.571Z [DEBUG] Total plugin agents loaded: 0
+2026-02-05T21:26:28.571Z [DEBUG] [STARTUP] Commands and agents loaded in 2ms
+2026-02-05T21:26:28.572Z [DEBUG] [STARTUP] Running showSetupScreens()...
+2026-02-05T21:26:28.572Z [DEBUG] [render] initLayout starting
+2026-02-05T21:26:28.572Z [DEBUG] Layout engine: yoga
+2026-02-05T21:26:28.579Z [DEBUG] [Claude in Chrome] Found chrome profiles: Default
+2026-02-05T21:26:28.585Z [DEBUG] [render] initLayout complete
+2026-02-05T21:26:28.587Z [DEBUG] [render] first ink render: 811ms since process start
+2026-02-05T21:26:28.587Z [DEBUG] [Claude in Chrome] Extension fcoeoabgfenejglbffodgkkbkcdhcgfn found in chrome Default
+2026-02-05T21:26:28.592Z [DEBUG] [keybindings] KeybindingSetup initialized with 99 bindings, 0 warnings
+2026-02-05T21:26:28.652Z [DEBUG] [keybindings] Watching for changes to C:\Users\ASUS\.claude\keybindings.json
+2026-02-05T21:26:28.681Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326788681
+2026-02-05T21:26:28.681Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:28.681Z [DEBUG] Temp file written successfully, size: 9766 bytes
+2026-02-05T21:26:28.681Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:28.681Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326788681 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:28.682Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:30.290Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326790290
+2026-02-05T21:26:30.290Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:30.290Z [DEBUG] Temp file written successfully, size: 10149 bytes
+2026-02-05T21:26:30.290Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:30.290Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326790290 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:30.290Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:30.362Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-02-05T21:26:30.365Z [DEBUG] Grove: Using fresh cached config
+2026-02-05T21:26:30.365Z [DEBUG] [render] initLayout starting
+2026-02-05T21:26:30.375Z [DEBUG] [render] initLayout complete
+2026-02-05T21:26:30.375Z [DEBUG] [render] first ink render: 2599ms since process start
+2026-02-05T21:26:30.379Z [DEBUG] [keybindings] KeybindingSetup initialized with 99 bindings, 0 warnings
+2026-02-05T21:26:30.406Z [DEBUG] Git remote URL: null
+2026-02-05T21:26:30.406Z [DEBUG] No git remote URL found
+2026-02-05T21:26:30.406Z [DEBUG] Not in a GitHub repository, skipping path mapping update
+2026-02-05T21:26:31.156Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326791156
+2026-02-05T21:26:31.156Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:31.156Z [DEBUG] Temp file written successfully, size: 10149 bytes
+2026-02-05T21:26:31.156Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:31.156Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326791156 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:31.157Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.073Z [DEBUG] [STARTUP] showSetupScreens() completed in 3501ms
+2026-02-05T21:26:32.073Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-02-05T21:26:32.074Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-02-05T21:26:32.074Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-02-05T21:26:32.074Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-05T21:26:32.074Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-05T21:26:32.077Z [DEBUG] Total LSP servers loaded: 0
+2026-02-05T21:26:32.077Z [DEBUG] [STARTUP] MCP configs loaded in 3557ms
+2026-02-05T21:26:32.090Z [DEBUG] [Reconnection] computeInitialTeamContext: No teammate context set (not a teammate)
+2026-02-05T21:26:32.092Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792092
+2026-02-05T21:26:32.093Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.093Z [DEBUG] Temp file written successfully, size: 10149 bytes
+2026-02-05T21:26:32.093Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.093Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792092 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.093Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.097Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-02-05T21:26:32.097Z [DEBUG] LSP manager initialized with 0 servers
+2026-02-05T21:26:32.098Z [DEBUG] Loaded 0 installed plugins from C:\Users\ASUS\.claude\plugins\installed_plugins.json
+2026-02-05T21:26:32.098Z [DEBUG] Initialized versioned plugins system with 0 plugins
+2026-02-05T21:26:32.099Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2026-02-05T21:26:32.099Z [DEBUG] Found 0 hook matchers in settings
+2026-02-05T21:26:32.099Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2026-02-05T21:26:32.099Z [DEBUG] LSP server manager initialized successfully
+2026-02-05T21:26:32.099Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-02-05T21:26:32.100Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-05T21:26:32.101Z [DEBUG] [render] initLayout starting
+2026-02-05T21:26:32.380Z [DEBUG] [render] initLayout complete
+2026-02-05T21:26:32.381Z [DEBUG] [render] first ink render: 4605ms since process start
+2026-02-05T21:26:32.387Z [DEBUG] Watching for changes in setting files C:\Users\ASUS\.claude\settings.json...
+2026-02-05T21:26:32.392Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=C:\Users\ASUS\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\vendor\ripgrep\x64-win32\rg.exe)
+2026-02-05T21:26:32.399Z [DEBUG] [keybindings] KeybindingSetup initialized with 99 bindings, 0 warnings
+2026-02-05T21:26:32.423Z [DEBUG] High write ratio: blit=0, write=1019 (100.0% writes), screen=20x132
+2026-02-05T21:26:32.436Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792436
+2026-02-05T21:26:32.436Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.436Z [DEBUG] Temp file written successfully, size: 10149 bytes
+2026-02-05T21:26:32.436Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.436Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792436 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.436Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.439Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792439
+2026-02-05T21:26:32.439Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.439Z [DEBUG] Temp file written successfully, size: 10149 bytes
+2026-02-05T21:26:32.439Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.439Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792439 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.439Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.443Z [DEBUG] [REPL:mount] REPL mounted, disabled=false
+2026-02-05T21:26:32.445Z [DEBUG] Official marketplace auto-install skipped: already_attempted
+2026-02-05T21:26:32.446Z [DEBUG] performStartupChecks called
+2026-02-05T21:26:32.446Z [DEBUG] Starting background plugin installations
+2026-02-05T21:26:32.447Z [DEBUG] performBackgroundPluginInstallations called
+2026-02-05T21:26:32.456Z [DEBUG] AutoUpdaterWrapper: Installation type: npm-global
+2026-02-05T21:26:32.458Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-05T21:26:32.458Z [DEBUG] [claudeai-mcp] Gate returned: true
+2026-02-05T21:26:32.458Z [DEBUG] [claudeai-mcp] Fetching from https://api.anthropic.com/v1/mcp_servers?limit=1000
+2026-02-05T21:26:32.459Z [DEBUG] Setting installation status: 0 marketplaces, 0 installable plugins, 0 uninstallable plugins
+2026-02-05T21:26:32.459Z [DEBUG] Loaded plugins - Enabled: 0, Disabled: 0, Commands: 0, Agents: 0, Errors: 0
+2026-02-05T21:26:32.473Z [DEBUG] High write ratio: blit=0, write=1182 (100.0% writes), screen=21x132
+2026-02-05T21:26:32.506Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-05T21:26:32.506Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-05T21:26:32.506Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-05T21:26:32.517Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792517
+2026-02-05T21:26:32.517Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.517Z [DEBUG] Temp file written successfully, size: 10330 bytes
+2026-02-05T21:26:32.517Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.517Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792517 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.517Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.520Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792520
+2026-02-05T21:26:32.520Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.521Z [DEBUG] Temp file written successfully, size: 10330 bytes
+2026-02-05T21:26:32.521Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.521Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792520 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.521Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.527Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326792527
+2026-02-05T21:26:32.527Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:32.527Z [DEBUG] Temp file written successfully, size: 10330 bytes
+2026-02-05T21:26:32.527Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:32.527Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326792527 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:32.527Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:32.604Z [DEBUG] [claudeai-mcp] Fetched 3 servers
+2026-02-05T21:26:32.606Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Initializing claude.ai proxy transport for server mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-05T21:26:32.606Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-05T21:26:32.606Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": claude.ai proxy transport created successfully
+2026-02-05T21:26:32.608Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Starting connection with timeout of 30000ms
+2026-02-05T21:26:32.609Z [DEBUG] MCP server "claude.ai AWS Marketplace": Initializing claude.ai proxy transport for server mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-05T21:26:32.609Z [DEBUG] MCP server "claude.ai AWS Marketplace": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-05T21:26:32.609Z [DEBUG] MCP server "claude.ai AWS Marketplace": claude.ai proxy transport created successfully
+2026-02-05T21:26:32.609Z [DEBUG] MCP server "claude.ai AWS Marketplace": Starting connection with timeout of 30000ms
+2026-02-05T21:26:32.610Z [DEBUG] MCP server "claude.ai Day AI": Initializing claude.ai proxy transport for server mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-05T21:26:32.610Z [DEBUG] MCP server "claude.ai Day AI": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-05T21:26:32.610Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy transport created successfully
+2026-02-05T21:26:32.610Z [DEBUG] MCP server "claude.ai Day AI": Starting connection with timeout of 30000ms
+2026-02-05T21:26:32.898Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy connection failed after 288ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CXqdUQenY7awrDzJ5K7T4"}
+2026-02-05T21:26:32.898Z [ERROR] MCP server "claude.ai Day AI" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CXqdUQenY7awrDzJ5K7T4"}
+2026-02-05T21:26:32.899Z [DEBUG] MCP server "claude.ai Day AI": Authentication required for claude.ai proxy server
+2026-02-05T21:26:33.287Z [DEBUG] MCP server "claude.ai AWS Marketplace": Successfully connected to claudeai-proxy server in 678ms
+2026-02-05T21:26:33.288Z [DEBUG] MCP server "claude.ai AWS Marketplace": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"AWS Marketplace - Agent mode","version":"1.0.0"}}
+2026-02-05T21:26:33.420Z [DEBUG] AutoUpdater: Detected installation type: npm-global
+2026-02-05T21:26:33.420Z [DEBUG] AutoUpdater: Using global update method
+2026-02-05T21:26:33.707Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Successfully connected to claudeai-proxy server in 1101ms
+2026-02-05T21:26:33.707Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":true,"serverVersion":{"name":"Three.js Server","version":"1.0.0"}}
+2026-02-05T21:26:36.962Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.25308.1770326796962
+2026-02-05T21:26:36.962Z [DEBUG] Preserving file permissions: 100666
+2026-02-05T21:26:36.963Z [DEBUG] Temp file written successfully, size: 10330 bytes
+2026-02-05T21:26:36.963Z [DEBUG] Applied original permissions to temp file
+2026-02-05T21:26:36.963Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.25308.1770326796962 to C:\Users\ASUS\.claude.json
+2026-02-05T21:26:36.963Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-05T21:26:39.788Z [DEBUG] High write ratio: blit=0, write=1182 (100.0% writes), screen=21x132
+2026-02-05T21:26:52.237Z [DEBUG] Getting matching hook commands for SessionEnd with query: prompt_input_exit
+2026-02-05T21:26:52.237Z [DEBUG] Found 0 hook matchers in settings
+2026-02-05T21:26:52.237Z [DEBUG] Matched 0 unique hooks for query "prompt_input_exit" (0 before deduplication)

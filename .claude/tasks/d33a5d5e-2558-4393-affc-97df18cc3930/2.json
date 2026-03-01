@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Feature 2: Mistake Timeline + Click-to-Jump",
+  "description": "Implement horizontal timeline under video:\n1. Create MistakeTimeline.tsx component\n2. Show colored segments by severity (red/orange)\n3. Add playhead synced with video currentTime\n4. Implement click-to-seek with HTMLVideoElement.currentTime\n5. Create FixItCard.tsx with animated stick figure corrections",
+  "activeForm": "Implementing Mistake Timeline",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,0 +1,108 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Client-side Supabase client (lazy initialization)
+let _supabase: SupabaseClient | null = null;
+
+export const supabase = (() => {
+  if (!_supabase && supabaseUrl && supabaseAnonKey) {
+    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  // Return a mock client if env vars not available (for SSR)
+  if (!_supabase) {
+    return createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'placeholder-key'
+    );
+  }
+  return _supabase;
+})();
+
+// Server-side Supabase client (for API routes)
+export function createServerClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+
+  if (!url || !key) {
+    throw new Error('Supabase environment variables not configured');
+  }
+
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+// Helper to get user from request
+export async function getUserFromRequest(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.split(' ')[1];
+  const serverClient = createServerClient();
+
+  const { data: { user }, error } = await serverClient.auth.getUser(token);
+
+  if (error || !user) {
+    return null;
+  }
+
+  return user;
+}
+
+// Sanitize filename to remove non-ASCII characters for Supabase storage
+function sanitizeFileName(fileName: string): string {
+  // Get file extension
+  const lastDot = fileName.lastIndexOf('.');
+  const ext = lastDot > 0 ? fileName.slice(lastDot) : '';
+  const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
+
+  // Replace non-ASCII characters with empty string, keep alphanumeric, dash, underscore
+  const sanitized = baseName
+    .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII
+    .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace special chars with underscore
+    .replace(/_+/g, '_') // Collapse multiple underscores
+    .replace(/^_|_$/g, '') // Trim underscores from start/end
+    || 'video'; // Default name if nothing remains
+
+  return sanitized + ext;
+}
+
+// Storage helpers
+export async function uploadVideo(file: File, userId: string): Promise<string | null> {
+  // Validate file size before attempting upload (Supabase default limit is 50MB)
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  if (file.size > MAX_FILE_SIZE) {
+    console.error('Upload error: File size exceeds 50MB limit');
+    throw new Error('File size exceeds 50MB limit. Please compress your video before uploading.');
+  }
+
+  const sanitizedName = sanitizeFileName(file.name);
+  const fileName = `${userId}/${Date.now()}-${sanitizedName}`;
+
+  const { data, error } = await supabase.storage
+    .from('videos')
+    .upload(fileName, file);
+
+  if (error) {
+    console.error('Upload error:', error);
+    // Provide more specific error messages
+    if (error.message?.includes('exceeded the maximum allowed size')) {
+      throw new Error('File size exceeds storage limit. Please compress your video before uploading.');
+    }
+    throw new Error(`Failed to upload video: ${error.message}`);
+  }
+
+  return data.path;
+}
+
+export function getVideoUrl(path: string): string {
+  const { data } = supabase.storage.from('videos').getPublicUrl(path);
+  return data.publicUrl;
+}

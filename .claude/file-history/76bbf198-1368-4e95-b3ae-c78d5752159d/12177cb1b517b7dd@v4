@@ -1,0 +1,891 @@
+'use client';
+
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Html, ContactShadows, Environment } from '@react-three/drei';
+import * as THREE from 'three';
+import type { PoseLandmark, MistakeEvent } from '@/lib/types';
+import { POSE_LANDMARKS } from '@/lib/pose-utils';
+import {
+  SKELETON_COLORS,
+  extractRacketTrajectory,
+  drawMotionPath,
+} from '@/lib/skeleton-renderer';
+
+// 3D skeleton connections for lower body focus
+const LOWER_BODY_CONNECTIONS: [number, number][] = [
+  [23, 24], // hips
+  [23, 25], [25, 27], // left leg
+  [24, 26], [26, 28], // right leg
+  [11, 23], [12, 24], // torso to hips
+];
+
+// Convert landmarks to 3D positions
+function landmarksTo3DPositions(
+  landmarks: PoseLandmark[],
+  scale: number = 2
+): Map<number, [number, number, number]> {
+  const positions = new Map<number, [number, number, number]>();
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i];
+    if (lm && lm.visibility > 0.3) {
+      const x = (lm.x - 0.5) * scale;
+      const y = -(lm.y - 0.5) * scale;
+      const z = -lm.z * scale;
+      positions.set(i, [x, y, z]);
+    }
+  }
+  return positions;
+}
+
+// 3D Joint component
+function Joint3D({ position, color, size, pulsing = false }: {
+  position: [number, number, number];
+  color: string;
+  size: number;
+  pulsing?: boolean;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (meshRef.current && pulsing) {
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.3;
+      meshRef.current.scale.setScalar(scale);
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <sphereGeometry args={[size, 16, 16]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={pulsing ? 0.5 : 0} />
+    </mesh>
+  );
+}
+
+// 3D Bone component - using primitive to avoid SVG line conflict
+function Bone3D({ start, end, color }: {
+  start: [number, number, number];
+  end: [number, number, number];
+  color: string;
+}) {
+  const lineObj = useMemo(() => {
+    const points = [new THREE.Vector3(...start), new THREE.Vector3(...end)];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color, linewidth: 3 });
+    return new THREE.Line(geometry, material);
+  }, [start, end, color]);
+
+  return <primitive object={lineObj} />;
+}
+
+// 3D Lower Body Skeleton
+function LowerBodySkeleton3D({ landmarks, color, label, highlightFeet = false }: {
+  landmarks: PoseLandmark[];
+  color: string;
+  label: string;
+  highlightFeet?: boolean;
+}) {
+  const positions = useMemo(() => landmarksTo3DPositions(landmarks), [landmarks]);
+
+  return (
+    <group>
+      {/* Bones */}
+      {LOWER_BODY_CONNECTIONS.map(([startIdx, endIdx], i) => {
+        const start = positions.get(startIdx);
+        const end = positions.get(endIdx);
+        if (start && end) {
+          return <Bone3D key={i} start={start} end={end} color={color} />;
+        }
+        return null;
+      })}
+
+      {/* Joints */}
+      {[23, 24, 25, 26, 27, 28].map((idx) => {
+        const pos = positions.get(idx);
+        if (pos) {
+          const isFoot = idx === 27 || idx === 28;
+          return (
+            <Joint3D
+              key={idx}
+              position={pos}
+              color={isFoot && highlightFeet ? '#fbbf24' : color}
+              size={isFoot ? 0.06 : 0.04}
+              pulsing={isFoot && highlightFeet}
+            />
+          );
+        }
+        return null;
+      })}
+
+      {/* Label */}
+      <Html position={[0, 0.8, 0]} center>
+        <div className={`px-2 py-1 text-white text-xs font-medium rounded whitespace-nowrap ${
+          color === '#ef4444' ? 'bg-red-500/90' : 'bg-green-500/90'
+        }`}>
+          {label}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// ============================================
+// Types
+// ============================================
+
+interface MovementGuidanceProps {
+  poseHistory: (PoseLandmark[] | null)[];
+  currentMistake?: MistakeEvent | null;
+  width?: number;
+  height?: number;
+  showCorrection?: boolean;
+}
+
+interface CorrectionKeyframe {
+  wrong: PoseLandmark[];
+  correct: PoseLandmark[];
+  label: string;
+  description: string;
+}
+
+// ============================================
+// Correction Pose Templates
+// ============================================
+
+/**
+ * TASK 3: Generate exaggerated correction poses for clear visualization
+ * Correction deltas increased 3-5x from original for visibility
+ */
+function generateCorrectionPoses(
+  currentPose: PoseLandmark[] | null,
+  mistakeType: string
+): CorrectionKeyframe | null {
+  if (!currentPose) return null;
+
+  // Clone the current pose
+  const wrongPose = currentPose.map(lm => ({ ...lm }));
+  const correctPose = currentPose.map(lm => ({ ...lm }));
+
+  // TASK 3: Exaggeration factor - makes corrections 3-5x more visible
+  const EXAGGERATE = 3.5;
+
+  switch (mistakeType) {
+    case 'OVERHEAD_CONTACT_LOW':
+      // Correct: raise wrist and elbow DRAMATICALLY higher
+      if (correctPose[POSE_LANDMARKS.RIGHT_WRIST]) {
+        correctPose[POSE_LANDMARKS.RIGHT_WRIST].y -= 0.08 * EXAGGERATE; // ~28% up
+        correctPose[POSE_LANDMARKS.RIGHT_WRIST].x += 0.02 * EXAGGERATE; // Slight outward
+      }
+      if (correctPose[POSE_LANDMARKS.RIGHT_ELBOW]) {
+        correctPose[POSE_LANDMARKS.RIGHT_ELBOW].y -= 0.05 * EXAGGERATE; // ~17% up
+      }
+      // Also raise shoulder slightly for full arm extension visual
+      if (correctPose[POSE_LANDMARKS.RIGHT_SHOULDER]) {
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].y -= 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'Raise Contact Point',
+        description: 'Hit at the HIGHEST point above your head - fully extend!',
+      };
+
+    case 'ELBOW_TOO_BENT':
+      // Correct: extend elbow FULLY
+      if (correctPose[POSE_LANDMARKS.RIGHT_ELBOW] && correctPose[POSE_LANDMARKS.RIGHT_WRIST]) {
+        const elbow = correctPose[POSE_LANDMARKS.RIGHT_ELBOW];
+        const wrist = correctPose[POSE_LANDMARKS.RIGHT_WRIST];
+        // Move wrist outward dramatically to show full extension
+        const dx = wrist.x - elbow.x;
+        const dy = wrist.y - elbow.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len > 0) {
+          // Extend arm by 60% (was 30%)
+          wrist.x = elbow.x + (dx / len) * (len * 1.6);
+          wrist.y = elbow.y + (dy / len) * (len * 1.6);
+        }
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'EXTEND Elbow Fully',
+        description: 'Arm should be almost straight at contact - maximum power!',
+      };
+
+    case 'INSUFFICIENT_ROTATION':
+      // Correct: rotate shoulders DRAMATICALLY more
+      if (correctPose[POSE_LANDMARKS.LEFT_SHOULDER] && correctPose[POSE_LANDMARKS.RIGHT_SHOULDER]) {
+        correctPose[POSE_LANDMARKS.LEFT_SHOULDER].x -= 0.03 * EXAGGERATE; // Pull back
+        correctPose[POSE_LANDMARKS.LEFT_SHOULDER].y += 0.02 * EXAGGERATE; // Drop slightly
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].x += 0.06 * EXAGGERATE; // Push forward
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].y -= 0.03 * EXAGGERATE; // Raise
+      }
+      // Also rotate hips
+      if (correctPose[POSE_LANDMARKS.LEFT_HIP] && correctPose[POSE_LANDMARKS.RIGHT_HIP]) {
+        correctPose[POSE_LANDMARKS.LEFT_HIP].x -= 0.02 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_HIP].x += 0.03 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'ROTATE Through Shot',
+        description: 'Turn your whole body - hips THEN shoulders for maximum power!',
+      };
+
+    case 'STANCE_TOO_NARROW':
+      // Correct: widen stance DRAMATICALLY
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x -= 0.06 * EXAGGERATE; // ~21% wider
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x += 0.06 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].x -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].x += 0.04 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'WIDEN Your Stance',
+        description: 'Feet shoulder-width apart or wider - stable athletic position!',
+      };
+
+    case 'STANCE_TOO_WIDE':
+      // Correct: narrow stance
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x += 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].x += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].x -= 0.03 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'NARROW Your Stance',
+        description: 'Bring feet closer together for quicker movement!',
+      };
+
+    case 'POOR_LUNGE_RECOVERY':
+      // Correct: show EXPLOSIVE recovery position
+      if (correctPose[POSE_LANDMARKS.RIGHT_KNEE] && correctPose[POSE_LANDMARKS.RIGHT_HIP]) {
+        const knee = correctPose[POSE_LANDMARKS.RIGHT_KNEE];
+        const hip = correctPose[POSE_LANDMARKS.RIGHT_HIP];
+        // Dramatic straightening - show almost standing
+        knee.y = hip.y + (knee.y - hip.y) * 0.4; // Much straighter (was 0.7)
+        knee.x = hip.x + (knee.x - hip.x) * 0.5; // Pull back toward center
+      }
+      // Also show rear leg pushing
+      if (correctPose[POSE_LANDMARKS.LEFT_KNEE] && correctPose[POSE_LANDMARKS.LEFT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].y -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].y -= 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'EXPLOSIVE Recovery',
+        description: 'Push off HARD from front foot - spring back to center!',
+      };
+
+    case 'LATE_SPLIT_STEP':
+      // Correct: show proper split-step position
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        // Wider, athletic stance
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x -= 0.05 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x += 0.05 * EXAGGERATE;
+        // Lower center of gravity
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].y += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].y += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_HIP].y += 0.02 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_HIP].y += 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'LAND Ready',
+        description: 'Land with feet apart, knees bent - ready to explode any direction!',
+      };
+
+    default:
+      return null;
+  }
+}
+
+// ============================================
+// Main Component
+// ============================================
+
+export default function MovementGuidance({
+  poseHistory,
+  currentMistake,
+  width = 320,
+  height = 280,
+  showCorrection = true,
+}: MovementGuidanceProps) {
+  const animationRef = useRef<number | null>(null);
+  const [interpolation, setInterpolation] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+
+  // Get current pose from history
+  const currentPose = useMemo(() => {
+    const validPoses = poseHistory.filter(p => p !== null);
+    return validPoses.length > 0 ? validPoses[Math.floor(validPoses.length / 2)] : null;
+  }, [poseHistory]);
+
+  // Generate correction poses based on mistake type
+  const correctionKeyframe = useMemo(() => {
+    if (!currentMistake || !currentPose) return null;
+    return generateCorrectionPoses(currentPose, currentMistake.type);
+  }, [currentMistake, currentPose]);
+
+  // Animation loop - SLOWED DOWN for clearer visualization
+  useEffect(() => {
+    if (!isAnimating || !showCorrection || !correctionKeyframe) return;
+
+    const duration = 6000; // 6 seconds per cycle (was 2.5s) - much slower for clarity
+    let startTime: number | null = null;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = (elapsed % duration) / duration;
+
+      // Smooth ping-pong: 0 -> 1 -> 0
+      const pingPong = progress < 0.5
+        ? progress * 2
+        : 2 - progress * 2;
+
+      // Apply easing for smoother motion
+      const eased = 0.5 - Math.cos(pingPong * Math.PI) / 2;
+
+      setInterpolation(eased);
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isAnimating, showCorrection, correctionKeyframe]);
+
+  // Interpolate landmarks for 3D animation
+  const interpolatedLandmarks = useMemo(() => {
+    if (!correctionKeyframe || !correctionKeyframe.wrong || !correctionKeyframe.correct) {
+      return currentPose;
+    }
+    return correctionKeyframe.wrong.map((wrongLm, idx) => {
+      const correctLm = correctionKeyframe.correct[idx];
+      if (!wrongLm || !correctLm) return wrongLm;
+      return {
+        x: wrongLm.x + (correctLm.x - wrongLm.x) * interpolation,
+        y: wrongLm.y + (correctLm.y - wrongLm.y) * interpolation,
+        z: wrongLm.z + (correctLm.z - wrongLm.z) * interpolation,
+        visibility: wrongLm.visibility,
+      };
+    });
+  }, [correctionKeyframe, interpolation, currentPose]);
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+      {/* Header */}
+      {correctionKeyframe && (
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-white">{correctionKeyframe.label}</h4>
+              <p className="text-xs text-slate-400 mt-0.5">{correctionKeyframe.description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Play/Pause */}
+              <button
+                onClick={() => setIsAnimating(!isAnimating)}
+                className="p-2 hover:bg-slate-700/50 rounded-lg transition"
+              >
+                {isAnimating ? (
+                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3D View - Always shown (removed 2D option) */}
+      {correctionKeyframe ? (
+        <div style={{ height: height + 40 }} className="relative bg-gradient-to-b from-slate-800 to-slate-900">
+          <Canvas camera={{ position: [0, 0.5, 3], fov: 45 }}>
+            <ambientLight intensity={0.6} />
+            <pointLight position={[5, 5, 5]} />
+            <Environment preset="studio" />
+
+            {/* Current/Wrong pose (left, red) */}
+            <group position={[-0.6, -0.3, 0]}>
+              <LowerBodySkeleton3D
+                landmarks={correctionKeyframe.wrong}
+                color="#ef4444"
+                label="Current"
+                highlightFeet={currentMistake?.type?.includes('STANCE')}
+              />
+            </group>
+
+            {/* Target/Correct pose (right, green) */}
+            <group position={[0.6, -0.3, 0]}>
+              <LowerBodySkeleton3D
+                landmarks={correctionKeyframe.correct}
+                color="#22c55e"
+                label="Target"
+                highlightFeet={currentMistake?.type?.includes('STANCE')}
+              />
+            </group>
+
+            {/* Animated transition skeleton (center, shown during animation) */}
+            {interpolatedLandmarks && (
+              <group position={[0, 0.5, 0.3]}>
+                <LowerBodySkeleton3D
+                  landmarks={interpolatedLandmarks}
+                  color={interpolation < 0.5 ? '#f59e0b' : '#22c55e'}
+                  label={`Transition ${Math.round(interpolation * 100)}%`}
+                  highlightFeet={true}
+                />
+              </group>
+            )}
+
+            <ContactShadows position={[0, -1, 0]} opacity={0.4} scale={5} blur={2} />
+            <OrbitControls enablePan={false} minDistance={2} maxDistance={5} />
+          </Canvas>
+
+          {/* 3D View hint */}
+          <div className="absolute bottom-2 right-2 text-xs text-slate-500">
+            Drag to rotate
+          </div>
+        </div>
+      ) : (
+        <div style={{ height }} className="bg-slate-800 flex items-center justify-center">
+          <p className="text-slate-500 text-sm">No correction guidance available</p>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="px-4 py-3 bg-slate-800/50 border-t border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs">
+          {showCorrection && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SKELETON_COLORS.correction.wrong }} />
+                <span className="text-slate-400">Current</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SKELETON_COLORS.correction.right }} />
+                <span className="text-slate-400">Target</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Progress indicator */}
+        {showCorrection && correctionKeyframe && (
+          <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full transition-all duration-75"
+              style={{
+                width: `${interpolation * 100}%`,
+                backgroundColor: interpolation < 0.5 ? SKELETON_COLORS.correction.wrong : SKELETON_COLORS.correction.right,
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Compact Trajectory Preview
+// ============================================
+
+export function TrajectoryPreview({
+  poseHistory,
+  width = 120,
+  height = 80,
+}: {
+  poseHistory: (PoseLandmark[] | null)[];
+  width?: number;
+  height?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || poseHistory.length < 5) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear with dark background
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, width, height);
+
+    // Extract and draw trajectory
+    const startFrame = Math.max(0, poseHistory.length - 20);
+    const points = extractRacketTrajectory(poseHistory, startFrame, poseHistory.length - 1);
+
+    if (points.length > 2) {
+      drawMotionPath(ctx, points, {
+        offsetX: 5,
+        offsetY: 5,
+        renderWidth: width - 10,
+        renderHeight: height - 10,
+      });
+    }
+  }, [poseHistory, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className="rounded-lg"
+    />
+  );
+}
+
+// ============================================
+// V5: Phase Sequence Bar
+// ============================================
+
+type MovementPhase = 'ready' | 'split' | 'push' | 'strike' | 'recover';
+
+interface PhaseInfo {
+  phase: MovementPhase;
+  label: string;
+  status: 'pending' | 'active' | 'completed' | 'error';
+  timingCue?: string;
+}
+
+interface PhaseSequenceBarProps {
+  phases: PhaseInfo[];
+  currentPhase: MovementPhase;
+  onPhaseClick?: (phase: MovementPhase) => void;
+}
+
+const PHASE_ICONS: Record<MovementPhase, string> = {
+  ready: 'M12 4v16m8-8H4',
+  split: 'M8 12h8M12 8v8',
+  push: 'M13 7l5 5m0 0l-5 5m5-5H6',
+  strike: 'M13 10V3L4 14h7v7l9-11h-7z',
+  recover: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+};
+
+export function PhaseSequenceBar({
+  phases,
+  currentPhase,
+  onPhaseClick,
+}: PhaseSequenceBarProps) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-4">
+      <h4 className="text-sm font-medium text-slate-300 mb-3">Movement Phases</h4>
+
+      <div className="flex items-center justify-between">
+        {phases.map((phase, idx) => {
+          const isActive = phase.phase === currentPhase;
+          const isCompleted = phase.status === 'completed';
+          const isError = phase.status === 'error';
+
+          return (
+            <div key={phase.phase} className="flex items-center">
+              {/* Phase circle */}
+              <button
+                onClick={() => onPhaseClick?.(phase.phase)}
+                className={`relative flex flex-col items-center group ${
+                  onPhaseClick ? 'cursor-pointer' : 'cursor-default'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    isActive
+                      ? 'bg-cyan-500 ring-4 ring-cyan-500/30'
+                      : isCompleted
+                      ? 'bg-green-500'
+                      : isError
+                      ? 'bg-red-500'
+                      : 'bg-slate-700'
+                  }`}
+                >
+                  {isCompleted ? (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : isError ? (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={PHASE_ICONS[phase.phase]} />
+                    </svg>
+                  )}
+                </div>
+
+                <span
+                  className={`text-xs mt-1.5 font-medium ${
+                    isActive ? 'text-cyan-400' : isCompleted ? 'text-green-400' : 'text-slate-400'
+                  }`}
+                >
+                  {phase.label}
+                </span>
+
+                {/* Timing cue tooltip */}
+                {phase.timingCue && isActive && (
+                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 px-2 py-1 rounded text-xs text-cyan-300 whitespace-nowrap">
+                    {phase.timingCue}
+                  </div>
+                )}
+              </button>
+
+              {/* Connector line */}
+              {idx < phases.length - 1 && (
+                <div
+                  className={`w-8 h-0.5 mx-1 ${
+                    phases[idx + 1].status === 'completed' || phases[idx + 1].status === 'active'
+                      ? 'bg-cyan-500'
+                      : 'bg-slate-600'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// V5: Why Card (Cause-Effect)
+// ============================================
+
+interface WhyCardProps {
+  mistakeType: string;
+  when: string;
+  why: string;
+  fix: string;
+  timing?: string;
+}
+
+// Cause-effect data for common mistakes
+const MISTAKE_EXPLANATIONS: Record<string, Omit<WhyCardProps, 'mistakeType'>> = {
+  OVERHEAD_CONTACT_LOW: {
+    when: 'When you hit below your highest reach point...',
+    why: '...power generation drops by ~40% and control decreases',
+    fix: 'Extend fully upward before contact - hit at the peak!',
+    timing: 'Start preparation as shuttle peaks',
+  },
+  ELBOW_TOO_BENT: {
+    when: 'When your elbow stays bent at contact...',
+    why: '...arm length shortens, reducing racket speed and power',
+    fix: 'Extend arm almost fully at the moment of impact',
+    timing: 'Straighten just before contact',
+  },
+  INSUFFICIENT_ROTATION: {
+    when: 'When your body stays square to the net...',
+    why: '...you lose rotational power from hips and core',
+    fix: 'Rotate hips and shoulders 45-90° during backswing',
+    timing: 'Start rotation as you track the shuttle',
+  },
+  LATE_SPLIT_STEP: {
+    when: 'When you split after opponent contacts...',
+    why: '...reaction time increases by 200-300ms',
+    fix: 'Time your split to land AS opponent hits',
+    timing: 'Jump when opponent starts swing',
+  },
+  NARROW_STANCE: {
+    when: 'When feet are too close together...',
+    why: '...balance suffers and recovery slows',
+    fix: 'Keep feet shoulder-width apart in ready position',
+  },
+  POOR_LUNGE_RECOVERY: {
+    when: 'When you stay low after the lunge...',
+    why: '...next shot preparation is delayed',
+    fix: 'Push back explosively from the lunge foot',
+    timing: 'Push immediately after contact',
+  },
+};
+
+export function WhyCard({ mistakeType }: { mistakeType: string }) {
+  const explanation = MISTAKE_EXPLANATIONS[mistakeType];
+
+  if (!explanation) {
+    return null;
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+        </div>
+
+        <div className="flex-1 space-y-2">
+          {/* When */}
+          <div>
+            <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">When</span>
+            <p className="text-sm text-slate-300">{explanation.when}</p>
+          </div>
+
+          {/* Why */}
+          <div>
+            <span className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Why it matters</span>
+            <p className="text-sm text-slate-300">{explanation.why}</p>
+          </div>
+
+          {/* Fix */}
+          <div className="pt-2 border-t border-slate-700">
+            <span className="text-xs font-semibold text-green-400 uppercase tracking-wide">Fix</span>
+            <p className="text-sm text-white font-medium">{explanation.fix}</p>
+          </div>
+
+          {/* Timing cue */}
+          {explanation.timing && (
+            <div className="flex items-center gap-2 text-xs text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {explanation.timing}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// V5: Stance Width Bracket
+// ============================================
+
+interface StanceBracketProps {
+  currentWidth: number; // Normalized 0-1
+  idealWidth: number;
+  tolerance: number;
+  leftAnklePos?: { x: number; y: number };
+  rightAnklePos?: { x: number; y: number };
+  showOverlay?: boolean;
+  onToggleOverlay?: (show: boolean) => void;
+}
+
+export function StanceBracket({
+  currentWidth,
+  idealWidth,
+  tolerance,
+  leftAnklePos,
+  rightAnklePos,
+  showOverlay = false,
+  onToggleOverlay,
+}: StanceBracketProps) {
+  const status = useMemo(() => {
+    const diff = currentWidth - idealWidth;
+    if (Math.abs(diff) <= tolerance) return 'ok';
+    return diff < 0 ? 'too-narrow' : 'too-wide';
+  }, [currentWidth, idealWidth, tolerance]);
+
+  const percentage = Math.round((currentWidth / idealWidth) * 100);
+
+  return (
+    <div className="bg-slate-800 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-medium text-slate-300">Stance Width</h4>
+        {onToggleOverlay && (
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={showOverlay}
+              onChange={(e) => onToggleOverlay(e.target.checked)}
+              className="rounded accent-cyan-500"
+            />
+            Video overlay
+          </label>
+        )}
+      </div>
+
+      {/* Bird's eye diagram */}
+      <div className="relative h-24 bg-slate-900 rounded-lg mb-3 overflow-hidden">
+        {/* Court lines */}
+        <div className="absolute inset-x-4 top-1/2 h-px bg-slate-700" />
+        <div className="absolute left-1/2 top-2 bottom-2 w-px bg-slate-700" />
+
+        {/* Ideal bracket (green) */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 border-2 border-green-500/50 border-dashed rounded"
+          style={{
+            left: `${50 - idealWidth * 100}%`,
+            width: `${idealWidth * 200}%`,
+            height: '40px',
+          }}
+        />
+
+        {/* Current bracket */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 border-2 rounded transition-all ${
+            status === 'ok'
+              ? 'border-green-500 bg-green-500/10'
+              : status === 'too-narrow'
+              ? 'border-red-500 bg-red-500/10'
+              : 'border-yellow-500 bg-yellow-500/10'
+          }`}
+          style={{
+            left: `${50 - currentWidth * 100}%`,
+            width: `${currentWidth * 200}%`,
+            height: '40px',
+          }}
+        />
+
+        {/* Feet markers */}
+        <div
+          className="absolute w-3 h-5 bg-slate-300 rounded-full"
+          style={{ left: `${50 - currentWidth * 100}%`, top: '50%', transform: 'translate(-50%, -50%)' }}
+        />
+        <div
+          className="absolute w-3 h-5 bg-slate-300 rounded-full"
+          style={{ left: `${50 + currentWidth * 100}%`, top: '50%', transform: 'translate(-50%, -50%)' }}
+        />
+
+        {/* Center marker */}
+        <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-cyan-400 rounded-full -translate-x-1/2 -translate-y-1/2" />
+      </div>
+
+      {/* Status indicator */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-3 h-3 rounded-full ${
+              status === 'ok' ? 'bg-green-500' : status === 'too-narrow' ? 'bg-red-500' : 'bg-yellow-500'
+            }`}
+          />
+          <span className="text-sm text-slate-300">
+            {status === 'ok' ? 'Good width' : status === 'too-narrow' ? 'Too narrow' : 'Too wide'}
+          </span>
+        </div>
+        <span className={`text-sm font-mono ${
+          status === 'ok' ? 'text-green-400' : status === 'too-narrow' ? 'text-red-400' : 'text-yellow-400'
+        }`}>
+          {percentage}%
+        </span>
+      </div>
+
+      {status !== 'ok' && (
+        <p className="text-xs text-slate-400 mt-2">
+          {status === 'too-narrow'
+            ? 'Widen your stance for better balance and power'
+            : 'Bring feet closer for quicker movement'}
+        </p>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<%- XR_ENV === 'avp' ? '<html lang="en" class="dark is-spatial">' : '<html lang="en" class="dark">' %>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="MemoryVoice — Help loved ones with dementia relive their most precious memories through AI-powered voice conversations and photo timelines." />
+    <meta name="theme-color" content="#0f0a1e" />
+    <meta property="og:title" content="MemoryVoice — Remember Together" />
+    <meta property="og:description" content="AI-powered memory companion for dementia care." />
+    <meta property="og:type" content="website" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      as="style"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+
+    <title>MemoryVoice — Remember Together</title>
+
+    <style>
+      /* Critical path: prevent flash of unstyled background */
+      html, body { background-color: #0f0a1e; margin: 0; padding: 0; }
+      #root { min-height: 100vh; }
+
+      /*
+        WebSpatial spatial mode overrides.
+        When html.is-spatial is present (XR_ENV=avp, running on visionOS):
+        - Background becomes transparent so the passthrough environment shows
+        - WebSpatial SDK manages the window material via --xr-background-material
+      */
+      html.is-spatial,
+      html.is-spatial body {
+        background-color: transparent;
+        --xr-background-material: transparent;
+      }
+
+      /* ElevenLabs widget global positioning */
+      elevenlabs-convai {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- ElevenLabs Conversational AI Widget -->
+    <!-- Widget is dynamically initialized via src/services/elevenlabs.ts -->
+    <!-- The script is loaded conditionally when a memory session is active -->
+    <!-- <script src="https://elevenlabs.io/convai-widget/index.js" async type="text/javascript"></script> -->
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

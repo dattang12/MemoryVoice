@@ -1,0 +1,665 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+     4→import { useSearchParams } from 'next/navigation';
+     5→import Link from 'next/link';
+     6→import DashboardNav from '@/components/DashboardNav';
+     7→import DrillCard from '@/components/DrillCard';
+     8→import { supabase, uploadVideo } from '@/lib/supabase';
+     9→import { drawSkeleton, POSE_CONNECTIONS, POSE_LANDMARKS } from '@/lib/pose-utils';
+    10→import { DRILLS } from '@/lib/rules-engine';
+    11→import type { AnalysisResultJson, Issue, Drill, PoseLandmark, Session } from '@/lib/types';
+    12→
+    13→function AnalyticsContent() {
+    14→  const searchParams = useSearchParams();
+    15→  const sessionId = searchParams.get('session');
+    16→
+    17→  const [uploading, setUploading] = useState(false);
+    18→  const [analyzing, setAnalyzing] = useState(false);
+    19→  const [analysisId, setAnalysisId] = useState<string | null>(null);
+    20→  const [result, setResult] = useState<AnalysisResultJson | null>(null);
+    21→  const [error, setError] = useState<string | null>(null);
+    22→  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+    23→  const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
+    24→
+    25→  // Video playback state
+    26→  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    27→  const [poseData, setPoseData] = useState<Array<PoseLandmark[] | null>>([]);
+    28→  const [issues, setIssues] = useState<Array<{
+    29→    code: string;
+    30→    title: string;
+    31→    severity: 'low' | 'medium' | 'high';
+    32→    description?: string;
+    33→    timestamps?: number[];
+    34→    drill?: any;
+    35→  }>>([]);
+    36→  const [currentTime, setCurrentTime] = useState(0);
+    37→  const [isPlaying, setIsPlaying] = useState(false);
+    38→  const [showSkeleton, setShowSkeleton] = useState(true);
+    39→  const [fps, setFps] = useState(30);
+    40→
+    41→  const fileInputRef = useRef<HTMLInputElement>(null);
+    42→  const videoRef = useRef<HTMLVideoElement>(null);
+    43→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    44→  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    45→  const animationRef = useRef<number | null>(null);
+    46→
+    47→  // Load session if ID provided
+    48→  useEffect(() => {
+    49→    if (sessionId) {
+    50→      loadSession(sessionId);
+    51→    }
+    52→    return () => {
+    53→      if (pollIntervalRef.current) {
+    54→        clearInterval(pollIntervalRef.current);
+    55→      }
+    56→      if (animationRef.current) {
+    57→        cancelAnimationFrame(animationRef.current);
+    58→      }
+    59→    };
+    60→  }, [sessionId]);
+    61→
+    62→  const loadSession = async (id: string) => {
+    63→    try {
+    64→      setAnalyzing(true);
+    65→
+    66→      // Try new sessions table first
+    67→      const { data: sessionData, error: sessionError } = await supabase
+    68→        .from('sessions')
+    69→        .select('*')
+    70→        .eq('id', id)
+    71→        .single();
+    72→
+    73→      if (sessionError) {
+    74→        // Try legacy table
+    75→        const { data: legacyData, error: legacyError } = await supabase
+    76→          .from('analysis_results')
+    77→          .select('*')
+    78→          .eq('id', id)
+    79→          .single();
+    80→
+    81→        if (legacyError) throw legacyError;
+    82→        if (legacyData?.result_json) {
+    83→          setResult(legacyData.result_json);
+    84→          if (legacyData.result_json.video_url) {
+    85→            setVideoUrl(legacyData.result_json.video_url);
+    86→          }
+    87→        }
+    88→      } else if (sessionData) {
+    89→        // New session format
+    90→        setVideoUrl(sessionData.video_url);
+    91→        setPoseData(sessionData.pose_data || []);
+    92→
+    93→        // Fetch issues
+    94→        const { data: issuesData } = await supabase
+    95→          .from('issues')
+    96→          .select('*')
+    97→          .eq('session_id', id);
+    98→
+    99→        if (issuesData) {
+   100→          setIssues(issuesData.map((issue: any) => ({
+   101→            code: issue.code,
+   102→            title: issue.title,
+   103→            severity: issue.severity,
+   104→            description: issue.description,
+   105→            timestamps: issue.timestamps,
+   106→            drill: issue.drill || DRILLS[issue.code.toLowerCase().replace(/_/g, '-')],
+   107→          })));
+   108→        }
+   109→
+   110→        // Build result from session summary
+   111→        const summary = sessionData.summary || {};
+   112→        setResult({
+   113→          top_issues: issuesData?.map((i: any) => ({
+   114→            id: i.id,
+   115→            title: i.title,
+   116→            severity: i.severity,
+   117→            description: i.description,
+   118→            affected_metrics: [],
+   119→          })) || [],
+   120→          drills: issuesData?.map((i: any) => DRILLS[i.code?.toLowerCase().replace(/_/g, '-')]).filter(Boolean) || [],
+   121→          technique_summary: summary.feedback?.technique_summary || 'Analysis complete.',
+   122→          strategy_summary: summary.feedback?.strategy_summary || '',
+   123→          training_plan: [],
+   124→        });
+   125→      }
+   126→    } catch (err) {
+   127→      console.error('Error loading session:', err);
+   128→      setError('Failed to load session');
+   129→    } finally {
+   130→      setAnalyzing(false);
+   131→    }
+   132→  };
+   133→
+   134→  // Video frame sync with skeleton overlay
+   135→  const renderFrame = useCallback(() => {
+   136→    if (!videoRef.current || !canvasRef.current || !showSkeleton) return;
+   137→
+   138→    const video = videoRef.current;
+   139→    const canvas = canvasRef.current;
+   140→    const ctx = canvas.getContext('2d');
+   141→    if (!ctx) return;
+   142→
+   143→    // Calculate frame index based on current time
+   144→    const frameIndex = Math.floor(video.currentTime * fps);
+   145→    const landmarks = poseData[frameIndex];
+   146→
+   147→    // Clear and draw video frame
+   148→    ctx.clearRect(0, 0, canvas.width, canvas.height);
+   149→
+   150→    if (landmarks && landmarks.length > 0) {
+   151→      // Draw skeleton
+   152→      drawSkeleton(ctx, landmarks, true, canvas.width, canvas.height);
+   153→    }
+   154→
+   155→    if (!video.paused) {
+   156→      animationRef.current = requestAnimationFrame(renderFrame);
+   157→    }
+   158→  }, [poseData, fps, showSkeleton]);
+   159→
+   160→  // Handle video time updates
+   161→  const handleTimeUpdate = useCallback(() => {
+   162→    if (videoRef.current) {
+   163→      setCurrentTime(videoRef.current.currentTime);
+   164→      renderFrame();
+   165→    }
+   166→  }, [renderFrame]);
+   167→
+   168→  // Handle video play/pause
+   169→  const togglePlayPause = useCallback(() => {
+   170→    if (videoRef.current) {
+   171→      if (videoRef.current.paused) {
+   172→        videoRef.current.play();
+   173→        setIsPlaying(true);
+   174→        animationRef.current = requestAnimationFrame(renderFrame);
+   175→      } else {
+   176→        videoRef.current.pause();
+   177→        setIsPlaying(false);
+   178→        if (animationRef.current) {
+   179→          cancelAnimationFrame(animationRef.current);
+   180→        }
+   181→      }
+   182→    }
+   183→  }, [renderFrame]);
+   184→
+   185→  // Jump to timestamp
+   186→  const jumpToTimestamp = useCallback((timestamp: number) => {
+   187→    if (videoRef.current) {
+   188→      videoRef.current.currentTime = timestamp;
+   189→      videoRef.current.pause();
+   190→      setIsPlaying(false);
+   191→      setCurrentTime(timestamp);
+   192→      // Force render frame at new position
+   193→      setTimeout(renderFrame, 50);
+   194→    }
+   195→  }, [renderFrame]);
+   196→
+   197→  // Find next mistake
+   198→  const goToNextMistake = useCallback(() => {
+   199→    const allTimestamps = issues
+   200→      .flatMap((i) => i.timestamps || [])
+   201→      .sort((a, b) => a - b);
+   202→
+   203→    const nextTimestamp = allTimestamps.find((t) => t > currentTime + 0.5);
+   204→    if (nextTimestamp !== undefined) {
+   205→      jumpToTimestamp(nextTimestamp);
+   206→    } else if (allTimestamps.length > 0) {
+   207→      // Wrap around to first
+   208→      jumpToTimestamp(allTimestamps[0]);
+   209→    }
+   210→  }, [issues, currentTime, jumpToTimestamp]);
+   211→
+   212→  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   213→    const file = e.target.files?.[0];
+   214→    if (!file) return;
+   215→
+   216→    if (!file.type.startsWith('video/')) {
+   217→      setError('Please select a video file');
+   218→      return;
+   219→    }
+   220→
+   221→    if (file.size > 100 * 1024 * 1024) {
+   222→      setError('File size must be less than 100MB');
+   223→      return;
+   224→    }
+   225→
+   226→    setError(null);
+   227→    setUploading(true);
+   228→    setResult(null);
+   229→    setIssues([]);
+   230→    setPoseData([]);
+   231→    setVideoUrl(null);
+   232→
+   233→    try {
+   234→      const { data: { user } } = await supabase.auth.getUser();
+   235→
+   236→      let videoPath: string;
+   237→
+   238→      if (user) {
+   239→        const path = await uploadVideo(file, user.id);
+   240→        if (!path) {
+   241→          throw new Error('Failed to upload video');
+   242→        }
+   243→        videoPath = path;
+   244→      } else {
+   245→        videoPath = `demo/${Date.now()}-${file.name}`;
+   246→      }
+   247→
+   248→      setUploading(false);
+   249→      setAnalyzing(true);
+   250→
+   251→      const response = await fetch('/api/analysis/start', {
+   252→        method: 'POST',
+   253→        headers: { 'Content-Type': 'application/json' },
+   254→        body: JSON.stringify({ video_path: videoPath }),
+   255→      });
+   256→
+   257→      if (!response.ok) {
+   258→        throw new Error('Failed to start analysis');
+   259→      }
+   260→
+   261→      const { analysis_id } = await response.json();
+   262→      setAnalysisId(analysis_id);
+   263→
+   264→      pollForResults(analysis_id);
+   265→    } catch (err) {
+   266→      console.error('Error:', err);
+   267→      setError('Failed to process video. Please try again.');
+   268→      setUploading(false);
+   269→      setAnalyzing(false);
+   270→    }
+   271→  };
+   272→
+   273→  const pollForResults = (id: string) => {
+   274→    let attempts = 0;
+   275→    const maxAttempts = 60;
+   276→
+   277→    pollIntervalRef.current = setInterval(async () => {
+   278→      attempts++;
+   279→
+   280→      try {
+   281→        const response = await fetch(`/api/analysis/${id}`);
+   282→        if (!response.ok) throw new Error('Failed to fetch results');
+   283→
+   284→        const data = await response.json();
+   285→
+   286→        if (data.status === 'completed' && data.result_json) {
+   287→          clearInterval(pollIntervalRef.current!);
+   288→          setResult(data.result_json);
+   289→          setAnalyzing(false);
+   290→
+   291→          // Set video URL if available
+   292→          if (data.video_url) {
+   293→            setVideoUrl(data.video_url);
+   294→          }
+   295→
+   296→          // Set pose data if available
+   297→          if (data.pose_data) {
+   298→            setPoseData(data.pose_data);
+   299→          }
+   300→
+   301→          // Set issues if available
+   302→          if (data.issues) {
+   303→            setIssues(data.issues);
+   304→          }
+   305→
+   306→          if (data.result_json.top_issues?.length > 0) {
+   307→            setSelectedIssue(data.result_json.top_issues[0]);
+   308→          }
+   309→          if (data.result_json.drills?.length > 0) {
+   310→            setSelectedDrill(data.result_json.drills[0]);
+   311→          }
+   312→        } else if (data.status === 'error') {
+   313→          clearInterval(pollIntervalRef.current!);
+   314→          setError('Analysis failed. Please try again.');
+   315→          setAnalyzing(false);
+   316→        } else if (attempts >= maxAttempts) {
+   317→          clearInterval(pollIntervalRef.current!);
+   318→          setError('Analysis timed out. Please try again.');
+   319→          setAnalyzing(false);
+   320→        }
+   321→      } catch (err) {
+   322→        console.error('Polling error:', err);
+   323→      }
+   324→    }, 1000);
+   325→  };
+   326→
+   327→  const getSeverityColor = (severity: string) => {
+   328→    switch (severity) {
+   329→      case 'high':
+   330→        return 'bg-red-50 border-red-200 text-red-800';
+   331→      case 'medium':
+   332→        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+   333→      case 'low':
+   334→        return 'bg-green-50 border-green-200 text-green-800';
+   335→      default:
+   336→        return 'bg-gray-50 border-gray-200 text-gray-800';
+   337→    }
+   338→  };
+   339→
+   340→  const formatTime = (seconds: number) => {
+   341→    const mins = Math.floor(seconds / 60);
+   342→    const secs = Math.floor(seconds % 60);
+   343→    return `${mins}:${secs.toString().padStart(2, '0')}`;
+   344→  };
+   345→
+   346→  return (
+   347→    <div className="min-h-screen bg-gray-50">
+   348→      <DashboardNav />
+   349→
+   350→      <main className="ml-64 p-8">
+   351→        <div className="max-w-7xl mx-auto">
+   352→          {/* Header */}
+   353→          <div className="mb-8">
+   354→            <h1 className="text-3xl font-bold text-gray-900">Video Analytics</h1>
+   355→            <p className="text-gray-600 mt-1">
+   356→              {sessionId ? 'Review your analysis results' : 'Upload a video for AI-powered technique analysis'}
+   357→            </p>
+   358→          </div>
+   359→
+   360→          {/* Upload Section */}
+   361→          {!result && !videoUrl && (
+   362→            <div className="bg-white rounded-xl p-8 shadow-sm mb-8">
+   363→              <div
+   364→                className={`border-2 border-dashed rounded-xl p-12 text-center transition ${
+   365→                  uploading || analyzing
+   366→                    ? 'border-primary-300 bg-primary-50'
+   367→                    : 'border-gray-300 hover:border-primary-400'
+   368→                }`}
+   369→              >
+   370→                {uploading ? (
+   371→                  <div className="space-y-4">
+   372→                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+   373→                    <p className="text-gray-600">Uploading video...</p>
+   374→                  </div>
+   375→                ) : analyzing ? (
+   376→                  <div className="space-y-4">
+   377→                    <div className="animate-pulse">
+   378→                      <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto">
+   379→                        <svg className="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   380→                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+   381→                        </svg>
+   382→                      </div>
+   383→                    </div>
+   384→                    <p className="text-gray-900 font-medium">Analyzing your technique...</p>
+   385→                    <p className="text-gray-500 text-sm">AI is reviewing your form and detecting issues</p>
+   386→                  </div>
+   387→                ) : (
+   388→                  <>
+   389→                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+   390→                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   391→                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+   392→                      </svg>
+   393→                    </div>
+   394→                    <h3 className="text-lg font-medium text-gray-900 mb-2">Upload your badminton video</h3>
+   395→                    <p className="text-gray-500 mb-4">MP4, MOV, or WebM up to 100MB</p>
+   396→                    <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
+   397→                    <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition">
+   398→                      Select Video
+   399→                    </button>
+   400→                  </>
+   401→                )}
+   402→              </div>
+   403→
+   404→              {error && (
+   405→                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
+   406→              )}
+   407→            </div>
+   408→          )}
+   409→
+   410→          {/* Video Player with Overlay */}
+   411→          {videoUrl && (
+   412→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+   413→              <div className="lg:col-span-2">
+   414→                <div className="bg-gray-900 rounded-xl overflow-hidden">
+   415→                  <div className="relative aspect-video">
+   416→                    <video
+   417→                      ref={videoRef}
+   418→                      src={videoUrl}
+   419→                      className="absolute inset-0 w-full h-full object-contain"
+   420→                      onTimeUpdate={handleTimeUpdate}
+   421→                      onEnded={() => setIsPlaying(false)}
+   422→                      playsInline
+   423→                    />
+   424→                    <canvas
+   425→                      ref={canvasRef}
+   426→                      width={640}
+   427→                      height={480}
+   428→                      className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${
+   429→                        showSkeleton ? '' : 'hidden'
+   430→                      }`}
+   431→                    />
+   432→
+   433→                    {/* Time display */}
+   434→                    <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+   435→                      {formatTime(currentTime)}
+   436→                    </div>
+   437→                  </div>
+   438→
+   439→                  {/* Controls */}
+   440→                  <div className="p-4 flex items-center justify-between">
+   441→                    <div className="flex items-center gap-2">
+   442→                      <button
+   443→                        onClick={togglePlayPause}
+   444→                        className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+   445→                      >
+   446→                        {isPlaying ? (
+   447→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   448→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+   449→                          </svg>
+   450→                        ) : (
+   451→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   452→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+   453→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+   454→                          </svg>
+   455→                        )}
+   456→                      </button>
+   457→
+   458→                      <button
+   459→                        onClick={goToNextMistake}
+   460→                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium"
+   461→                      >
+   462→                        Next Mistake
+   463→                      </button>
+   464→                    </div>
+   465→
+   466→                    <label className="flex items-center gap-2 text-white text-sm">
+   467→                      <input
+   468→                        type="checkbox"
+   469→                        checked={showSkeleton}
+   470→                        onChange={(e) => setShowSkeleton(e.target.checked)}
+   471→                        className="rounded"
+   472→                      />
+   473→                      Show Skeleton
+   474→                    </label>
+   475→                  </div>
+   476→                </div>
+   477→              </div>
+   478→
+   479→              {/* Issues Panel */}
+   480→              <div className="space-y-4">
+   481→                <h3 className="font-semibold text-gray-900">Detected Issues</h3>
+   482→                {issues.length > 0 ? (
+   483→                  <div className="space-y-4 max-h-[600px] overflow-y-auto">
+   484→                    {issues.map((issue, index) => (
+   485→                      <DrillCard
+   486→                        key={index}
+   487→                        issue={issue}
+   488→                        onTimestampClick={jumpToTimestamp}
+   489→                        currentTime={currentTime}
+   490→                      />
+   491→                    ))}
+   492→                  </div>
+   493→                ) : (
+   494→                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800">
+   495→                    <p className="font-medium">Great form!</p>
+   496→                    <p className="text-sm">No major issues detected in this video.</p>
+   497→                  </div>
+   498→                )}
+   499→              </div>
+   500→            </div>
+   501→          )}
+   502→
+   503→          {/* Results Section (original format) */}
+   504→          {result && !videoUrl && (
+   505→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+   506→              {/* Left Column - Issues */}
+   507→              <div className="space-y-6">
+   508→                <div className="bg-white rounded-xl p-6 shadow-sm">
+   509→                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Areas to Improve</h2>
+   510→                  <div className="space-y-3">
+   511→                    {result.top_issues.map((issue) => (
+   512→                      <button
+   513→                        key={issue.id}
+   514→                        onClick={() => setSelectedIssue(issue)}
+   515→                        className={`w-full text-left p-4 rounded-lg border transition ${
+   516→                          selectedIssue?.id === issue.id ? 'ring-2 ring-primary-500' : ''
+   517→                        } ${getSeverityColor(issue.severity)}`}
+   518→                      >
+   519→                        <div className="flex items-center justify-between mb-1">
+   520→                          <span className="font-medium">{issue.title}</span>
+   521→                          <span className="text-xs uppercase font-semibold">{issue.severity}</span>
+   522→                        </div>
+   523→                        <p className="text-sm opacity-80">{issue.description}</p>
+   524→                      </button>
+   525→                    ))}
+   526→                  </div>
+   527→                </div>
+   528→
+   529→                <div className="bg-white rounded-xl p-6 shadow-sm">
+   530→                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Technique Summary</h2>
+   531→                  <p className="text-gray-600">{result.technique_summary}</p>
+   532→                </div>
+   533→
+   534→                {result.strategy_summary && (
+   535→                  <div className="bg-white rounded-xl p-6 shadow-sm">
+   536→                    <h2 className="text-lg font-semibold text-gray-900 mb-3">Strategy Insights</h2>
+   537→                    <p className="text-gray-600">{result.strategy_summary}</p>
+   538→                  </div>
+   539→                )}
+   540→              </div>
+   541→
+   542→              {/* Right Column - Drills */}
+   543→              <div className="space-y-6">
+   544→                <div className="bg-white rounded-xl p-6 shadow-sm">
+   545→                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Recommended Drills</h2>
+   546→                  <div className="space-y-3">
+   547→                    {result.drills.map((drill) => (
+   548→                      <button
+   549→                        key={drill.id}
+   550→                        onClick={() => setSelectedDrill(drill)}
+   551→                        className={`w-full text-left p-4 rounded-lg border border-gray-200 hover:border-primary-300 transition ${
+   552→                          selectedDrill?.id === drill.id ? 'ring-2 ring-primary-500 border-primary-300' : ''
+   553→                        }`}
+   554→                      >
+   555→                        <div className="flex items-center justify-between mb-1">
+   556→                          <span className="font-medium text-gray-900">{drill.name}</span>
+   557→                          <span className="text-sm text-gray-500">{drill.duration_minutes} min</span>
+   558→                        </div>
+   559→                        <p className="text-sm text-gray-600">{drill.description}</p>
+   560→                      </button>
+   561→                    ))}
+   562→                  </div>
+   563→                </div>
+   564→
+   565→                {selectedDrill && (
+   566→                  <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-6">
+   567→                    <div className="flex items-center justify-between mb-4">
+   568→                      <h3 className="text-lg font-semibold text-gray-900">{selectedDrill.name}</h3>
+   569→                      <Link
+   570→                        href={`/practice?drill=${selectedDrill.id}`}
+   571→                        className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition"
+   572→                      >
+   573→                        Let&apos;s Practice
+   574→                      </Link>
+   575→                    </div>
+   576→                    <div className="space-y-3">
+   577→                      <p className="text-gray-700">{selectedDrill.description}</p>
+   578→                      <div>
+   579→                        <p className="font-medium text-gray-900 mb-2">Instructions:</p>
+   580→                        <ol className="list-decimal list-inside space-y-1 text-gray-700">
+   581→                          {selectedDrill.instructions.map((instruction, i) => (
+   582→                            <li key={i}>{instruction}</li>
+   583→                          ))}
+   584→                        </ol>
+   585→                      </div>
+   586→                    </div>
+   587→                  </div>
+   588→                )}
+   589→
+   590→                {result.training_plan.length > 0 && (
+   591→                  <div className="bg-white rounded-xl p-6 shadow-sm">
+   592→                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Training Plan</h2>
+   593→                    <div className="space-y-3">
+   594→                      {result.training_plan.map((day) => (
+   595→                        <div key={day.day} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+   596→                          <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+   597→                            <span className="font-bold text-primary-600">D{day.day}</span>
+   598→                          </div>
+   599→                          <div className="flex-1 min-w-0">
+   600→                            <p className="font-medium text-gray-900">{day.focus}</p>
+   601→                            <p className="text-sm text-gray-500 truncate">
+   602→                              {day.drills.length > 0 ? day.drills.join(', ') : 'Rest day'}
+   603→                            </p>
+   604→                          </div>
+   605→                          {day.duration_minutes > 0 && (
+   606→                            <span className="text-sm text-gray-500">{day.duration_minutes}m</span>
+   607→                          )}
+   608→                        </div>
+   609→                      ))}
+   610→                    </div>
+   611→                  </div>
+   612→                )}
+   613→
+   614→                <button
+   615→                  onClick={() => {
+   616→                    setResult(null);
+   617→                    setAnalysisId(null);
+   618→                    setSelectedIssue(null);
+   619→                    setSelectedDrill(null);
+   620→                    setVideoUrl(null);
+   621→                    setPoseData([]);
+   622→                    setIssues([]);
+   623→                  }}
+   624→                  className="w-full py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
+   625→                >
+   626→                  Analyze Another Video
+   627→                </button>
+   628→              </div>
+   629→            </div>
+   630→          )}
+   631→        </div>
+   632→      </main>
+   633→    </div>
+   634→  );
+   635→}
+   636→
+   637→function AnalyticsLoading() {
+   638→  return (
+   639→    <div className="min-h-screen bg-gray-50">
+   640→      <DashboardNav />
+   641→      <main className="ml-64 p-8">
+   642→        <div className="max-w-7xl mx-auto">
+   643→          <div className="animate-pulse">
+   644→            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+   645→            <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+   646→            <div className="bg-gray-200 rounded-xl h-96"></div>
+   647→          </div>
+   648→        </div>
+   649→      </main>
+   650→    </div>
+   651→  );
+   652→}
+   653→
+   654→export default function AnalyticsPage() {
+   655→  return (
+   656→    <Suspense fallback={<AnalyticsLoading />}>
+   657→      <AnalyticsContent />
+   658→    </Suspense>
+   659→  );
+   660→}
+   661→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

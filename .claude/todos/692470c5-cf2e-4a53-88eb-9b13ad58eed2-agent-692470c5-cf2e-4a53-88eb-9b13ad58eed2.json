@@ -1,0 +1,17 @@
+[
+  {
+    "content": "Add survey completion check before Health Mode generation",
+    "status": "in_progress",
+    "activeForm": "Adding survey completion check before Health Mode generation"
+  },
+  {
+    "content": "Show survey reminder in Health Mode when not completed",
+    "status": "pending",
+    "activeForm": "Showing survey reminder in Health Mode when not completed"
+  },
+  {
+    "content": "Link survey and Health Mode refresh timing",
+    "status": "pending",
+    "activeForm": "Linking survey and Health Mode refresh timing"
+  }
+]

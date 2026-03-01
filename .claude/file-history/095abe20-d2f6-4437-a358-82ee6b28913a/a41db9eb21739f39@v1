@@ -1,0 +1,382 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { MistakeEvent, FixKeyframe, PoseLandmark } from '@/lib/types';
+import { POSE_CONNECTIONS } from '@/lib/pose-utils';
+
+interface FixItCardProps {
+  mistake: MistakeEvent;
+  fixKeyframes?: FixKeyframe[];
+  onClose?: () => void;
+}
+
+// Skeleton connections for drawing
+const SKELETON_CONNECTIONS = [
+  [11, 12], // shoulders
+  [11, 23], [12, 24], // shoulders to hips
+  [23, 24], // hips
+  [11, 13], [13, 15], // left arm
+  [12, 14], [14, 16], // right arm
+  [23, 25], [25, 27], // left leg
+  [24, 26], [26, 28], // right leg
+];
+
+export default function FixItCard({
+  mistake,
+  fixKeyframes,
+  onClose,
+}: FixItCardProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [activePhase, setActivePhase] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const animationRef = useRef<number | null>(null);
+  const phaseTimeRef = useRef<number>(0);
+
+  const phases = fixKeyframes?.length ? fixKeyframes : getDefaultPhases(mistake.type);
+
+  // Animation loop
+  useEffect(() => {
+    if (!isAnimating || phases.length === 0) return;
+
+    let lastTime = performance.now();
+    const phaseDuration = 1500; // 1.5 seconds per phase
+
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      lastTime = currentTime;
+
+      phaseTimeRef.current += deltaTime;
+
+      if (phaseTimeRef.current >= phaseDuration) {
+        phaseTimeRef.current = 0;
+        setActivePhase(prev => (prev + 1) % phases.length);
+      }
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isAnimating, phases.length]);
+
+  // Draw skeleton
+  const drawSkeleton = useCallback((
+    ctx: CanvasRenderingContext2D,
+    landmarks: PoseLandmark[],
+    width: number,
+    height: number,
+    color: string,
+    alpha: number = 1
+  ) => {
+    const padding = 20;
+    const drawWidth = width - padding * 2;
+    const drawHeight = height - padding * 2;
+
+    ctx.globalAlpha = alpha;
+
+    // Draw connections
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    for (const [startIdx, endIdx] of SKELETON_CONNECTIONS) {
+      const start = landmarks[startIdx];
+      const end = landmarks[endIdx];
+      if (!start || !end) continue;
+      if ((start.visibility ?? 0) < 0.3 || (end.visibility ?? 0) < 0.3) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(padding + start.x * drawWidth, padding + start.y * drawHeight);
+      ctx.lineTo(padding + end.x * drawWidth, padding + end.y * drawHeight);
+      ctx.stroke();
+    }
+
+    // Draw joints
+    ctx.fillStyle = color;
+    for (let i = 0; i < landmarks.length; i++) {
+      const landmark = landmarks[i];
+      if (!landmark || (landmark.visibility ?? 0) < 0.3) continue;
+
+      const isKeyJoint = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].includes(i);
+      const isAffected = mistake.joints.includes(i);
+
+      ctx.beginPath();
+      ctx.arc(
+        padding + landmark.x * drawWidth,
+        padding + landmark.y * drawHeight,
+        isAffected ? 6 : isKeyJoint ? 5 : 3,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Highlight affected joints
+      if (isAffected) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+  }, [mistake.joints]);
+
+  // Render canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || phases.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear
+    ctx.clearRect(0, 0, width, height);
+
+    // Background gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#f8fafc');
+    gradient.addColorStop(1, '#e2e8f0');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw current phase
+    const currentPhase = phases[activePhase];
+    if (currentPhase?.landmarks) {
+      // Draw main skeleton in green (correct form)
+      drawSkeleton(ctx, currentPhase.landmarks, width, height, '#22c55e', 1);
+
+      // Draw arrows for affected joints if correction exists
+      if (currentPhase.correction) {
+        ctx.fillStyle = '#3b82f6';
+        ctx.font = 'bold 10px system-ui';
+        ctx.textAlign = 'center';
+
+        // Draw correction indicator
+        const padding = 20;
+        const drawWidth = width - padding * 2;
+        const drawHeight = height - padding * 2;
+
+        for (const jointIdx of mistake.joints.slice(0, 2)) {
+          const landmark = currentPhase.landmarks[jointIdx];
+          if (landmark && (landmark.visibility ?? 0) > 0.3) {
+            const x = padding + landmark.x * drawWidth;
+            const y = padding + landmark.y * drawHeight;
+
+            // Draw pulsing circle
+            ctx.beginPath();
+            ctx.arc(x, y, 12, 0, Math.PI * 2);
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+      }
+    }
+
+    // Draw phase label
+    ctx.fillStyle = '#334155';
+    ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentPhase?.label || `Phase ${activePhase + 1}`, width / 2, height - 10);
+
+  }, [activePhase, phases, drawSkeleton, mistake.joints]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-red-50 to-orange-50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">{mistake.summaryTitle}</h3>
+            <p className="text-xs text-gray-500">
+              {Math.round(mistake.confidence * 100)}% confidence
+            </p>
+          </div>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-full transition"
+          >
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Animation Canvas */}
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={200}
+          height={240}
+          className="w-full"
+        />
+
+        {/* Play/Pause button */}
+        <button
+          onClick={() => setIsAnimating(!isAnimating)}
+          className="absolute bottom-14 right-2 p-2 bg-white/90 rounded-full shadow-md hover:bg-white transition"
+        >
+          {isAnimating ? (
+            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Phase selector */}
+      <div className="flex justify-center gap-2 py-2 bg-gray-50">
+        {phases.map((phase, idx) => (
+          <button
+            key={idx}
+            onClick={() => {
+              setActivePhase(idx);
+              phaseTimeRef.current = 0;
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${
+              activePhase === idx
+                ? 'bg-primary-500 text-white'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+          >
+            {phase.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Correction text */}
+      {phases[activePhase]?.correction && (
+        <div className="px-4 py-3 bg-blue-50 border-t border-blue-100">
+          <div className="flex items-start gap-2">
+            <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-blue-800">
+              {phases[activePhase].correction}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Description */}
+      <div className="p-4 border-t border-gray-100">
+        <p className="text-sm text-gray-600">{mistake.description}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Generate default phases for mistake types when no keyframes provided
+ */
+function getDefaultPhases(mistakeType: string): FixKeyframe[] {
+  // Default pose landmarks for each phase
+  const defaultPose: PoseLandmark[] = Array(33).fill(null).map((_, i) => ({
+    x: 0.5,
+    y: 0.5,
+    z: 0,
+    visibility: 0,
+  }));
+
+  // Set visible landmarks for a basic stick figure
+  const setLandmark = (pose: PoseLandmark[], idx: number, x: number, y: number) => {
+    pose[idx] = { x, y, z: 0, visibility: 1 };
+  };
+
+  // Setup phase
+  const setupPose = [...defaultPose];
+  setLandmark(setupPose, 0, 0.5, 0.15); // nose
+  setLandmark(setupPose, 11, 0.42, 0.28); // left shoulder
+  setLandmark(setupPose, 12, 0.58, 0.28); // right shoulder
+  setLandmark(setupPose, 13, 0.38, 0.4); // left elbow
+  setLandmark(setupPose, 14, 0.62, 0.4); // right elbow
+  setLandmark(setupPose, 15, 0.35, 0.52); // left wrist
+  setLandmark(setupPose, 16, 0.65, 0.52); // right wrist
+  setLandmark(setupPose, 23, 0.44, 0.55); // left hip
+  setLandmark(setupPose, 24, 0.56, 0.55); // right hip
+  setLandmark(setupPose, 25, 0.42, 0.75); // left knee
+  setLandmark(setupPose, 26, 0.58, 0.75); // right knee
+  setLandmark(setupPose, 27, 0.4, 0.95); // left ankle
+  setLandmark(setupPose, 28, 0.6, 0.95); // right ankle
+
+  // Contact phase (overhead)
+  const contactPose = [...defaultPose];
+  setLandmark(contactPose, 0, 0.5, 0.12); // nose
+  setLandmark(contactPose, 11, 0.4, 0.25); // left shoulder
+  setLandmark(contactPose, 12, 0.6, 0.25); // right shoulder
+  setLandmark(contactPose, 13, 0.35, 0.35); // left elbow
+  setLandmark(contactPose, 14, 0.7, 0.15); // right elbow (raised)
+  setLandmark(contactPose, 15, 0.3, 0.45); // left wrist
+  setLandmark(contactPose, 16, 0.75, 0.08); // right wrist (high)
+  setLandmark(contactPose, 23, 0.42, 0.52); // left hip
+  setLandmark(contactPose, 24, 0.58, 0.52); // right hip
+  setLandmark(contactPose, 25, 0.4, 0.72); // left knee
+  setLandmark(contactPose, 26, 0.6, 0.72); // right knee
+  setLandmark(contactPose, 27, 0.38, 0.92); // left ankle
+  setLandmark(contactPose, 28, 0.62, 0.92); // right ankle
+
+  // Recovery phase
+  const recoveryPose = [...setupPose];
+
+  const corrections = {
+    OVERHEAD_CONTACT_LOW: [
+      { label: 'Setup', correction: 'Position yourself under the shuttle' },
+      { label: 'Contact', correction: 'Hit at highest point above your head' },
+      { label: 'Recovery', correction: 'Return to ready position' },
+    ],
+    LATE_SPLIT_STEP: [
+      { label: 'Watch', correction: 'Watch opponent\'s racket' },
+      { label: 'Split', correction: 'Land as opponent makes contact' },
+      { label: 'Move', correction: 'Explode to the shuttle' },
+    ],
+    POOR_LUNGE_RECOVERY: [
+      { label: 'Lunge', correction: 'Keep weight on front heel' },
+      { label: 'Push', correction: 'Push off immediately' },
+      { label: 'Return', correction: 'Return to center quickly' },
+    ],
+    INSUFFICIENT_ROTATION: [
+      { label: 'Setup', correction: 'Turn sideways to the net' },
+      { label: 'Rotate', correction: 'Lead with hips, then shoulders' },
+      { label: 'Follow', correction: 'Complete the rotation' },
+    ],
+    ELBOW_TOO_BENT: [
+      { label: 'Prepare', correction: 'Raise elbow high' },
+      { label: 'Extend', correction: 'Fully extend at contact' },
+      { label: 'Follow', correction: 'Follow through smoothly' },
+    ],
+  };
+
+  const mistakeCorrections = corrections[mistakeType as keyof typeof corrections] || [
+    { label: 'Setup', correction: 'Ready position' },
+    { label: 'Action', correction: 'Execute the movement' },
+    { label: 'Finish', correction: 'Return to ready' },
+  ];
+
+  return [
+    { phase: 'setup', landmarks: setupPose, label: mistakeCorrections[0].label, correction: mistakeCorrections[0].correction },
+    { phase: 'contact', landmarks: contactPose, label: mistakeCorrections[1].label, correction: mistakeCorrections[1].correction },
+    { phase: 'recover', landmarks: recoveryPose, label: mistakeCorrections[2].label, correction: mistakeCorrections[2].correction },
+  ];
+}

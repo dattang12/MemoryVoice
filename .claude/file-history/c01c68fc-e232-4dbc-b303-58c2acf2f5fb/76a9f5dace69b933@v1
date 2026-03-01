@@ -1,0 +1,24 @@
+# RallyCoach Project Memory
+
+## Project Overview
+- Next.js 14.2.5 + React 18 + Tailwind CSS badminton coaching app
+- Located at `C:\Users\ASUS\Desktop\Gemini 3 hack\rallycoach`
+- Uses: Supabase (auth/db), MediaPipe (pose), Three.js (3D), Recharts (charts), Google Gemini AI
+
+## UI Redesign (Completed)
+- Dark theme for auth pages (login/signup) and landing page
+- Premium light theme (`app-page` class) for dashboard/app pages
+- Dark sidebar nav (`nav-dark` class)
+- Custom Tailwind tokens: `dark-50` to `dark-950`, `primary-*`, `accent-green/red`
+- CSS classes added: `hero-grid`, `glass-card`, `stat-card-premium`, `app-page`, `nav-dark`
+- Charts (Recharts) were NOT touched per user instruction
+
+## Key Patterns
+- `coach-card` class replaced with `stat-card-premium` or `bg-white rounded-2xl border border-gray-100 shadow-sm`
+- Auth pages use `bg-dark-950` + `hero-grid` + `bg-dark-800/80 backdrop-blur-xl`
+- Form inputs on dark: `bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-dark-500`
+- Header cards on app pages: `bg-gradient-to-r from-dark-900 to-dark-800` with white text
+
+## Files Modified
+- tailwind.config.ts, globals.css, page.tsx (landing), DashboardNav.tsx
+- All page files: dashboard, analytics, practice, strategy, history, history/[sessionId], racket, login, signup

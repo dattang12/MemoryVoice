@@ -1,0 +1,254 @@
+     1→import type { PoseMetrics, PoseLandmark } from './types';
+     2→
+     3→// MediaPipe Pose landmark indices
+     4→export const POSE_LANDMARKS = {
+     5→  NOSE: 0,
+     6→  LEFT_EYE_INNER: 1,
+     7→  LEFT_EYE: 2,
+     8→  LEFT_EYE_OUTER: 3,
+     9→  RIGHT_EYE_INNER: 4,
+    10→  RIGHT_EYE: 5,
+    11→  RIGHT_EYE_OUTER: 6,
+    12→  LEFT_EAR: 7,
+    13→  RIGHT_EAR: 8,
+    14→  MOUTH_LEFT: 9,
+    15→  MOUTH_RIGHT: 10,
+    16→  LEFT_SHOULDER: 11,
+    17→  RIGHT_SHOULDER: 12,
+    18→  LEFT_ELBOW: 13,
+    19→  RIGHT_ELBOW: 14,
+    20→  LEFT_WRIST: 15,
+    21→  RIGHT_WRIST: 16,
+    22→  LEFT_PINKY: 17,
+    23→  RIGHT_PINKY: 18,
+    24→  LEFT_INDEX: 19,
+    25→  RIGHT_INDEX: 20,
+    26→  LEFT_THUMB: 21,
+    27→  RIGHT_THUMB: 22,
+    28→  LEFT_HIP: 23,
+    29→  RIGHT_HIP: 24,
+    30→  LEFT_KNEE: 25,
+    31→  RIGHT_KNEE: 26,
+    32→  LEFT_ANKLE: 27,
+    33→  RIGHT_ANKLE: 28,
+    34→  LEFT_HEEL: 29,
+    35→  RIGHT_HEEL: 30,
+    36→  LEFT_FOOT_INDEX: 31,
+    37→  RIGHT_FOOT_INDEX: 32,
+    38→};
+    39→
+    40→// Calculate angle between three points (in degrees)
+    41→export function calculateAngle(
+    42→  p1: PoseLandmark,
+    43→  p2: PoseLandmark, // vertex
+    44→  p3: PoseLandmark
+    45→): number {
+    46→  const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+    47→  const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+    48→
+    49→  const dot = v1.x * v2.x + v1.y * v2.y;
+    50→  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+    51→  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    52→
+    53→  if (mag1 === 0 || mag2 === 0) return 0;
+    54→
+    55→  const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+    56→  return Math.acos(cosAngle) * (180 / Math.PI);
+    57→}
+    58→
+    59→// Calculate distance between two points
+    60→export function calculateDistance(p1: PoseLandmark, p2: PoseLandmark): number {
+    61→  const dx = p2.x - p1.x;
+    62→  const dy = p2.y - p1.y;
+    63→  return Math.sqrt(dx * dx + dy * dy);
+    64→}
+    65→
+    66→// Extract metrics from pose landmarks
+    67→export function extractMetrics(landmarks: PoseLandmark[]): PoseMetrics {
+    68→  // Get relevant landmarks
+    69→  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+    70→  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+    71→  const leftElbow = landmarks[POSE_LANDMARKS.LEFT_ELBOW];
+    72→  const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+    73→  const leftWrist = landmarks[POSE_LANDMARKS.LEFT_WRIST];
+    74→  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+    75→  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+    76→  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+    77→  const leftKnee = landmarks[POSE_LANDMARKS.LEFT_KNEE];
+    78→  const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+    79→  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+    80→  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+    81→
+    82→  // Calculate elbow angle (use the more visible arm)
+    83→  const leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+    84→  const rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+    85→  const elbowAngle =
+    86→    leftElbow.visibility > rightElbow.visibility ? leftElbowAngle : rightElbowAngle;
+    87→
+    88→  // Calculate knee angle (average of both knees)
+    89→  const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+    90→  const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+    91→  const kneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
+    92→
+    93→  // Calculate stance width normalized by shoulder width
+    94→  const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+    95→  const ankleWidth = calculateDistance(leftAnkle, rightAnkle);
+    96→  const stanceWidthNorm = shoulderWidth > 0 ? ankleWidth / shoulderWidth : 0;
+    97→
+    98→  // Calculate shoulder-hip rotation proxy
+    99→  // This measures the rotation difference between shoulder line and hip line
+   100→  const shoulderAngle = Math.atan2(
+   101→    rightShoulder.y - leftShoulder.y,
+   102→    rightShoulder.x - leftShoulder.x
+   103→  );
+   104→  const hipAngle = Math.atan2(rightHip.y - leftHip.y, rightHip.x - leftHip.x);
+   105→  const rotationProxy = Math.abs(shoulderAngle - hipAngle);
+   106→
+   107→  return {
+   108→    elbow_angle: elbowAngle,
+   109→    knee_angle: kneeAngle,
+   110→    stance_width_norm: stanceWidthNorm,
+   111→    shoulder_hip_rotation_proxy: rotationProxy,
+   112→    timestamp: Date.now(),
+   113→  };
+   114→}
+   115→
+   116→// Check if metrics are within acceptable thresholds
+   117→export function evaluateMetrics(metrics: PoseMetrics): {
+   118→  isGreen: boolean;
+   119→  feedback: string[];
+   120→} {
+   121→  const feedback: string[] = [];
+   122→  let greenCount = 0;
+   123→  const totalChecks = 4;
+   124→
+   125→  // Elbow angle check (90-120 degrees is ideal)
+   126→  if (metrics.elbow_angle >= 90 && metrics.elbow_angle <= 120) {
+   127→    greenCount++;
+   128→  } else if (metrics.elbow_angle < 90) {
+   129→    feedback.push('Extend your elbow more');
+   130→  } else {
+   131→    feedback.push('Bend your elbow slightly');
+   132→  }
+   133→
+   134→  // Knee angle check (120-150 degrees is ideal)
+   135→  if (metrics.knee_angle >= 120 && metrics.knee_angle <= 150) {
+   136→    greenCount++;
+   137→  } else if (metrics.knee_angle < 120) {
+   138→    feedback.push('Straighten your knees a bit');
+   139→  } else {
+   140→    feedback.push('Bend your knees more');
+   141→  }
+   142→
+   143→  // Stance width check (0.3-0.5 normalized is ideal)
+   144→  if (metrics.stance_width_norm >= 0.3 && metrics.stance_width_norm <= 0.5) {
+   145→    greenCount++;
+   146→  } else if (metrics.stance_width_norm < 0.3) {
+   147→    feedback.push('Widen your stance');
+   148→  } else {
+   149→    feedback.push('Narrow your stance slightly');
+   150→  }
+   151→
+   152→  // Rotation check (0.1-0.3 is ideal for most shots)
+   153→  if (
+   154→    metrics.shoulder_hip_rotation_proxy >= 0.1 &&
+   155→    metrics.shoulder_hip_rotation_proxy <= 0.3
+   156→  ) {
+   157→    greenCount++;
+   158→  } else if (metrics.shoulder_hip_rotation_proxy < 0.1) {
+   159→    feedback.push('Rotate your body more');
+   160→  } else {
+   161→    feedback.push('Control your rotation');
+   162→  }
+   163→
+   164→  return {
+   165→    isGreen: greenCount >= 3, // Green if at least 3 out of 4 metrics are good
+   166→    feedback: feedback.length > 0 ? feedback : ['Great form! Keep it up!'],
+   167→  };
+   168→}
+   169→
+   170→// Generate mock metrics for demo/fallback
+   171→export function generateMockMetrics(): PoseMetrics {
+   172→  return {
+   173→    elbow_angle: 95 + Math.random() * 30,
+   174→    knee_angle: 125 + Math.random() * 30,
+   175→    stance_width_norm: 0.35 + Math.random() * 0.2,
+   176→    shoulder_hip_rotation_proxy: 0.15 + Math.random() * 0.2,
+   177→    timestamp: Date.now(),
+   178→  };
+   179→}
+   180→
+   181→// Drawing utilities for canvas
+   182→export const POSE_CONNECTIONS = [
+   183→  // Face
+   184→  [POSE_LANDMARKS.LEFT_EAR, POSE_LANDMARKS.LEFT_EYE],
+   185→  [POSE_LANDMARKS.LEFT_EYE, POSE_LANDMARKS.NOSE],
+   186→  [POSE_LANDMARKS.NOSE, POSE_LANDMARKS.RIGHT_EYE],
+   187→  [POSE_LANDMARKS.RIGHT_EYE, POSE_LANDMARKS.RIGHT_EAR],
+   188→  // Torso
+   189→  [POSE_LANDMARKS.LEFT_SHOULDER, POSE_LANDMARKS.RIGHT_SHOULDER],
+   190→  [POSE_LANDMARKS.LEFT_SHOULDER, POSE_LANDMARKS.LEFT_HIP],
+   191→  [POSE_LANDMARKS.RIGHT_SHOULDER, POSE_LANDMARKS.RIGHT_HIP],
+   192→  [POSE_LANDMARKS.LEFT_HIP, POSE_LANDMARKS.RIGHT_HIP],
+   193→  // Left arm
+   194→  [POSE_LANDMARKS.LEFT_SHOULDER, POSE_LANDMARKS.LEFT_ELBOW],
+   195→  [POSE_LANDMARKS.LEFT_ELBOW, POSE_LANDMARKS.LEFT_WRIST],
+   196→  // Right arm
+   197→  [POSE_LANDMARKS.RIGHT_SHOULDER, POSE_LANDMARKS.RIGHT_ELBOW],
+   198→  [POSE_LANDMARKS.RIGHT_ELBOW, POSE_LANDMARKS.RIGHT_WRIST],
+   199→  // Left leg
+   200→  [POSE_LANDMARKS.LEFT_HIP, POSE_LANDMARKS.LEFT_KNEE],
+   201→  [POSE_LANDMARKS.LEFT_KNEE, POSE_LANDMARKS.LEFT_ANKLE],
+   202→  // Right leg
+   203→  [POSE_LANDMARKS.RIGHT_HIP, POSE_LANDMARKS.RIGHT_KNEE],
+   204→  [POSE_LANDMARKS.RIGHT_KNEE, POSE_LANDMARKS.RIGHT_ANKLE],
+   205→];
+   206→
+   207→export function drawSkeleton(
+   208→  ctx: CanvasRenderingContext2D,
+   209→  landmarks: PoseLandmark[],
+   210→  isGreen: boolean,
+   211→  width: number,
+   212→  height: number
+   213→) {
+   214→  const color = isGreen ? '#22c55e' : '#ef4444';
+   215→
+   216→  // Draw connections
+   217→  ctx.strokeStyle = color;
+   218→  ctx.lineWidth = 3;
+   219→
+   220→  for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+   221→    const start = landmarks[startIdx];
+   222→    const end = landmarks[endIdx];
+   223→
+   224→    if (start.visibility > 0.5 && end.visibility > 0.5) {
+   225→      ctx.beginPath();
+   226→      ctx.moveTo(start.x * width, start.y * height);
+   227→      ctx.lineTo(end.x * width, end.y * height);
+   228→      ctx.stroke();
+   229→    }
+   230→  }
+   231→
+   232→  // Draw landmarks
+   233→  ctx.fillStyle = color;
+   234→  for (const landmark of landmarks) {
+   235→    if (landmark.visibility > 0.5) {
+   236→      ctx.beginPath();
+   237→      ctx.arc(landmark.x * width, landmark.y * height, 5, 0, 2 * Math.PI);
+   238→      ctx.fill();
+   239→    }
+   240→  }
+   241→}
+   242→
+   243→// Default thresholds for metrics
+   244→export const DEFAULT_THRESHOLDS = {
+   245→  elbow_angle: { min: 90, max: 120 },
+   246→  knee_angle: { min: 120, max: 150 },
+   247→  stance_width_norm: { min: 0.3, max: 0.5 },
+   248→  shoulder_hip_rotation_proxy: { min: 0.1, max: 0.3 },
+   249→};
+   250→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

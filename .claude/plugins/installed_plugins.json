@@ -1,0 +1,58 @@
+{
+  "version": 2,
+  "plugins": {
+    "everything-claude-code@everything-claude-code": [
+      {
+        "scope": "project",
+        "projectPath": "C:\\Users\\ASUS\\Desktop\\Gemini 3 hack",
+        "installPath": "C:\\Users\\ASUS\\.claude\\plugins\\cache\\everything-claude-code\\everything-claude-code\\1.2.0",
+        "version": "1.2.0",
+        "installedAt": "2026-02-06T06:05:49.983Z",
+        "lastUpdated": "2026-02-06T06:05:49.983Z",
+        "gitCommitSha": "c0fdd89c4957c2abcbe5cfe424027398b8e65fd1"
+      }
+    ],
+    "figma@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\ASUS\\.claude\\plugins\\cache\\claude-plugins-official\\figma\\1.1.0",
+        "version": "1.1.0",
+        "installedAt": "2026-02-06T06:44:46.291Z",
+        "lastUpdated": "2026-02-13T01:11:30.897Z",
+        "gitCommitSha": "20aca44ee6ba6092037e943c151c067896828360"
+      }
+    ],
+    "claude-code-setup@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\ASUS\\.claude\\plugins\\cache\\claude-plugins-official\\claude-code-setup\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-02-06T06:45:12.174Z",
+        "lastUpdated": "2026-02-06T06:45:12.174Z",
+        "gitCommitSha": "236752ad9ab36029b648bfd94707944760242768"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "C:\\Users\\ASUS",
+        "installPath": "C:\\Users\\ASUS\\.claude\\plugins\\cache\\claude-plugins-official\\frontend-design\\aa296ec81e8c",
+        "version": "aa296ec81e8c",
+        "installedAt": "2026-02-15T00:23:59.294Z",
+        "lastUpdated": "2026-02-20T17:39:29.345Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "C:\\Users\\ASUS",
+        "installPath": "C:\\Users\\ASUS\\.claude\\plugins\\cache\\claude-plugins-official\\context7\\aa296ec81e8c",
+        "version": "aa296ec81e8c",
+        "installedAt": "2026-02-15T00:26:09.569Z",
+        "lastUpdated": "2026-02-20T17:39:29.341Z",
+        "gitCommitSha": "2cd88e7947b7382e045666abee790c7f55f669f3"
+      }
+    ]
+  }
+}

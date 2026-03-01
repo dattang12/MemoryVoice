@@ -1,0 +1,249 @@
+# Badminton Analyzer & Coach App - MVP
+
+AI-powered badminton video analysis application that provides coaching feedback using pose estimation and Google Gemini API.
+
+## Features
+
+✅ **Video Upload & Analysis** - Upload badminton videos for automated analysis
+✅ **Pose Estimation** - Uses MediaPipe to detect player poses and body landmarks
+✅ **Shot Detection** - Automatically detects shots based on wrist velocity
+✅ **Form Analysis** - Compares user form to ideal poses and identifies errors
+✅ **AI Coaching** - Gemini generates personalized technique, strategy, and training plan feedback
+✅ **User Authentication** - Secure login/signup with Supabase Auth
+✅ **Results Dashboard** - View detailed analysis with visual feedback
+
+## Tech Stack
+
+**Backend:**
+- Python 3.11.6
+- FastAPI
+- MediaPipe (pose estimation)
+- OpenCV (video processing)
+- Google Gemini API (gemini-2.0-flash-exp)
+- Supabase (auth, database, storage)
+
+**Frontend:**
+- React 19
+- Vite
+- React Router
+- Supabase JS Client
+
+## Project Structure
+
+```
+Gemini 3 hack/
+├── backend/
+│   ├── main.py              # FastAPI server
+│   ├── analysis.py          # Video analysis pipeline
+│   ├── pose_estimation.py   # MediaPipe pose detection
+│   ├── gemini_client.py     # Gemini API integration
+│   ├── requirements.txt     # Python dependencies
+│   └── .env                 # Backend environment variables
+├── frontend/
+│   ├── src/
+│   │   ├── pages/           # Login, Upload, Results
+│   │   ├── context/         # Auth context
+│   │   ├── lib/             # Supabase client
+│   │   └── App.jsx          # Main app component
+│   ├── package.json
+│   └── .env                 # Frontend environment variables
+├── supabase-setup.sql       # Database schema and RLS policies
+└── README.md
+```
+
+## Setup Instructions
+
+### Prerequisites
+
+- Python 3.11.6
+- Node.js (v18+)
+- Supabase account
+- Google AI Studio account (for Gemini API)
+
+### 1. Supabase Setup
+
+1. **Create a Supabase project** at [supabase.com](https://supabase.com)
+
+2. **Get your credentials:**
+   - Project URL: `https://your-project.supabase.co`
+   - Anon Key: Found in Settings → API
+   - Service Role Key: Found in Settings → API (keep this secret!)
+
+3. **Set up database:**
+   - Go to SQL Editor in Supabase dashboard
+   - Copy and run the SQL from `supabase-setup.sql`
+   - This creates tables, RLS policies, and indexes
+
+4. **Create Storage Bucket:**
+   - Go to Storage in Supabase dashboard
+   - Create a new bucket named `videos`
+   - Set to **Private** (not public)
+   - Add storage policies for authenticated users (see SQL file comments)
+
+### 2. Get Gemini API Key
+
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key
+3. Copy the key for later use
+
+### 3. Backend Setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+# Edit backend/.env and fill in your keys:
+# GEMINI_API_KEY=your-actual-gemini-key
+# SUPABASE_URL=https://your-project.supabase.co
+# SUPABASE_ANON_KEY=your-anon-key
+# SUPABASE_SERVICE_KEY=your-service-role-key
+```
+
+### 4. Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+# Edit frontend/.env and fill in your keys:
+# VITE_SUPABASE_URL=https://your-project.supabase.co
+# VITE_SUPABASE_ANON_KEY=your-anon-key
+# VITE_BACKEND_URL=http://localhost:8000
+```
+
+### 5. Run the Application
+
+**Start Backend (in backend directory):**
+```bash
+# Make sure venv is activated
+python main.py
+```
+Backend runs on `http://localhost:8000`
+
+**Start Frontend (in frontend directory, new terminal):**
+```bash
+npm run dev
+```
+Frontend runs on `http://localhost:5173`
+
+## Usage
+
+1. **Sign Up / Sign In**
+   - Open http://localhost:5173
+   - Create an account or sign in
+
+2. **Upload Video**
+   - Click "Upload & Analyze"
+   - Select a badminton video (MP4, MOV, etc.)
+   - Wait for analysis (may take 30-60 seconds)
+
+3. **View Results**
+   - See detected shots and pose errors
+   - Read AI-generated technique feedback
+   - Review strategy suggestions
+   - Get personalized training plan
+
+## API Endpoints
+
+### Backend API
+
+- `GET /` - Health check
+- `GET /health` - Service status
+- `POST /api/analyze` - Analyze uploaded video
+  - Body: FormData with `file` (video) and optional `user_id`
+  - Returns: Analysis JSON with shots, feedback, and training plan
+
+## How It Works
+
+### Analysis Pipeline
+
+1. **Video Upload** → User uploads video through React UI
+2. **Pose Estimation** → MediaPipe extracts 12 key body joint positions per frame
+3. **Shot Detection** → Algorithm detects shots based on wrist velocity spikes
+4. **Shot Classification** → Classifies shots (Smash, Clear, Net Shot, etc.) based on pose
+5. **Form Analysis** → Compares joint angles to ideal form, identifies errors
+6. **AI Feedback** → Gemini generates coaching feedback from analysis summary
+7. **Results Display** → Frontend shows detailed results with visual indicators
+
+## Troubleshooting
+
+### Backend Issues
+
+**ModuleNotFoundError:**
+```bash
+# Make sure venv is activated and dependencies are installed
+pip install -r requirements.txt
+```
+
+**Port already in use:**
+```bash
+# Change port in main.py or kill existing process
+# Windows: netstat -ano | findstr :8000
+# Mac/Linux: lsof -ti:8000 | xargs kill
+```
+
+### Frontend Issues
+
+**Can't connect to backend:**
+- Ensure backend is running on port 8000
+- Check `VITE_BACKEND_URL` in frontend/.env
+
+**Supabase errors:**
+- Verify your Supabase URL and keys are correct
+- Check if RLS policies are set up correctly
+- Ensure auth is enabled in Supabase dashboard
+
+### Analysis Issues
+
+**No shots detected:**
+- Video might be too short or unclear
+- Try videos with clear player movements
+- Adjust threshold in `analysis.py` (line with `speed > 20`)
+
+**Gemini API errors:**
+- Check if API key is valid
+- Verify you have API quota remaining
+- Check model name is correct (currently using `gemini-2.0-flash-exp`)
+
+## Future Enhancements
+
+- [ ] Real-time AR pose correction with live camera
+- [ ] Shuttlecock tracking
+- [ ] More sophisticated shot classification (ML model)
+- [ ] Video playback with shot markers
+- [ ] Historical analysis tracking
+- [ ] Comparison with pro player footage
+- [ ] Mobile app (React Native)
+
+## Notes
+
+- This is an MVP focused on core functionality
+- Some features from the original spec are planned for future releases
+- Analysis accuracy depends on video quality and player visibility
+- Gemini feedback quality depends on the model version and prompt engineering
+
+## License
+
+MIT License - Feel free to use and modify for your projects
+
+## Support
+
+For issues or questions, please check:
+- Backend logs in terminal
+- Browser console for frontend errors
+- Supabase dashboard for auth/database issues

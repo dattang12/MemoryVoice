@@ -1,0 +1,660 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react';
+     4→import { useParams, useRouter } from 'next/navigation';
+     5→import Link from 'next/link';
+     6→import DashboardNav from '@/components/DashboardNav';
+     7→import DrillCard from '@/components/DrillCard';
+     8→import { TabbedDrillAnimation } from '@/components/Skeleton3D';
+     9→import { EventTypeBadge, MatchFormatBadge } from '@/components/PlayerSelectionModal';
+    10→import { supabase } from '@/lib/supabase';
+    11→import {
+    12→  drawSkeleton,
+    13→  extractMetrics,
+    14→} from '@/lib/pose-utils';
+    15→import {
+    16→  DRILLS,
+    17→  evaluateForm,
+    18→  type EvaluationResult
+    19→} from '@/lib/rules-engine';
+    20→import {
+    21→  evaluateWithBands,
+    22→  SCORING_LEGEND,
+    23→} from '@/lib/scoring-rules';
+    24→import type { Session, PoseLandmark, PoseMetrics, StrategyResult } from '@/lib/types';
+    25→
+    26→// ============================================
+    27→// View Details Page - Replay Stored Results
+    28→// ============================================
+    29→
+    30→interface StoredIssue {
+    31→  id: string;
+    32→  code: string;
+    33→  title: string;
+    34→  severity: 'low' | 'medium' | 'high';
+    35→  description?: string;
+    36→  timestamps?: number[];
+    37→  drill?: any;
+    38→}
+    39→
+    40→interface FrameAnalysis {
+    41→  timestamp: number;
+    42→  landmarks: PoseLandmark[] | null;
+    43→  evaluation: EvaluationResult | null;
+    44→  metrics: PoseMetrics | null;
+    45→}
+    46→
+    47→export default function SessionDetailPage() {
+    48→  const params = useParams();
+    49→  const router = useRouter();
+    50→  const sessionId = params.sessionId as string;
+    51→
+    52→  // Session data
+    53→  const [session, setSession] = useState<Session | null>(null);
+    54→  const [issues, setIssues] = useState<StoredIssue[]>([]);
+    55→  const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
+    56→  const [loading, setLoading] = useState(true);
+    57→  const [error, setError] = useState<string | null>(null);
+    58→
+    59→  // Video playback state
+    60→  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    61→  const [poseData, setPoseData] = useState<Array<PoseLandmark[] | null>>([]);
+    62→  const [currentTime, setCurrentTime] = useState(0);
+    63→  const [duration, setDuration] = useState(0);
+    64→  const [isPlaying, setIsPlaying] = useState(false);
+    65→  const [showSkeleton, setShowSkeleton] = useState(true);
+    66→  const [selectedIssue, setSelectedIssue] = useState<StoredIssue | null>(null);
+    67→
+    68→  // Banded scoring display
+    69→  const [skillLevel, setSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+    70→  const [currentBandedScore, setCurrentBandedScore] = useState<any>(null);
+    71→
+    72→  // Refs
+    73→  const videoRef = useRef<HTMLVideoElement>(null);
+    74→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    75→  const animationRef = useRef<number | null>(null);
+    76→
+    77→  // Load session data
+    78→  useEffect(() => {
+    79→    if (sessionId) {
+    80→      loadSession(sessionId);
+    81→    }
+    82→  }, [sessionId]);
+    83→
+    84→  const loadSession = async (id: string) => {
+    85→    setLoading(true);
+    86→    setError(null);
+    87→
+    88→    try {
+    89→      // Load session
+    90→      const { data: sessionData, error: sessionError } = await supabase
+    91→        .from('sessions')
+    92→        .select('*')
+    93→        .eq('id', id)
+    94→        .single();
+    95→
+    96→      if (sessionError) throw sessionError;
+    97→
+    98→      setSession(sessionData);
+    99→      setVideoUrl(sessionData.video_url);
+   100→      setSkillLevel(sessionData.skill_level || 'intermediate');
+   101→
+   102→      // Load pose data if available
+   103→      if (sessionData.pose_data) {
+   104→        setPoseData(sessionData.pose_data);
+   105→      }
+   106→
+   107→      // Load issues
+   108→      const { data: issuesData, error: issuesError } = await supabase
+   109→        .from('issues')
+   110→        .select('*')
+   111→        .eq('session_id', id)
+   112→        .order('severity', { ascending: false });
+   113→
+   114→      if (!issuesError && issuesData) {
+   115→        const mappedIssues = issuesData.map((issue: any) => ({
+   116→          id: issue.id,
+   117→          code: issue.code,
+   118→          title: issue.title,
+   119→          severity: issue.severity,
+   120→          description: issue.description,
+   121→          timestamps: issue.timestamps || [],
+   122→          drill: issue.drill || DRILLS[issue.code?.toLowerCase().replace(/_/g, '-')],
+   123→        }));
+   124→        setIssues(mappedIssues);
+   125→        if (mappedIssues.length > 0) {
+   126→          setSelectedIssue(mappedIssues[0]);
+   127→        }
+   128→      }
+   129→
+   130→      // Load strategy results if strategy session
+   131→      if (sessionData.type === 'strategy') {
+   132→        const { data: strategyData } = await supabase
+   133→          .from('strategy_results')
+   134→          .select('*')
+   135→          .eq('session_id', id)
+   136→          .single();
+   137→
+   138→        if (strategyData) {
+   139→          setStrategyResult(strategyData);
+   140→        }
+   141→      }
+   142→    } catch (err) {
+   143→      console.error('Error loading session:', err);
+   144→      setError('Failed to load session. It may have been deleted.');
+   145→    } finally {
+   146→      setLoading(false);
+   147→    }
+   148→  };
+   149→
+   150→  // Render skeleton overlay
+   151→  const renderFrame = useCallback(() => {
+   152→    if (!videoRef.current || !canvasRef.current) return;
+   153→
+   154→    const video = videoRef.current;
+   155→    const canvas = canvasRef.current;
+   156→    const ctx = canvas.getContext('2d');
+   157→    if (!ctx) return;
+   158→
+   159→    // Resize canvas to match video
+   160→    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+   161→      canvas.width = video.videoWidth || 640;
+   162→      canvas.height = video.videoHeight || 480;
+   163→    }
+   164→
+   165→    // Clear canvas
+   166→    ctx.clearRect(0, 0, canvas.width, canvas.height);
+   167→
+   168→    if (!showSkeleton || poseData.length === 0) return;
+   169→
+   170→    // Find closest frame
+   171→    const frameIndex = Math.floor(video.currentTime * 10); // Assuming 10fps sample rate
+   172→    const landmarks = poseData[Math.min(frameIndex, poseData.length - 1)];
+   173→
+   174→    if (landmarks) {
+   175→      // Use banded scoring
+   176→      const bandedResult = evaluateWithBands(landmarks, skillLevel);
+   177→      setCurrentBandedScore(bandedResult);
+   178→
+   179→      // Choose color based on band
+   180→      const isGreen = bandedResult.overall_band === 'green';
+   181→      const isYellow = bandedResult.overall_band === 'yellow';
+   182→
+   183→      // Draw with appropriate color
+   184→      const color = isGreen ? '#22c55e' : isYellow ? '#eab308' : '#ef4444';
+   185→
+   186→      // Custom draw with banded color
+   187→      ctx.strokeStyle = color;
+   188→      ctx.lineWidth = 3;
+   189→      ctx.fillStyle = color;
+   190→
+   191→      // Draw skeleton connections
+   192→      const POSE_CONNECTIONS = [
+   193→        [7, 2], [2, 0], [0, 5], [5, 8],
+   194→        [11, 12], [11, 23], [12, 24], [23, 24],
+   195→        [11, 13], [13, 15],
+   196→        [12, 14], [14, 16],
+   197→        [23, 25], [25, 27],
+   198→        [24, 26], [26, 28],
+   199→      ];
+   200→
+   201→      for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+   202→        const start = landmarks[startIdx];
+   203→        const end = landmarks[endIdx];
+   204→        if (start && end && start.visibility > 0.5 && end.visibility > 0.5) {
+   205→          ctx.beginPath();
+   206→          ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
+   207→          ctx.lineTo(end.x * canvas.width, end.y * canvas.height);
+   208→          ctx.stroke();
+   209→        }
+   210→      }
+   211→
+   212→      // Draw joints
+   213→      for (const landmark of landmarks) {
+   214→        if (landmark.visibility > 0.5) {
+   215→          ctx.beginPath();
+   216→          ctx.arc(
+   217→            landmark.x * canvas.width,
+   218→            landmark.y * canvas.height,
+   219→            5,
+   220→            0,
+   221→            2 * Math.PI
+   222→          );
+   223→          ctx.fill();
+   224→        }
+   225→      }
+   226→    }
+   227→
+   228→    if (!video.paused) {
+   229→      animationRef.current = requestAnimationFrame(renderFrame);
+   230→    }
+   231→  }, [poseData, showSkeleton, skillLevel]);
+   232→
+   233→  // Handle video time updates
+   234→  const handleTimeUpdate = useCallback(() => {
+   235→    if (videoRef.current) {
+   236→      setCurrentTime(videoRef.current.currentTime);
+   237→      renderFrame();
+   238→    }
+   239→  }, [renderFrame]);
+   240→
+   241→  // Toggle play/pause
+   242→  const togglePlayPause = useCallback(() => {
+   243→    if (videoRef.current) {
+   244→      if (videoRef.current.paused) {
+   245→        videoRef.current.play();
+   246→        setIsPlaying(true);
+   247→        animationRef.current = requestAnimationFrame(renderFrame);
+   248→      } else {
+   249→        videoRef.current.pause();
+   250→        setIsPlaying(false);
+   251→        if (animationRef.current) {
+   252→          cancelAnimationFrame(animationRef.current);
+   253→        }
+   254→      }
+   255→    }
+   256→  }, [renderFrame]);
+   257→
+   258→  // Jump to timestamp
+   259→  const jumpToTimestamp = useCallback((timestamp: number) => {
+   260→    if (videoRef.current) {
+   261→      videoRef.current.currentTime = timestamp;
+   262→      videoRef.current.pause();
+   263→      setIsPlaying(false);
+   264→      setCurrentTime(timestamp);
+   265→      setTimeout(renderFrame, 50);
+   266→    }
+   267→  }, [renderFrame]);
+   268→
+   269→  // Go to next mistake
+   270→  const goToNextMistake = useCallback(() => {
+   271→    const allTimestamps = issues
+   272→      .flatMap((i) => i.timestamps || [])
+   273→      .sort((a, b) => a - b);
+   274→
+   275→    const nextTimestamp = allTimestamps.find((t) => t > currentTime + 0.5);
+   276→    if (nextTimestamp !== undefined) {
+   277→      jumpToTimestamp(nextTimestamp);
+   278→    } else if (allTimestamps.length > 0) {
+   279→      jumpToTimestamp(allTimestamps[0]);
+   280→    }
+   281→  }, [issues, currentTime, jumpToTimestamp]);
+   282→
+   283→  // Handle video loaded
+   284→  const handleLoadedMetadata = useCallback(() => {
+   285→    if (videoRef.current) {
+   286→      setDuration(videoRef.current.duration);
+   287→      setTimeout(renderFrame, 100);
+   288→    }
+   289→  }, [renderFrame]);
+   290→
+   291→  // Format time
+   292→  const formatTime = (seconds: number) => {
+   293→    const mins = Math.floor(seconds / 60);
+   294→    const secs = Math.floor(seconds % 60);
+   295→    return `${mins}:${secs.toString().padStart(2, '0')}`;
+   296→  };
+   297→
+   298→  // Format date
+   299→  const formatDate = (dateString: string) => {
+   300→    return new Date(dateString).toLocaleDateString('en-US', {
+   301→      year: 'numeric',
+   302→      month: 'long',
+   303→      day: 'numeric',
+   304→      hour: '2-digit',
+   305→      minute: '2-digit',
+   306→    });
+   307→  };
+   308→
+   309→  // Cleanup on unmount
+   310→  useEffect(() => {
+   311→    return () => {
+   312→      if (animationRef.current) {
+   313→        cancelAnimationFrame(animationRef.current);
+   314→      }
+   315→    };
+   316→  }, []);
+   317→
+   318→  if (loading) {
+   319→    return (
+   320→      <div className="min-h-screen bg-gray-50">
+   321→        <DashboardNav />
+   322→        <main className="ml-64 p-8">
+   323→          <div className="max-w-7xl mx-auto">
+   324→            <div className="animate-pulse">
+   325→              <div className="h-8 bg-gray-200 rounded w-64 mb-4" />
+   326→              <div className="h-4 bg-gray-200 rounded w-96 mb-8" />
+   327→              <div className="grid grid-cols-3 gap-8">
+   328→                <div className="col-span-2 h-96 bg-gray-200 rounded-xl" />
+   329→                <div className="h-96 bg-gray-200 rounded-xl" />
+   330→              </div>
+   331→            </div>
+   332→          </div>
+   333→        </main>
+   334→      </div>
+   335→    );
+   336→  }
+   337→
+   338→  if (error || !session) {
+   339→    return (
+   340→      <div className="min-h-screen bg-gray-50">
+   341→        <DashboardNav />
+   342→        <main className="ml-64 p-8">
+   343→          <div className="max-w-7xl mx-auto">
+   344→            <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+   345→              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+   346→                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   347→                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+   348→                </svg>
+   349→              </div>
+   350→              <h2 className="text-xl font-semibold text-gray-900 mb-2">Session Not Found</h2>
+   351→              <p className="text-gray-500 mb-6">{error || 'This session could not be loaded.'}</p>
+   352→              <Link
+   353→                href="/history"
+   354→                className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+   355→              >
+   356→                Back to History
+   357→              </Link>
+   358→            </div>
+   359→          </div>
+   360→        </main>
+   361→      </div>
+   362→    );
+   363→  }
+   364→
+   365→  return (
+   366→    <div className="min-h-screen bg-gray-50">
+   367→      <DashboardNav />
+   368→
+   369→      <main className="ml-64 p-8">
+   370→        <div className="max-w-7xl mx-auto">
+   371→          {/* Header */}
+   372→          <div className="mb-6">
+   373→            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+   374→              <Link href="/history" className="hover:text-primary-600">
+   375→                History
+   376→              </Link>
+   377→              <span>/</span>
+   378→              <span className="text-gray-900">Session Details</span>
+   379→            </div>
+   380→
+   381→            <div className="flex items-start justify-between">
+   382→              <div>
+   383→                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+   384→                  {session.type === 'strategy' ? 'Strategy Analysis' :
+   385→                   session.type === 'practice' ? 'Practice Session' : 'Video Analysis'}
+   386→                  {session.match_format && (
+   387→                    <MatchFormatBadge format={session.match_format} />
+   388→                  )}
+   389→                  {session.event_type && session.event_type !== 'unknown' && (
+   390→                    <EventTypeBadge eventType={session.event_type} />
+   391→                  )}
+   392→                </h1>
+   393→                <p className="text-gray-600 mt-1">
+   394→                  {session.filename && <span className="mr-2">{session.filename}</span>}
+   395→                  {formatDate(session.created_at)}
+   396→                </p>
+   397→              </div>
+   398→
+   399→              {/* Score badge */}
+   400→              {session.overall_score !== undefined && session.overall_score > 0 && (
+   401→                <div className="text-right">
+   402→                  <p className={`text-4xl font-bold ${
+   403→                    session.overall_score >= 80 ? 'text-green-600' :
+   404→                    session.overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+   405→                  }`}>
+   406→                    {Math.round(session.overall_score)}%
+   407→                  </p>
+   408→                  <p className="text-sm text-gray-500">Overall Score</p>
+   409→                </div>
+   410→              )}
+   411→            </div>
+   412→          </div>
+   413→
+   414→          {/* Main content */}
+   415→          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+   416→            {/* Video Player */}
+   417→            <div className="lg:col-span-2 space-y-6">
+   418→              {videoUrl ? (
+   419→                <div className="bg-gray-900 rounded-xl overflow-hidden">
+   420→                  <div className="relative aspect-video">
+   421→                    <video
+   422→                      ref={videoRef}
+   423→                      src={videoUrl}
+   424→                      className="absolute inset-0 w-full h-full object-contain"
+   425→                      onTimeUpdate={handleTimeUpdate}
+   426→                      onLoadedMetadata={handleLoadedMetadata}
+   427→                      onEnded={() => setIsPlaying(false)}
+   428→                      playsInline
+   429→                    />
+   430→                    <canvas
+   431→                      ref={canvasRef}
+   432→                      className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${
+   433→                        showSkeleton ? '' : 'hidden'
+   434→                      }`}
+   435→                    />
+   436→
+   437→                    {/* Banded score indicator */}
+   438→                    {currentBandedScore && (
+   439→                      <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-sm font-medium ${
+   440→                        currentBandedScore.overall_band === 'green' ? 'bg-green-500 text-white' :
+   441→                        currentBandedScore.overall_band === 'yellow' ? 'bg-yellow-500 text-white' :
+   442→                        currentBandedScore.overall_band === 'red' ? 'bg-red-500 text-white' :
+   443→                        'bg-gray-500 text-white'
+   444→                      }`}>
+   445→                        {SCORING_LEGEND[currentBandedScore.overall_band as keyof typeof SCORING_LEGEND]?.label || 'Unknown'}
+   446→                        <span className="ml-2 opacity-75">
+   447→                          {Math.round(currentBandedScore.overall_score)}%
+   448→                        </span>
+   449→                      </div>
+   450→                    )}
+   451→
+   452→                    {/* Time display */}
+   453→                    <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+   454→                      {formatTime(currentTime)} / {formatTime(duration)}
+   455→                    </div>
+   456→                  </div>
+   457→
+   458→                  {/* Controls */}
+   459→                  <div className="p-4 flex items-center justify-between">
+   460→                    <div className="flex items-center gap-2">
+   461→                      <button
+   462→                        onClick={togglePlayPause}
+   463→                        className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+   464→                      >
+   465→                        {isPlaying ? (
+   466→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   467→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+   468→                          </svg>
+   469→                        ) : (
+   470→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   471→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+   472→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+   473→                          </svg>
+   474→                        )}
+   475→                      </button>
+   476→
+   477→                      <button
+   478→                        onClick={goToNextMistake}
+   479→                        disabled={issues.length === 0}
+   480→                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium disabled:opacity-50"
+   481→                      >
+   482→                        Next Mistake
+   483→                      </button>
+   484→                    </div>
+   485→
+   486→                    <div className="flex items-center gap-4">
+   487→                      {/* Skill level selector */}
+   488→                      <select
+   489→                        value={skillLevel}
+   490→                        onChange={(e) => setSkillLevel(e.target.value as any)}
+   491→                        className="text-sm bg-gray-800 text-white border-gray-700 rounded-lg px-2 py-1"
+   492→                      >
+   493→                        <option value="beginner">Beginner</option>
+   494→                        <option value="intermediate">Intermediate</option>
+   495→                        <option value="advanced">Advanced</option>
+   496→                      </select>
+   497→
+   498→                      <label className="flex items-center gap-2 text-white text-sm">
+   499→                        <input
+   500→                          type="checkbox"
+   501→                          checked={showSkeleton}
+   502→                          onChange={(e) => {
+   503→                            setShowSkeleton(e.target.checked);
+   504→                            if (e.target.checked) {
+   505→                              setTimeout(renderFrame, 50);
+   506→                            }
+   507→                          }}
+   508→                          className="rounded"
+   509→                        />
+   510→                        Show Skeleton
+   511→                      </label>
+   512→                    </div>
+   513→                  </div>
+   514→
+   515→                  {/* Timeline */}
+   516→                  <div className="px-4 pb-4">
+   517→                    <input
+   518→                      type="range"
+   519→                      min={0}
+   520→                      max={duration || 100}
+   521→                      step={0.1}
+   522→                      value={currentTime}
+   523→                      onChange={(e) => {
+   524→                        const time = parseFloat(e.target.value);
+   525→                        if (videoRef.current) {
+   526→                          videoRef.current.currentTime = time;
+   527→                          setCurrentTime(time);
+   528→                          setTimeout(renderFrame, 50);
+   529→                        }
+   530→                      }}
+   531→                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+   532→                    />
+   533→                  </div>
+   534→                </div>
+   535→              ) : (
+   536→                <div className="bg-gray-200 rounded-xl aspect-video flex items-center justify-center">
+   537→                  <p className="text-gray-500">No video available</p>
+   538→                </div>
+   539→              )}
+   540→
+   541→              {/* Scoring Legend */}
+   542→              <div className="bg-white rounded-xl p-4 shadow-sm">
+   543→                <h3 className="font-semibold text-gray-900 mb-3">Scoring Legend</h3>
+   544→                <div className="grid grid-cols-4 gap-3">
+   545→                  {Object.entries(SCORING_LEGEND).map(([key, value]) => (
+   546→                    <div key={key} className="flex items-center gap-2">
+   547→                      <div
+   548→                        className="w-4 h-4 rounded"
+   549→                        style={{ backgroundColor: value.bgColor, borderColor: value.color, borderWidth: 2 }}
+   550→                      />
+   551→                      <div>
+   552→                        <p className="text-sm font-medium" style={{ color: value.color }}>
+   553→                          {value.label}
+   554→                        </p>
+   555→                        <p className="text-xs text-gray-500">{value.description}</p>
+   556→                      </div>
+   557→                    </div>
+   558→                  ))}
+   559→                </div>
+   560→              </div>
+   561→
+   562→              {/* Current metrics display */}
+   563→              {currentBandedScore && currentBandedScore.metrics && (
+   564→                <div className="bg-white rounded-xl p-4 shadow-sm">
+   565→                  <h3 className="font-semibold text-gray-900 mb-3">Current Frame Metrics</h3>
+   566→                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   567→                    {Object.entries(currentBandedScore.metrics).map(([key, score]: [string, any]) => (
+   568→                      <div key={key} className={`p-3 rounded-lg ${
+   569→                        SCORING_LEGEND[score.band as keyof typeof SCORING_LEGEND]?.bgColor || 'bg-gray-100'
+   570→                      }`}>
+   571→                        <p className="text-xs text-gray-600 capitalize">{key.replace(/_/g, ' ')}</p>
+   572→                        <p className="text-lg font-semibold" style={{
+   573→                          color: SCORING_LEGEND[score.band as keyof typeof SCORING_LEGEND]?.color
+   574→                        }}>
+   575→                          {typeof score.value === 'number' ? score.value.toFixed(1) : score.value}
+   576→                        </p>
+   577→                        {score.feedback && (
+   578→                          <p className="text-xs text-gray-500 mt-1">{score.feedback}</p>
+   579→                        )}
+   580→                      </div>
+   581→                    ))}
+   582→                  </div>
+   583→                </div>
+   584→              )}
+   585→            </div>
+   586→
+   587→            {/* Issues Panel */}
+   588→            <div className="space-y-4">
+   589→              <h3 className="font-semibold text-gray-900">
+   590→                Detected Issues ({issues.length})
+   591→              </h3>
+   592→
+   593→              {issues.length > 0 ? (
+   594→                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+   595→                  {issues.map((issue, index) => (
+   596→                    <div key={issue.id || index}>
+   597→                      <DrillCard
+   598→                        issue={issue}
+   599→                        onTimestampClick={jumpToTimestamp}
+   600→                        currentTime={currentTime}
+   601→                      />
+   602→                    </div>
+   603→                  ))}
+   604→                </div>
+   605→              ) : (
+   606→                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800">
+   607→                  <p className="font-medium">Great form!</p>
+   608→                  <p className="text-sm">No major issues detected in this session.</p>
+   609→                </div>
+   610→              )}
+   611→
+   612→              {/* 3D Animation for selected issue */}
+   613→              {selectedIssue?.drill?.keyframeType && (
+   614→                <div className="mt-4">
+   615→                  <h4 className="font-medium text-gray-900 mb-2">Correct Form</h4>
+   616→                  <TabbedDrillAnimation
+   617→                    drillType={selectedIssue.drill.keyframeType}
+   618→                  />
+   619→                </div>
+   620→              )}
+   621→            </div>
+   622→          </div>
+   623→
+   624→          {/* Strategy Results (if applicable) */}
+   625→          {strategyResult && (
+   626→            <div className="mt-8 space-y-6">
+   627→              <h2 className="text-xl font-bold text-gray-900">Strategy Analysis Results</h2>
+   628→
+   629→              {/* Coaching Points */}
+   630→              {strategyResult.coaching_points && strategyResult.coaching_points.length > 0 && (
+   631→                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   632→                  <div className="p-4 border-b border-gray-200">
+   633→                    <h3 className="font-semibold text-gray-900">Key Tactical Insights</h3>
+   634→                  </div>
+   635→                  <div className="p-6">
+   636→                    <ul className="space-y-4">
+   637→                      {strategyResult.coaching_points.map((point, index) => (
+   638→                        <li key={index} className="flex items-start gap-3">
+   639→                          <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">
+   640→                            {index + 1}
+   641→                          </span>
+   642→                          <p className="text-gray-700">{point}</p>
+   643→                        </li>
+   644→                      ))}
+   645→                    </ul>
+   646→                  </div>
+   647→                </div>
+   648→              )}
+   649→            </div>
+   650→          )}
+   651→        </div>
+   652→      </main>
+   653→    </div>
+   654→  );
+   655→}
+   656→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

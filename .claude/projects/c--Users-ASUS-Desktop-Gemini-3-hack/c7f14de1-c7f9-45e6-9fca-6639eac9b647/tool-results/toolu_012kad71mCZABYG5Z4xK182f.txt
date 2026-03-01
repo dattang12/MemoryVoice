@@ -1,0 +1,19 @@
+total 110
+drwxr-xr-x 1 ASUS 197609     0  1月 18 22:56 .
+drwxr-xr-x 1 ASUS 197609     0  1月 18 23:12 ..
+-rw-r--r-- 1 ASUS 197609   609  1月 17 23:21 .env
+-rw-r--r-- 1 ASUS 197609   612  1月 12 23:08 .env.example
+drwxr-xr-x 1 ASUS 197609     0  1月 17 23:22 __pycache__
+-rw-r--r-- 1 ASUS 197609  5359  1月 12 22:50 analysis.py
+-rw-r--r-- 1 ASUS 197609  3469  1月 12 22:50 gemini_client.py
+-rw-r--r-- 1 ASUS 197609 25906  1月 18 22:56 main.py
+drwxr-xr-x 1 ASUS 197609     0  1月 11 15:20 models
+-rw-r--r-- 1 ASUS 197609    69  1月 12 00:12 nul
+-rw-r--r-- 1 ASUS 197609  2387  1月 12 00:13 pose_estimation.py
+-rw-r--r-- 1 ASUS 197609   227  1月 18 14:50 requirements.txt
+-rw-r--r-- 1 ASUS 197609  5159  1月 11 16:15 shuttlecock_tracking.py
+drwxr-xr-x 1 ASUS 197609     0  1月 18 23:03 temp
+-rwxr-xr-x 1 ASUS 197609  1167  1月 11 14:32 test_setup.py
+drwxr-xr-x 1 ASUS 197609     0  1月 12 00:03 venv
+-rw-r--r-- 1 ASUS 197609  8518  1月 12 00:37 video_annotator.py
+-rw-r--r-- 1 ASUS 197609  6013  1月 11 22:59 video_processing.py

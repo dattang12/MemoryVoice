@@ -1,0 +1,3 @@
+Found 2 files
+rallycoach\docs\VERIFICATION_COMPLETE.md
+rallycoach\src\app\history\[sessionId]\page.tsx

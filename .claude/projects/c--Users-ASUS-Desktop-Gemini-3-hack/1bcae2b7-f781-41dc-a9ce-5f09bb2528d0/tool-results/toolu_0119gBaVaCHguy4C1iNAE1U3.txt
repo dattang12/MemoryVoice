@@ -1,0 +1,232 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import Link from 'next/link';
+     5→import { getKeyframeSVGs, type DrillDefinition } from '@/lib/rules-engine';
+     6→
+     7→interface DrillCardProps {
+     8→  issue: {
+     9→    code: string;
+    10→    title: string;
+    11→    severity: 'low' | 'medium' | 'high';
+    12→    description?: string;
+    13→    timestamps?: number[];
+    14→    drill?: DrillDefinition;
+    15→  };
+    16→  onTimestampClick?: (timestamp: number) => void;
+    17→  onPracticeClick?: (drillId: string) => void;
+    18→  currentTime?: number;
+    19→}
+    20→
+    21→export default function DrillCard({
+    22→  issue,
+    23→  onTimestampClick,
+    24→  onPracticeClick,
+    25→  currentTime = 0,
+    26→}: DrillCardProps) {
+    27→  const [activeKeyframe, setActiveKeyframe] = useState(0);
+    28→
+    29→  // Get drill info
+    30→  const drill = issue.drill;
+    31→  const drillType = (drill?.keyframeType || 'footwork') as 'smash' | 'clear' | 'netshot' | 'footwork' | 'drive';
+    32→  const keyframes = getKeyframeSVGs(drillType, { width: 100, height: 150 });
+    33→
+    34→  // Get severity color
+    35→  const getSeverityColor = (severity: string) => {
+    36→    switch (severity) {
+    37→      case 'high':
+    38→        return 'bg-red-50 border-red-200 text-red-800';
+    39→      case 'medium':
+    40→        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+    41→      case 'low':
+    42→        return 'bg-green-50 border-green-200 text-green-800';
+    43→      default:
+    44→        return 'bg-gray-50 border-gray-200 text-gray-800';
+    45→    }
+    46→  };
+    47→
+    48→  const getSeverityBadgeColor = (severity: string) => {
+    49→    switch (severity) {
+    50→      case 'high':
+    51→        return 'bg-red-500';
+    52→      case 'medium':
+    53→        return 'bg-yellow-500';
+    54→      case 'low':
+    55→        return 'bg-green-500';
+    56→      default:
+    57→        return 'bg-gray-500';
+    58→    }
+    59→  };
+    60→
+    61→  // Format timestamp for display
+    62→  const formatTimestamp = (seconds: number) => {
+    63→    const mins = Math.floor(seconds / 60);
+    64→    const secs = Math.floor(seconds % 60);
+    65→    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    66→  };
+    67→
+    68→  // Check if a timestamp is currently playing
+    69→  const isTimestampActive = (timestamp: number) => {
+    70→    return Math.abs(currentTime - timestamp) < 0.5;
+    71→  };
+    72→
+    73→  return (
+    74→    <div className={`rounded-xl border-2 overflow-hidden ${getSeverityColor(issue.severity)}`}>
+    75→      {/* Header */}
+    76→      <div className="p-4 border-b border-current/10">
+    77→        <div className="flex items-start justify-between">
+    78→          <div className="flex-1">
+    79→            <div className="flex items-center gap-2 mb-1">
+    80→              <span className={`w-2 h-2 rounded-full ${getSeverityBadgeColor(issue.severity)}`}></span>
+    81→              <h3 className="font-semibold">{issue.title}</h3>
+    82→            </div>
+    83→            {issue.description && (
+    84→              <p className="text-sm opacity-80">{issue.description}</p>
+    85→            )}
+    86→          </div>
+    87→          <span className="text-xs uppercase font-bold px-2 py-1 rounded bg-current/10">
+    88→            {issue.severity}
+    89→          </span>
+    90→        </div>
+    91→      </div>
+    92→
+    93→      {/* Keyframe Carousel */}
+    94→      <div className="p-4 bg-white/50">
+    95→        <p className="text-xs font-medium text-gray-600 mb-2">Correct Form:</p>
+    96→        <div className="flex gap-2 overflow-x-auto pb-2">
+    97→          {keyframes.map((keyframe, index) => (
+    98→            <button
+    99→              key={index}
+   100→              onClick={() => setActiveKeyframe(index)}
+   101→              className={`flex-shrink-0 rounded-lg border-2 transition ${
+   102→                activeKeyframe === index
+   103→                  ? 'border-primary-500 shadow-md'
+   104→                  : 'border-gray-200 hover:border-gray-300'
+   105→              }`}
+   106→            >
+   107→              <div
+   108→                dangerouslySetInnerHTML={{ __html: keyframe.svg }}
+   109→                className="w-[100px] h-[150px]"
+   110→              />
+   111→              <p className="text-xs text-center py-1 bg-gray-50 rounded-b-lg font-medium">
+   112→                {keyframe.label}
+   113→              </p>
+   114→            </button>
+   115→          ))}
+   116→        </div>
+   117→      </div>
+   118→
+   119→      {/* Timestamps */}
+   120→      {issue.timestamps && issue.timestamps.length > 0 && (
+   121→        <div className="px-4 py-3 bg-white/30 border-t border-current/10">
+   122→          <p className="text-xs font-medium text-gray-600 mb-2">
+   123→            Occurred at ({issue.timestamps.length}x):
+   124→          </p>
+   125→          <div className="flex flex-wrap gap-2">
+   126→            {issue.timestamps.slice(0, 8).map((timestamp, index) => (
+   127→              <button
+   128→                key={index}
+   129→                onClick={() => onTimestampClick?.(timestamp)}
+   130→                className={`px-2 py-1 text-xs font-mono rounded transition ${
+   131→                  isTimestampActive(timestamp)
+   132→                    ? 'bg-primary-500 text-white'
+   133→                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+   134→                }`}
+   135→              >
+   136→                {formatTimestamp(timestamp)}
+   137→              </button>
+   138→            ))}
+   139→            {issue.timestamps.length > 8 && (
+   140→              <span className="px-2 py-1 text-xs text-gray-500">
+   141→                +{issue.timestamps.length - 8} more
+   142→              </span>
+   143→            )}
+   144→          </div>
+   145→        </div>
+   146→      )}
+   147→
+   148→      {/* Drill Info */}
+   149→      {drill && (
+   150→        <div className="p-4 bg-white/30 border-t border-current/10">
+   151→          <div className="flex items-center justify-between mb-3">
+   152→            <div>
+   153→              <p className="text-xs font-medium text-gray-600">Recommended Drill:</p>
+   154→              <p className="font-semibold text-gray-900">{drill.name}</p>
+   155→            </div>
+   156→            <span className="text-sm text-gray-500">{drill.durationMinutes} min</span>
+   157→          </div>
+   158→
+   159→          {/* Drill Steps */}
+   160→          <div className="mb-3">
+   161→            <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
+   162→              {drill.steps.slice(0, 3).map((step, index) => (
+   163→                <li key={index}>{step}</li>
+   164→              ))}
+   165→            </ol>
+   166→          </div>
+   167→
+   168→          {/* Tips */}
+   169→          {drill.tips.length > 0 && (
+   170→            <div className="flex flex-wrap gap-1 mb-3">
+   171→              {drill.tips.map((tip, index) => (
+   172→                <span
+   173→                  key={index}
+   174→                  className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded"
+   175→                >
+   176→                  {tip}
+   177→                </span>
+   178→              ))}
+   179→            </div>
+   180→          )}
+   181→
+   182→          {/* Practice Button */}
+   183→          <Link
+   184→            href={`/practice?drill=${drill.id}`}
+   185→            className="block w-full py-2 bg-primary-500 text-white text-center rounded-lg font-medium hover:bg-primary-600 transition"
+   186→          >
+   187→            Practice This Drill
+   188→          </Link>
+   189→        </div>
+   190→      )}
+   191→    </div>
+   192→  );
+   193→}
+   194→
+   195→// Mini version for lists
+   196→export function DrillCardMini({
+   197→  issue,
+   198→  onClick,
+   199→}: {
+   200→  issue: { code: string; title: string; severity: string; count?: number };
+   201→  onClick?: () => void;
+   202→}) {
+   203→  const getSeverityColor = (severity: string) => {
+   204→    switch (severity) {
+   205→      case 'high':
+   206→        return 'border-red-300 bg-red-50';
+   207→      case 'medium':
+   208→        return 'border-yellow-300 bg-yellow-50';
+   209→      default:
+   210→        return 'border-green-300 bg-green-50';
+   211→    }
+   212→  };
+   213→
+   214→  return (
+   215→    <button
+   216→      onClick={onClick}
+   217→      className={`w-full text-left p-3 rounded-lg border-2 transition hover:shadow-md ${getSeverityColor(issue.severity)}`}
+   218→    >
+   219→      <div className="flex items-center justify-between">
+   220→        <span className="font-medium text-gray-900">{issue.title}</span>
+   221→        {issue.count && (
+   222→          <span className="text-xs text-gray-500">{issue.count}x</span>
+   223→        )}
+   224→      </div>
+   225→    </button>
+   226→  );
+   227→}
+   228→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

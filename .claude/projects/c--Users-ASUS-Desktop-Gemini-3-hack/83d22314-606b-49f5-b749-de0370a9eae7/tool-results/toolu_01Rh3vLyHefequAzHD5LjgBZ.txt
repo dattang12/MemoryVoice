@@ -1,0 +1,438 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect } from 'react';
+     4→import DashboardNav from '@/components/DashboardNav';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { RacketRecommendation } from '@/lib/types';
+     7→
+     8→const SKILL_LEVELS = [
+     9→  { value: 'beginner', label: 'Beginner', description: 'New to badminton' },
+    10→  { value: 'intermediate', label: 'Intermediate', description: '1-3 years experience' },
+    11→  { value: 'advanced', label: 'Advanced', description: '3+ years, competitive play' },
+    12→];
+    13→
+    14→const PLAY_STYLES = [
+    15→  { value: 'power', label: 'Power', description: 'Strong smashes and clears' },
+    16→  { value: 'control', label: 'Control', description: 'Precise placement and drops' },
+    17→  { value: 'all-round', label: 'All-Round', description: 'Balanced gameplay' },
+    18→];
+    19→
+    20→const WEAKNESSES = [
+    21→  { value: 'smash_power', label: 'Smash Power' },
+    22→  { value: 'defense', label: 'Defense' },
+    23→  { value: 'footwork', label: 'Footwork' },
+    24→  { value: 'net_play', label: 'Net Play' },
+    25→  { value: 'endurance', label: 'Endurance' },
+    26→  { value: 'consistency', label: 'Consistency' },
+    27→];
+    28→
+    29→export default function RacketPage() {
+    30→  const [level, setLevel] = useState<string>('intermediate');
+    31→  const [style, setStyle] = useState<string>('all-round');
+    32→  const [weaknesses, setWeaknesses] = useState<string[]>([]);
+    33→  const [loading, setLoading] = useState(false);
+    34→  const [recommendations, setRecommendations] = useState<RacketRecommendation[]>([]);
+    35→  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+    36→  const [error, setError] = useState<string | null>(null);
+    37→
+    38→  useEffect(() => {
+    39→    loadFavorites();
+    40→  }, []);
+    41→
+    42→  const loadFavorites = async () => {
+    43→    const { data: { user } } = await supabase.auth.getUser();
+    44→    if (!user) return;
+    45→
+    46→    try {
+    47→      const { data, error } = await supabase
+    48→        .from('racket_favorites')
+    49→        .select('racket_id')
+    50→        .eq('user_id', user.id);
+    51→
+    52→      // Gracefully handle if table doesn't exist
+    53→      if (error) {
+    54→        console.log('Favorites not available:', error.message);
+    55→        return;
+    56→      }
+    57→
+    58→      if (data) {
+    59→        setFavorites(new Set(data.map((f) => f.racket_id)));
+    60→      }
+    61→    } catch (err) {
+    62→      // Table may not exist - just use local state
+    63→      console.log('Using local favorites only');
+    64→    }
+    65→  };
+    66→
+    67→  const toggleWeakness = (weakness: string) => {
+    68→    setWeaknesses((prev) =>
+    69→      prev.includes(weakness)
+    70→        ? prev.filter((w) => w !== weakness)
+    71→        : [...prev, weakness]
+    72→    );
+    73→  };
+    74→
+    75→  const getRecommendations = async () => {
+    76→    if (weaknesses.length === 0) {
+    77→      setError('Please select at least one weakness to improve');
+    78→      return;
+    79→    }
+    80→
+    81→    setError(null);
+    82→    setLoading(true);
+    83→
+    84→    try {
+    85→      const response = await fetch('/api/racket/recommend', {
+    86→        method: 'POST',
+    87→        headers: { 'Content-Type': 'application/json' },
+    88→        body: JSON.stringify({
+    89→          level,
+    90→          weaknesses,
+    91→          style_pref: style,
+    92→        }),
+    93→      });
+    94→
+    95→      if (!response.ok) {
+    96→        throw new Error('Failed to get recommendations');
+    97→      }
+    98→
+    99→      const data = await response.json();
+   100→      setRecommendations(data.recommendations);
+   101→    } catch (err) {
+   102→      console.error('Error:', err);
+   103→      setError('Failed to get recommendations. Please try again.');
+   104→    } finally {
+   105→      setLoading(false);
+   106→    }
+   107→  };
+   108→
+   109→  const toggleFavorite = async (racketId: string) => {
+   110→    // Always toggle locally first for immediate UI feedback
+   111→    setFavorites((prev) => {
+   112→      const next = new Set(prev);
+   113→      if (next.has(racketId)) {
+   114→        next.delete(racketId);
+   115→      } else {
+   116→        next.add(racketId);
+   117→      }
+   118→      return next;
+   119→    });
+   120→
+   121→    // Try to persist to database if user is logged in
+   122→    const { data: { user } } = await supabase.auth.getUser();
+   123→    if (!user) return;
+   124→
+   125→    try {
+   126→      if (favorites.has(racketId)) {
+   127→        // Remove from favorites
+   128→        await supabase
+   129→          .from('racket_favorites')
+   130→          .delete()
+   131→          .eq('user_id', user.id)
+   132→          .eq('racket_id', racketId);
+   133→      } else {
+   134→        // Add to favorites
+   135→        await supabase.from('racket_favorites').insert({
+   136→          user_id: user.id,
+   137→          racket_id: racketId,
+   138→        });
+   139→      }
+   140→    } catch (err) {
+   141→      // Table may not exist - favorites are still stored locally
+   142→      console.log('Favorites stored locally only');
+   143→    }
+   144→  };
+   145→
+   146→  const openEbaySearch = (query: string) => {
+   147→    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
+   148→    window.open(url, '_blank');
+   149→  };
+   150→
+   151→  return (
+   152→    <div className="min-h-screen bg-gray-50">
+   153→      <DashboardNav />
+   154→
+   155→      <main className="ml-64 p-8">
+   156→        <div className="max-w-7xl mx-auto">
+   157→          {/* Header */}
+   158→          <div className="mb-8">
+   159→            <h1 className="text-3xl font-bold text-gray-900">Racket Finder</h1>
+   160→            <p className="text-gray-600 mt-1">
+   161→              Get personalized racket recommendations based on your playing profile
+   162→            </p>
+   163→          </div>
+   164→
+   165→          {/* Selection Form */}
+   166→          <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
+   167→            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+   168→              {/* Skill Level */}
+   169→              <div>
+   170→                <h3 className="font-semibold text-gray-900 mb-3">Skill Level</h3>
+   171→                <div className="space-y-2">
+   172→                  {SKILL_LEVELS.map((lvl) => (
+   173→                    <button
+   174→                      key={lvl.value}
+   175→                      onClick={() => setLevel(lvl.value)}
+   176→                      className={`w-full text-left p-3 rounded-lg border transition ${
+   177→                        level === lvl.value
+   178→                          ? 'border-primary-500 bg-primary-50'
+   179→                          : 'border-gray-200 hover:border-gray-300'
+   180→                      }`}
+   181→                    >
+   182→                      <p className="font-medium text-gray-900">{lvl.label}</p>
+   183→                      <p className="text-sm text-gray-500">{lvl.description}</p>
+   184→                    </button>
+   185→                  ))}
+   186→                </div>
+   187→              </div>
+   188→
+   189→              {/* Play Style */}
+   190→              <div>
+   191→                <h3 className="font-semibold text-gray-900 mb-3">Play Style</h3>
+   192→                <div className="space-y-2">
+   193→                  {PLAY_STYLES.map((s) => (
+   194→                    <button
+   195→                      key={s.value}
+   196→                      onClick={() => setStyle(s.value)}
+   197→                      className={`w-full text-left p-3 rounded-lg border transition ${
+   198→                        style === s.value
+   199→                          ? 'border-primary-500 bg-primary-50'
+   200→                          : 'border-gray-200 hover:border-gray-300'
+   201→                      }`}
+   202→                    >
+   203→                      <p className="font-medium text-gray-900">{s.label}</p>
+   204→                      <p className="text-sm text-gray-500">{s.description}</p>
+   205→                    </button>
+   206→                  ))}
+   207→                </div>
+   208→              </div>
+   209→
+   210→              {/* Weaknesses */}
+   211→              <div>
+   212→                <h3 className="font-semibold text-gray-900 mb-3">
+   213→                  Areas to Improve
+   214→                </h3>
+   215→                <div className="flex flex-wrap gap-2">
+   216→                  {WEAKNESSES.map((w) => (
+   217→                    <button
+   218→                      key={w.value}
+   219→                      onClick={() => toggleWeakness(w.value)}
+   220→                      className={`px-3 py-2 rounded-lg border text-sm transition ${
+   221→                        weaknesses.includes(w.value)
+   222→                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+   223→                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+   224→                      }`}
+   225→                    >
+   226→                      {w.label}
+   227→                    </button>
+   228→                  ))}
+   229→                </div>
+   230→                <p className="text-xs text-gray-500 mt-2">
+   231→                  Select at least one area
+   232→                </p>
+   233→              </div>
+   234→            </div>
+   235→
+   236→            {error && (
+   237→              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+   238→                {error}
+   239→              </div>
+   240→            )}
+   241→
+   242→            <div className="mt-6 flex justify-center">
+   243→              <button
+   244→                onClick={getRecommendations}
+   245→                disabled={loading}
+   246→                className="px-8 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition disabled:opacity-50"
+   247→              >
+   248→                {loading ? (
+   249→                  <span className="flex items-center space-x-2">
+   250→                    <svg
+   251→                      className="animate-spin h-5 w-5"
+   252→                      fill="none"
+   253→                      viewBox="0 0 24 24"
+   254→                    >
+   255→                      <circle
+   256→                        className="opacity-25"
+   257→                        cx="12"
+   258→                        cy="12"
+   259→                        r="10"
+   260→                        stroke="currentColor"
+   261→                        strokeWidth="4"
+   262→                      />
+   263→                      <path
+   264→                        className="opacity-75"
+   265→                        fill="currentColor"
+   266→                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+   267→                      />
+   268→                    </svg>
+   269→                    <span>Finding Rackets...</span>
+   270→                  </span>
+   271→                ) : (
+   272→                  'Get Recommendations'
+   273→                )}
+   274→              </button>
+   275→            </div>
+   276→          </div>
+   277→
+   278→          {/* Recommendations Grid */}
+   279→          {recommendations.length > 0 && (
+   280→            <div>
+   281→              <h2 className="text-xl font-bold text-gray-900 mb-4">
+   282→                Top 5 Recommended Rackets
+   283→              </h2>
+   284→              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+   285→                {recommendations.map((racket, index) => (
+   286→                  <div
+   287→                    key={racket.id}
+   288→                    className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition"
+   289→                  >
+   290→                    {/* Rank Badge */}
+   291→                    <div className="relative">
+   292→                      <div className="bg-gray-100 h-48 flex items-center justify-center">
+   293→                        <span className="text-6xl">🏸</span>
+   294→                      </div>
+   295→                      <div className="absolute top-3 left-3 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+   296→                        <span className="text-white font-bold text-sm">
+   297→                          #{index + 1}
+   298→                        </span>
+   299→                      </div>
+   300→                      <button
+   301→                        onClick={() => toggleFavorite(racket.id)}
+   302→                        className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition"
+   303→                      >
+   304→                        <svg
+   305→                          className={`w-5 h-5 ${
+   306→                            favorites.has(racket.id)
+   307→                              ? 'text-red-500 fill-current'
+   308→                              : 'text-gray-400'
+   309→                          }`}
+   310→                          fill={favorites.has(racket.id) ? 'currentColor' : 'none'}
+   311→                          stroke="currentColor"
+   312→                          viewBox="0 0 24 24"
+   313→                        >
+   314→                          <path
+   315→                            strokeLinecap="round"
+   316→                            strokeLinejoin="round"
+   317→                            strokeWidth={2}
+   318→                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+   319→                          />
+   320→                        </svg>
+   321→                      </button>
+   322→                    </div>
+   323→
+   324→                    <div className="p-4">
+   325→                      {/* Header */}
+   326→                      <div className="flex items-start justify-between mb-2">
+   327→                        <div>
+   328→                          <h3 className="font-semibold text-gray-900">
+   329→                            {racket.name}
+   330→                          </h3>
+   331→                          <p className="text-sm text-gray-500">{racket.brand}</p>
+   332→                        </div>
+   333→                        <div className="text-right">
+   334→                          <p className="font-bold text-primary-600">
+   335→                            {racket.match_score}%
+   336→                          </p>
+   337→                          <p className="text-xs text-gray-500">match</p>
+   338→                        </div>
+   339→                      </div>
+   340→
+   341→                      {/* Match Reason */}
+   342→                      <p className="text-sm text-gray-600 mb-3">
+   343→                        {racket.match_reason}
+   344→                      </p>
+   345→
+   346→                      {/* Specs */}
+   347→                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+   348→                        <div className="bg-gray-50 rounded p-2">
+   349→                          <p className="text-gray-500">Weight</p>
+   350→                          <p className="font-medium text-gray-900">
+   351→                            {racket.weight}
+   352→                          </p>
+   353→                        </div>
+   354→                        <div className="bg-gray-50 rounded p-2">
+   355→                          <p className="text-gray-500">Balance</p>
+   356→                          <p className="font-medium text-gray-900">
+   357→                            {racket.balance}
+   358→                          </p>
+   359→                        </div>
+   360→                        <div className="bg-gray-50 rounded p-2">
+   361→                          <p className="text-gray-500">Flex</p>
+   362→                          <p className="font-medium text-gray-900">
+   363→                            {racket.flexibility}
+   364→                          </p>
+   365→                        </div>
+   366→                        <div className="bg-gray-50 rounded p-2">
+   367→                          <p className="text-gray-500">Price</p>
+   368→                          <p className="font-medium text-gray-900">
+   369→                            {racket.price_range}
+   370→                          </p>
+   371→                        </div>
+   372→                      </div>
+   373→
+   374→                      {/* Style Tags */}
+   375→                      <div className="flex flex-wrap gap-1 mb-4">
+   376→                        {racket.play_style.map((style) => (
+   377→                          <span
+   378→                            key={style}
+   379→                            className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs"
+   380→                          >
+   381→                            {style}
+   382→                          </span>
+   383→                        ))}
+   384→                      </div>
+   385→
+   386→                      {/* Action Button */}
+   387→                      <button
+   388→                        onClick={() => openEbaySearch(racket.ebay_search_query)}
+   389→                        className="w-full py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition flex items-center justify-center space-x-2"
+   390→                      >
+   391→                        <span>View on eBay</span>
+   392→                        <svg
+   393→                          className="w-4 h-4"
+   394→                          fill="none"
+   395→                          stroke="currentColor"
+   396→                          viewBox="0 0 24 24"
+   397→                        >
+   398→                          <path
+   399→                            strokeLinecap="round"
+   400→                            strokeLinejoin="round"
+   401→                            strokeWidth={2}
+   402→                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+   403→                          />
+   404→                        </svg>
+   405→                      </button>
+   406→                    </div>
+   407→                  </div>
+   408→                ))}
+   409→              </div>
+   410→            </div>
+   411→          )}
+   412→
+   413→          {/* Empty State */}
+   414→          {recommendations.length === 0 && !loading && (
+   415→            <div className="text-center py-12">
+   416→              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+   417→                <span className="text-4xl">🏸</span>
+   418→              </div>
+   419→              <h3 className="text-lg font-medium text-gray-900 mb-2">
+   420→                Find Your Perfect Racket
+   421→              </h3>
+   422→              <p className="text-gray-500 max-w-md mx-auto">
+   423→                Select your skill level, playing style, and areas you want to
+   424→                improve, then click &quot;Get Recommendations&quot; to see personalized
+   425→                racket suggestions.
+   426→              </p>
+   427→            </div>
+   428→          )}
+   429→        </div>
+   430→      </main>
+   431→    </div>
+   432→  );
+   433→}
+   434→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

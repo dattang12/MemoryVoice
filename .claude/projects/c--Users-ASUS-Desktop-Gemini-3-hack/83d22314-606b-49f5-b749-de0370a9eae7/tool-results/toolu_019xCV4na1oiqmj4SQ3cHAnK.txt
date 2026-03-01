@@ -1,0 +1,320 @@
+     1→import { createClient, SupabaseClient } from '@supabase/supabase-js';
+     2→import * as tus from 'tus-js-client';
+     3→
+     4→const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+     5→const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+     6→
+     7→// Constants for upload handling
+     8→const RESUMABLE_THRESHOLD = 6 * 1024 * 1024; // 6MB - use TUS for files larger than this
+     9→const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB max file size
+    10→const STORAGE_BUCKET = 'videos';
+    11→
+    12→// Client-side Supabase client (lazy initialization)
+    13→let _supabase: SupabaseClient | null = null;
+    14→
+    15→export const supabase = (() => {
+    16→  if (!_supabase && supabaseUrl && supabaseAnonKey) {
+    17→    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+    18→  }
+    19→  // Return a mock client if env vars not available (for SSR)
+    20→  if (!_supabase) {
+    21→    return createClient(
+    22→      supabaseUrl || 'https://placeholder.supabase.co',
+    23→      supabaseAnonKey || 'placeholder-key'
+    24→    );
+    25→  }
+    26→  return _supabase;
+    27→})();
+    28→
+    29→// Server-side Supabase client (for API routes)
+    30→export function createServerClient() {
+    31→  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
+    32→  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+    33→
+    34→  if (!url || !key) {
+    35→    throw new Error('Supabase environment variables not configured');
+    36→  }
+    37→
+    38→  return createClient(url, key, {
+    39→    auth: {
+    40→      autoRefreshToken: false,
+    41→      persistSession: false,
+    42→    },
+    43→  });
+    44→}
+    45→
+    46→// Helper to get user from request
+    47→export async function getUserFromRequest(request: Request) {
+    48→  const authHeader = request.headers.get('authorization');
+    49→  if (!authHeader?.startsWith('Bearer ')) {
+    50→    return null;
+    51→  }
+    52→
+    53→  const token = authHeader.split(' ')[1];
+    54→  const serverClient = createServerClient();
+    55→
+    56→  const { data: { user }, error } = await serverClient.auth.getUser(token);
+    57→
+    58→  if (error || !user) {
+    59→    return null;
+    60→  }
+    61→
+    62→  return user;
+    63→}
+    64→
+    65→// Sanitize filename to remove non-ASCII characters for Supabase storage
+    66→function sanitizeFileName(fileName: string): string {
+    67→  // Get file extension
+    68→  const lastDot = fileName.lastIndexOf('.');
+    69→  const ext = lastDot > 0 ? fileName.slice(lastDot) : '';
+    70→  const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
+    71→
+    72→  // Replace non-ASCII characters with empty string, keep alphanumeric, dash, underscore
+    73→  const sanitized = baseName
+    74→    .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII
+    75→    .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace special chars with underscore
+    76→    .replace(/_+/g, '_') // Collapse multiple underscores
+    77→    .replace(/^_|_$/g, '') // Trim underscores from start/end
+    78→    || 'video'; // Default name if nothing remains
+    79→
+    80→  return sanitized + ext;
+    81→}
+    82→
+    83→// Upload progress callback type
+    84→export type UploadProgressCallback = (progress: number) => void;
+    85→
+    86→// Upload result type
+    87→export interface UploadResult {
+    88→  path: string;
+    89→  bucket: string;
+    90→  publicUrl: string;
+    91→}
+    92→
+    93→// Storage helpers
+    94→
+    95→/**
+    96→ * Upload video with automatic selection of standard or TUS resumable upload
+    97→ * based on file size. Files > 6MB use TUS protocol for reliability.
+    98→ *
+    99→ * @param file - The video file to upload
+   100→ * @param userId - The user ID for path organization
+   101→ * @param onProgress - Optional progress callback (0-100)
+   102→ * @returns UploadResult with path, bucket, and publicUrl
+   103→ * @throws Error if upload fails
+   104→ */
+   105→export async function uploadVideo(
+   106→  file: File,
+   107→  userId: string,
+   108→  onProgress?: UploadProgressCallback
+   109→): Promise<string | null> {
+   110→  // Validate file size
+   111→  if (file.size > MAX_FILE_SIZE) {
+   112→    console.error('Upload error: File size exceeds 100MB limit');
+   113→    throw new Error('File size exceeds 100MB limit. Please compress your video before uploading.');
+   114→  }
+   115→
+   116→  // Validate file type
+   117→  if (!file.type.startsWith('video/')) {
+   118→    throw new Error('Invalid file type. Please upload a video file.');
+   119→  }
+   120→
+   121→  const sanitizedName = sanitizeFileName(file.name);
+   122→  const fileName = `${userId}/${Date.now()}-${sanitizedName}`;
+   123→
+   124→  // Use TUS resumable upload for large files
+   125→  if (file.size > RESUMABLE_THRESHOLD) {
+   126→    console.log(`Using TUS resumable upload for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+   127→    return await uploadVideoResumable(file, fileName, onProgress);
+   128→  }
+   129→
+   130→  // Use standard upload for small files
+   131→  console.log(`Using standard upload for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+   132→  return await uploadVideoStandard(file, fileName, onProgress);
+   133→}
+   134→
+   135→/**
+   136→ * Standard upload for files < 6MB
+   137→ */
+   138→async function uploadVideoStandard(
+   139→  file: File,
+   140→  fileName: string,
+   141→  onProgress?: UploadProgressCallback
+   142→): Promise<string | null> {
+   143→  // Report initial progress
+   144→  onProgress?.(10);
+   145→
+   146→  const { data, error } = await supabase.storage
+   147→    .from(STORAGE_BUCKET)
+   148→    .upload(fileName, file, {
+   149→      cacheControl: '3600',
+   150→      upsert: false
+   151→    });
+   152→
+   153→  if (error) {
+   154→    console.error('Upload error:', error);
+   155→    if (error.message?.includes('exceeded the maximum allowed size')) {
+   156→      throw new Error('File size exceeds storage limit. Please compress your video before uploading.');
+   157→    }
+   158→    if (error.message?.includes('Bucket not found')) {
+   159→      throw new Error('Storage not configured. Please contact support.');
+   160→    }
+   161→    throw new Error(`Failed to upload video: ${error.message}`);
+   162→  }
+   163→
+   164→  onProgress?.(100);
+   165→  return data.path;
+   166→}
+   167→
+   168→/**
+   169→ * TUS resumable upload for files >= 6MB
+   170→ * Uses tus-js-client for reliable large file uploads with resume capability
+   171→ */
+   172→async function uploadVideoResumable(
+   173→  file: File,
+   174→  fileName: string,
+   175→  onProgress?: UploadProgressCallback
+   176→): Promise<string | null> {
+   177→  return new Promise(async (resolve, reject) => {
+   178→    try {
+   179→      // Get the current session for auth token
+   180→      const { data: { session } } = await supabase.auth.getSession();
+   181→      if (!session?.access_token) {
+   182→        throw new Error('Not authenticated. Please log in again.');
+   183→      }
+   184→
+   185→      const upload = new tus.Upload(file, {
+   186→        endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+   187→        retryDelays: [0, 1000, 3000, 5000], // Retry delays in ms
+   188→        chunkSize: 6 * 1024 * 1024, // 6MB chunks
+   189→        headers: {
+   190→          authorization: `Bearer ${session.access_token}`,
+   191→          'x-upsert': 'false', // Don't overwrite existing files
+   192→        },
+   193→        uploadDataDuringCreation: true,
+   194→        removeFingerprintOnSuccess: true,
+   195→        metadata: {
+   196→          bucketName: STORAGE_BUCKET,
+   197→          objectName: fileName,
+   198→          contentType: file.type,
+   199→          cacheControl: '3600',
+   200→        },
+   201→        onError: (error) => {
+   202→          console.error('TUS upload error:', error);
+   203→          // Parse error message for user-friendly display
+   204→          let message = 'Failed to upload video.';
+   205→          if (error.message?.includes('exceeded')) {
+   206→            message = 'File size exceeds storage limit.';
+   207→          } else if (error.message?.includes('network')) {
+   208→            message = 'Network error. Please check your connection and try again.';
+   209→          } else if (error.message?.includes('unauthorized') || error.message?.includes('401')) {
+   210→            message = 'Session expired. Please log in again.';
+   211→          }
+   212→          reject(new Error(message));
+   213→        },
+   214→        onProgress: (bytesUploaded, bytesTotal) => {
+   215→          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
+   216→          onProgress?.(percentage);
+   217→        },
+   218→        onSuccess: () => {
+   219→          console.log('TUS upload completed:', fileName);
+   220→          onProgress?.(100);
+   221→          resolve(fileName);
+   222→        },
+   223→      });
+   224→
+   225→      // Check for previous upload to resume
+   226→      const previousUploads = await upload.findPreviousUploads();
+   227→      if (previousUploads.length > 0) {
+   228→        console.log('Resuming previous upload...');
+   229→        upload.resumeFromPreviousUpload(previousUploads[0]);
+   230→      }
+   231→
+   232→      // Start the upload
+   233→      upload.start();
+   234→    } catch (error) {
+   235→      console.error('TUS setup error:', error);
+   236→      reject(error);
+   237→    }
+   238→  });
+   239→}
+   240→
+   241→/**
+   242→ * Get public URL for a video in storage
+   243→ */
+   244→export function getVideoUrl(path: string): string {
+   245→  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+   246→  return data.publicUrl;
+   247→}
+   248→
+   249→/**
+   250→ * Create a signed URL for private bucket access
+   251→ * Use this when the bucket is not public
+   252→ *
+   253→ * @param path - The storage path
+   254→ * @param expiresIn - Expiration time in seconds (default: 1 hour)
+   255→ */
+   256→export async function getSignedVideoUrl(path: string, expiresIn: number = 3600): Promise<string | null> {
+   257→  const { data, error } = await supabase.storage
+   258→    .from(STORAGE_BUCKET)
+   259→    .createSignedUrl(path, expiresIn);
+   260→
+   261→  if (error) {
+   262→    console.error('Failed to create signed URL:', error);
+   263→    return null;
+   264→  }
+   265→
+   266→  return data.signedUrl;
+   267→}
+   268→
+   269→/**
+   270→ * Check if a video exists in storage
+   271→ */
+   272→export async function videoExists(path: string): Promise<boolean> {
+   273→  const { data, error } = await supabase.storage
+   274→    .from(STORAGE_BUCKET)
+   275→    .list(path.substring(0, path.lastIndexOf('/')), {
+   276→      search: path.substring(path.lastIndexOf('/') + 1),
+   277→    });
+   278→
+   279→  if (error) {
+   280→    console.error('Error checking video existence:', error);
+   281→    return false;
+   282→  }
+   283→
+   284→  return data && data.length > 0;
+   285→}
+   286→
+   287→/**
+   288→ * Upload a thumbnail image to storage
+   289→ */
+   290→export async function uploadThumbnail(
+   291→  blob: Blob,
+   292→  sessionId: string,
+   293→  trackId: number
+   294→): Promise<string | null> {
+   295→  const fileName = `thumbnails/${sessionId}/${trackId}.jpg`;
+   296→
+   297→  const { data, error } = await supabase.storage
+   298→    .from(STORAGE_BUCKET)
+   299→    .upload(fileName, blob, {
+   300→      contentType: 'image/jpeg',
+   301→      cacheControl: '3600',
+   302→      upsert: true,
+   303→    });
+   304→
+   305→  if (error) {
+   306→    console.error('Thumbnail upload error:', error);
+   307→    return null;
+   308→  }
+   309→
+   310→  const { data: urlData } = supabase.storage
+   311→    .from(STORAGE_BUCKET)
+   312→    .getPublicUrl(data.path);
+   313→
+   314→  return urlData.publicUrl;
+   315→}
+   316→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

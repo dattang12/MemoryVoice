@@ -1,0 +1,371 @@
+/**
+ * Ghost Rival Overlay Module
+ *
+ * Provides "My Best Rep" ghost skeleton overlay functionality:
+ * 1. Finds the highest-quality segment from the same video
+ * 2. Extracts pose frames for ghost rendering
+ * 3. Syncs ghost playback with user video time
+ */
+
+import type {
+  PoseLandmark,
+  PoseMetrics,
+  GhostRivalData,
+  GhostPoseFrame,
+  MistakeEvent
+} from './types';
+import { POSE_LANDMARKS, calculateAngle, calculateDistance } from './pose-utils';
+
+// Minimum window size for a valid "rep"
+const MIN_REP_DURATION_SEC = 0.8;
+const MAX_REP_DURATION_SEC = 3.0;
+const GHOST_FPS = 15; // Downsample to 15fps for rendering
+
+/**
+ * Shot event detected in video
+ */
+interface ShotEvent {
+  frameIndex: number;
+  timestamp: number;
+  shotType: 'overhead' | 'drive' | 'netshot' | 'footwork' | 'unknown';
+  confidence: number;
+}
+
+/**
+ * Calculate form quality score for a segment of pose frames
+ * Higher score = better form
+ */
+export function calculateSegmentFormScore(
+  poseFrames: (PoseLandmark[] | null)[],
+  metricsHistory: (PoseMetrics | null)[]
+): number {
+  let totalScore = 0;
+  let validFrames = 0;
+
+  for (let i = 0; i < poseFrames.length; i++) {
+    const landmarks = poseFrames[i];
+    const metrics = metricsHistory[i];
+
+    if (!landmarks || !metrics) continue;
+
+    // Calculate average visibility
+    const avgVisibility = landmarks.reduce((sum, lm) => sum + (lm.visibility ?? 0), 0) / landmarks.length;
+    if (avgVisibility < 0.5) continue;
+
+    let frameScore = avgVisibility * 20; // Base score from visibility
+
+    // Elbow angle scoring (ideal: 90-130 for most shots)
+    const elbowScore = scoreInRange(metrics.elbow_angle, 80, 140, 60, 160);
+    frameScore += elbowScore * 25;
+
+    // Knee angle scoring (ideal: 110-160)
+    const kneeScore = scoreInRange(metrics.knee_angle, 110, 160, 80, 175);
+    frameScore += kneeScore * 25;
+
+    // Stance width scoring (ideal: 0.6-1.4 normalized)
+    const stanceScore = scoreInRange(metrics.stance_width_norm, 0.6, 1.4, 0.3, 2.0);
+    frameScore += stanceScore * 15;
+
+    // Rotation scoring (ideal: 0.1-0.4)
+    const rotationScore = scoreInRange(metrics.shoulder_hip_rotation_proxy, 0.1, 0.4, 0, 0.6);
+    frameScore += rotationScore * 15;
+
+    totalScore += frameScore;
+    validFrames++;
+  }
+
+  return validFrames > 0 ? totalScore / validFrames : 0;
+}
+
+/**
+ * Score a value within ideal and acceptable ranges
+ */
+function scoreInRange(
+  value: number,
+  idealMin: number,
+  idealMax: number,
+  acceptMin: number,
+  acceptMax: number
+): number {
+  if (value >= idealMin && value <= idealMax) {
+    return 1.0; // Perfect
+  }
+  if (value < acceptMin || value > acceptMax) {
+    return 0.2; // Poor
+  }
+  // In acceptable but not ideal range
+  if (value < idealMin) {
+    return 0.5 + 0.5 * ((value - acceptMin) / (idealMin - acceptMin));
+  }
+  return 0.5 + 0.5 * ((acceptMax - value) / (acceptMax - idealMax));
+}
+
+/**
+ * Detect shot events in the video based on pose patterns
+ */
+export function detectShotEvents(
+  poseData: (PoseLandmark[] | null)[],
+  fps: number = 10
+): ShotEvent[] {
+  const events: ShotEvent[] = [];
+  const minFramesBetweenShots = Math.floor(fps * 0.5); // At least 0.5s between shots
+
+  for (let i = 5; i < poseData.length - 5; i++) {
+    const landmarks = poseData[i];
+    if (!landmarks) continue;
+
+    // Check for overhead shot (wrist above shoulder)
+    const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+    const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+    const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+
+    if (!rightWrist || !rightShoulder || !rightElbow) continue;
+    if ((rightWrist.visibility ?? 0) < 0.5) continue;
+
+    // Detect overhead position
+    if (rightWrist.y < rightShoulder.y - 0.05) {
+      // Check if this is a new shot (not too close to previous)
+      const lastEvent = events[events.length - 1];
+      if (!lastEvent || i - lastEvent.frameIndex >= minFramesBetweenShots) {
+        // Calculate elbow extension for overhead
+        const elbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+
+        events.push({
+          frameIndex: i,
+          timestamp: i / fps,
+          shotType: elbowAngle > 140 ? 'overhead' : 'drive',
+          confidence: (rightWrist.visibility ?? 0.5) * (rightShoulder.visibility ?? 0.5),
+        });
+      }
+    }
+
+    // Detect lunge/netshot (deep knee bend with forward reach)
+    const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+    const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+    const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+
+    if (rightHip && rightKnee && rightAnkle) {
+      const kneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+      if (kneeAngle < 100) {
+        const lastEvent = events[events.length - 1];
+        if (!lastEvent || i - lastEvent.frameIndex >= minFramesBetweenShots) {
+          events.push({
+            frameIndex: i,
+            timestamp: i / fps,
+            shotType: 'netshot',
+            confidence: Math.min(rightKnee.visibility ?? 0.5, rightAnkle.visibility ?? 0.5),
+          });
+        }
+      }
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Find the best rep window from the video
+ * This is the highest-quality segment that can be used as ghost overlay
+ */
+export function findBestRepWindow(
+  poseData: (PoseLandmark[] | null)[],
+  metricsHistory: (PoseMetrics | null)[],
+  shotEvents: ShotEvent[],
+  fps: number = 10
+): GhostRivalData['bestRepWindow'] | null {
+  if (shotEvents.length === 0) {
+    // No shots detected, find best continuous segment
+    return findBestContinuousSegment(poseData, metricsHistory, fps);
+  }
+
+  let bestWindow: GhostRivalData['bestRepWindow'] | null = null;
+  let bestScore = 0;
+
+  for (const shot of shotEvents) {
+    // Define window around shot: 0.8s before to 0.6s after
+    const windowStartFrame = Math.max(0, shot.frameIndex - Math.floor(fps * 0.8));
+    const windowEndFrame = Math.min(poseData.length - 1, shot.frameIndex + Math.floor(fps * 0.6));
+
+    // Extract segment
+    const segmentPoses = poseData.slice(windowStartFrame, windowEndFrame + 1);
+    const segmentMetrics = metricsHistory.slice(windowStartFrame, windowEndFrame + 1);
+
+    // Calculate form quality score
+    const score = calculateSegmentFormScore(segmentPoses, segmentMetrics);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestWindow = {
+        startTime: windowStartFrame / fps,
+        endTime: windowEndFrame / fps,
+        score,
+        shotType: shot.shotType,
+      };
+    }
+  }
+
+  return bestWindow;
+}
+
+/**
+ * Find best continuous segment when no shots are detected
+ */
+function findBestContinuousSegment(
+  poseData: (PoseLandmark[] | null)[],
+  metricsHistory: (PoseMetrics | null)[],
+  fps: number
+): GhostRivalData['bestRepWindow'] | null {
+  const windowSize = Math.floor(fps * 1.5); // 1.5 second windows
+  const step = Math.floor(fps * 0.5); // 0.5 second steps
+
+  let bestWindow: GhostRivalData['bestRepWindow'] | null = null;
+  let bestScore = 0;
+
+  for (let start = 0; start + windowSize < poseData.length; start += step) {
+    const segmentPoses = poseData.slice(start, start + windowSize);
+    const segmentMetrics = metricsHistory.slice(start, start + windowSize);
+
+    const score = calculateSegmentFormScore(segmentPoses, segmentMetrics);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestWindow = {
+        startTime: start / fps,
+        endTime: (start + windowSize) / fps,
+        score,
+        shotType: 'footwork',
+      };
+    }
+  }
+
+  return bestWindow;
+}
+
+/**
+ * Extract ghost pose sequence from best rep window
+ * Downsamples to GHOST_FPS for efficient rendering
+ */
+export function extractGhostPoseSequence(
+  poseData: (PoseLandmark[] | null)[],
+  bestRepWindow: GhostRivalData['bestRepWindow'],
+  sourceFps: number = 10
+): GhostPoseFrame[] {
+  if (!bestRepWindow) return [];
+
+  const startFrame = Math.floor(bestRepWindow.startTime * sourceFps);
+  const endFrame = Math.floor(bestRepWindow.endTime * sourceFps);
+  const windowDuration = bestRepWindow.endTime - bestRepWindow.startTime;
+
+  const ghostFrames: GhostPoseFrame[] = [];
+
+  // Calculate frame step for downsampling to GHOST_FPS
+  const frameStep = Math.max(1, Math.floor(sourceFps / GHOST_FPS));
+
+  for (let i = startFrame; i <= endFrame; i += frameStep) {
+    const landmarks = poseData[i];
+    if (!landmarks) continue;
+
+    const timestamp = i / sourceFps;
+    const normalizedTime = (timestamp - bestRepWindow.startTime) / windowDuration;
+
+    ghostFrames.push({
+      timestamp,
+      normalizedTime: Math.max(0, Math.min(1, normalizedTime)),
+      landmarks,
+    });
+  }
+
+  return ghostFrames;
+}
+
+/**
+ * Get ghost pose for current video time
+ * Handles sync between user video time and ghost animation
+ */
+export function getGhostPoseAtTime(
+  ghostData: GhostRivalData,
+  currentTime: number
+): PoseLandmark[] | null {
+  if (!ghostData.enabled || ghostData.poseSequence.length === 0) {
+    return null;
+  }
+
+  const { poseSequence, bestRepWindow } = ghostData;
+
+  if (!bestRepWindow) {
+    // Fallback: use absolute time
+    let closestFrame = poseSequence[0];
+    let minDiff = Infinity;
+
+    for (const frame of poseSequence) {
+      const diff = Math.abs(frame.timestamp - currentTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestFrame = frame;
+      }
+    }
+
+    return closestFrame?.landmarks ?? null;
+  }
+
+  // Use absolute time matching if within window
+  if (currentTime >= bestRepWindow.startTime && currentTime <= bestRepWindow.endTime) {
+    let closestFrame = poseSequence[0];
+    let minDiff = Infinity;
+
+    for (const frame of poseSequence) {
+      const diff = Math.abs(frame.timestamp - currentTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestFrame = frame;
+      }
+    }
+
+    return closestFrame?.landmarks ?? null;
+  }
+
+  // Loop the ghost animation when outside window
+  const windowDuration = bestRepWindow.endTime - bestRepWindow.startTime;
+  const loopTime = ((currentTime - bestRepWindow.startTime) % windowDuration + windowDuration) % windowDuration;
+  const targetTime = bestRepWindow.startTime + loopTime;
+
+  let closestFrame = poseSequence[0];
+  let minDiff = Infinity;
+
+  for (const frame of poseSequence) {
+    const diff = Math.abs(frame.timestamp - targetTime);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestFrame = frame;
+    }
+  }
+
+  return closestFrame?.landmarks ?? null;
+}
+
+/**
+ * Initialize ghost rival data from analysis
+ */
+export function initializeGhostRival(
+  poseData: (PoseLandmark[] | null)[],
+  metricsHistory: (PoseMetrics | null)[],
+  fps: number = 10
+): GhostRivalData {
+  // Detect shot events
+  const shotEvents = detectShotEvents(poseData, fps);
+
+  // Find best rep window
+  const bestRepWindow = findBestRepWindow(poseData, metricsHistory, shotEvents, fps);
+
+  // Extract ghost pose sequence
+  const poseSequence = bestRepWindow
+    ? extractGhostPoseSequence(poseData, bestRepWindow, fps)
+    : [];
+
+  return {
+    source: 'my-best-rep',
+    enabled: false, // User must enable
+    poseSequence,
+    bestRepWindow: bestRepWindow ?? undefined,
+  };
+}

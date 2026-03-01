@@ -1,0 +1,2214 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+     4→import { useSearchParams } from 'next/navigation';
+     5→import Link from 'next/link';
+     6→import DashboardNav from '@/components/DashboardNav';
+     7→import DrillCard from '@/components/DrillCard';
+     8→import { TabbedDrillAnimation } from '@/components/Skeleton3D';
+     9→import PlayerSelectionModal from '@/components/PlayerSelectionModal';
+    10→import GuidanceAnimation from '@/components/GuidanceAnimation';
+    11→import { supabase, uploadVideo, getVideoUrl, getSignedVideoUrl } from '@/lib/supabase';
+    12→import {
+    13→  drawSkeleton,
+    14→  extractMetrics,
+    15→  POSE_CONNECTIONS,
+    16→  POSE_LANDMARKS
+    17→} from '@/lib/pose-utils';
+    18→import {
+    19→  DRILLS,
+    20→  FORM_RULES,
+    21→  evaluateForm,
+    22→  findViolationTimestamps,
+    23→  type EvaluationResult
+    24→} from '@/lib/rules-engine';
+    25→import {
+    26→  evaluateWithBands,
+    27→  SCORING_LEGEND,
+    28→  SKILL_LEVEL_DESCRIPTIONS,
+    29→  validateSessionPoseData,
+    30→} from '@/lib/scoring-rules';
+    31→import { computeSkillScore } from '@/lib/skill-scoring';
+    32→import { initializeGhostRival, getGhostPoseAtTime } from '@/lib/ghost-overlay';
+    33→import { detectMistakes, generateFixKeyframes } from '@/lib/mistake-detection';
+    34→import MistakeTimeline, { MistakeTimelineMini } from '@/components/MistakeTimeline';
+    35→import FixItCard from '@/components/FixItCard';
+    36→import SkillMeter, { SkillBadgeInline } from '@/components/SkillMeter';
+    37→import type { AnalysisResultJson, Issue, Drill, PoseLandmark, Session, PoseMetrics, PlayerTrackData, ComputedSkillScore, MistakeEvent, GhostPoseFrame, GhostRivalData } from '@/lib/types';
+    38→
+    39→// MediaPipe Types
+    40→type PoseLandmarker = any;
+    41→
+    42→interface FrameAnalysis {
+    43→  timestamp: number;
+    44→  landmarks: PoseLandmark[] | null;
+    45→  evaluation: EvaluationResult | null;
+    46→  metrics: PoseMetrics | null;
+    47→}
+    48→
+    49→interface DetectedIssue {
+    50→  code: string;
+    51→  title: string;
+    52→  severity: 'low' | 'medium' | 'high';
+    53→  description?: string;
+    54→  timestamps: number[];
+    55→  drill?: any;
+    56→}
+    57→
+    58→// PHASE 5: Analysis state machine
+    59→type AnalysisState = 'IDLE' | 'DETECTING_PLAYERS' | 'EXTRACTING_POSE' | 'GEMINI_SCORING' | 'DONE' | 'ERROR';
+    60→
+    61→// PHASE 3: Auto-level detection result from Gemini
+    62→interface AutoLevelResult {
+    63→  level: 'Beginner' | 'Intermediate' | 'Advanced';
+    64→  confidence: number;
+    65→  rationaleBullets: string[];
+    66→  guidanceKeyframes?: GuidanceKeyframe[];
+    67→}
+    68→
+    69→// PHASE 4: Guidance keyframe for animation
+    70→interface GuidanceKeyframe {
+    71→  name: string;
+    72→  description: string;
+    73→  landmarks: PoseLandmark[] | null;
+    74→  targetLandmarks?: PoseLandmark[] | null;
+    75→  correction?: string;
+    76→}
+    77→
+    78→function AnalyticsContent() {
+    79→  const searchParams = useSearchParams();
+    80→  const sessionId = searchParams.get('session');
+    81→
+    82→  // State
+    83→  const [uploading, setUploading] = useState(false);
+    84→  const [analyzing, setAnalyzing] = useState(false);
+    85→  const [analyzeProgress, setAnalyzeProgress] = useState(0);
+    86→  const [analysisState, setAnalysisState] = useState<AnalysisState>('IDLE');
+    87→  const [analysisId, setAnalysisId] = useState<string | null>(null);
+    88→  const [result, setResult] = useState<AnalysisResultJson | null>(null);
+    89→  const [error, setError] = useState<string | null>(null);
+    90→  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+    91→  const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
+    92→
+    93→  // Multi-pose and player selection state
+    94→  const [showPlayerSelection, setShowPlayerSelection] = useState(false);
+    95→  const [detectedTracks, setDetectedTracks] = useState<PlayerTrackData[]>([]);
+    96→  const [selectedTrackIds, setSelectedTrackIds] = useState<number[]>([]);
+    97→  const [detectedMatchFormat, setDetectedMatchFormat] = useState<'singles' | 'doubles' | null>(null);
+    98→  const [matchFormat, setMatchFormat] = useState<'singles' | 'doubles'>('singles');
+    99→  const [eventType, setEventType] = useState<string>('');
+   100→
+   101→  // PHASE 3: Auto-level detection state (replaces manual skill level selector)
+   102→  const [autoLevelResult, setAutoLevelResult] = useState<AutoLevelResult | null>(null);
+   103→  const [currentBandedScore, setCurrentBandedScore] = useState<any>(null);
+   104→
+   105→  // PHASE 4: Guidance animation state
+   106→  const [guidanceKeyframes, setGuidanceKeyframes] = useState<GuidanceKeyframe[]>([]);
+   107→  const [showGuidance, setShowGuidance] = useState(false);
+   108→
+   109→  // V4 FEATURES: Ghost Rival, Skill Scoring, Mistake Timeline
+   110→  const [ghostData, setGhostData] = useState<GhostRivalData | null>(null);
+   111→  const [showGhost, setShowGhost] = useState(false);
+   112→  const [computedSkill, setComputedSkill] = useState<ComputedSkillScore | null>(null);
+   113→  const [mistakeEvents, setMistakeEvents] = useState<MistakeEvent[]>([]);
+   114→  const [selectedMistake, setSelectedMistake] = useState<MistakeEvent | null>(null);
+   115→
+   116→  // Video playback state
+   117→  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+   118→  const [videoFile, setVideoFile] = useState<File | null>(null);
+   119→  const [poseData, setPoseData] = useState<Array<PoseLandmark[] | null>>([]);
+   120→  const [frameAnalyses, setFrameAnalyses] = useState<FrameAnalysis[]>([]);
+   121→  const [issues, setIssues] = useState<DetectedIssue[]>([]);
+   122→  const [currentTime, setCurrentTime] = useState(0);
+   123→  const [duration, setDuration] = useState(0);
+   124→  const [isPlaying, setIsPlaying] = useState(false);
+   125→  const [showSkeleton, setShowSkeleton] = useState(true);
+   126→  const [fps, setFps] = useState(30);
+   127→
+   128→  // PHASE 2: Canvas overlay alignment state
+   129→  const [videoRect, setVideoRect] = useState<DOMRect | null>(null);
+   130→
+   131→  // Pose detection
+   132→  const [poseLandmarkerReady, setPoseLandmarkerReady] = useState(false);
+   133→  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+   134→
+   135→  // PHASE 1: Timestamp tracking for monotonic enforcement
+   136→  const lastTimestampMsRef = useRef<number>(-1);
+   137→  const timestampBaseOffsetRef = useRef<number>(0);
+   138→  const isProcessingRef = useRef<boolean>(false);
+   139→
+   140→  // Refs
+   141→  const fileInputRef = useRef<HTMLInputElement>(null);
+   142→  const videoRef = useRef<HTMLVideoElement>(null);
+   143→  const canvasRef = useRef<HTMLCanvasElement>(null);
+   144→  const videoContainerRef = useRef<HTMLDivElement>(null);
+   145→  const processVideoRef = useRef<HTMLVideoElement | null>(null);
+   146→  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+   147→  const animationRef = useRef<number | null>(null);
+   148→
+   149→  // Initialize MediaPipe Pose Landmarker
+   150→  useEffect(() => {
+   151→    initializePoseLandmarker();
+   152→    return () => {
+   153→      cleanup();
+   154→    };
+   155→  }, []);
+   156→
+   157→  // Load session if ID provided
+   158→  useEffect(() => {
+   159→    if (sessionId) {
+   160→      loadSession(sessionId);
+   161→    }
+   162→  }, [sessionId]);
+   163→
+   164→  // PHASE 2: Update canvas size on video resize
+   165→  useEffect(() => {
+   166→    const updateVideoRect = () => {
+   167→      if (videoRef.current && videoContainerRef.current) {
+   168→        const video = videoRef.current;
+   169→        const container = videoContainerRef.current;
+   170→
+   171→        // Calculate the actual rendered video rectangle (accounting for object-contain)
+   172→        const containerRect = container.getBoundingClientRect();
+   173→        const videoAspect = video.videoWidth / video.videoHeight;
+   174→        const containerAspect = containerRect.width / containerRect.height;
+   175→
+   176→        let renderWidth, renderHeight, offsetX, offsetY;
+   177→
+   178→        if (videoAspect > containerAspect) {
+   179→          // Video is wider - letterbox top/bottom
+   180→          renderWidth = containerRect.width;
+   181→          renderHeight = containerRect.width / videoAspect;
+   182→          offsetX = 0;
+   183→          offsetY = (containerRect.height - renderHeight) / 2;
+   184→        } else {
+   185→          // Video is taller - letterbox left/right
+   186→          renderHeight = containerRect.height;
+   187→          renderWidth = containerRect.height * videoAspect;
+   188→          offsetX = (containerRect.width - renderWidth) / 2;
+   189→          offsetY = 0;
+   190→        }
+   191→
+   192→        setVideoRect({
+   193→          x: offsetX,
+   194→          y: offsetY,
+   195→          width: renderWidth,
+   196→          height: renderHeight,
+   197→          top: offsetY,
+   198→          left: offsetX,
+   199→          right: offsetX + renderWidth,
+   200→          bottom: offsetY + renderHeight,
+   201→          toJSON: () => ({})
+   202→        } as DOMRect);
+   203→      }
+   204→    };
+   205→
+   206→    updateVideoRect();
+   207→    window.addEventListener('resize', updateVideoRect);
+   208→
+   209→    return () => window.removeEventListener('resize', updateVideoRect);
+   210→  }, [videoUrl]);
+   211→
+   212→  const initializePoseLandmarker = async () => {
+   213→    try {
+   214→      const vision = await import('@mediapipe/tasks-vision');
+   215→      const { PoseLandmarker, FilesetResolver } = vision;
+   216→
+   217→      const filesetResolver = await FilesetResolver.forVisionTasks(
+   218→        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+   219→      );
+   220→
+   221→      poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
+   222→        baseOptions: {
+   223→          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+   224→          delegate: 'GPU',
+   225→        },
+   226→        runningMode: 'VIDEO',
+   227→        numPoses: 4, // Support up to 4 players for doubles
+   228→        minPoseDetectionConfidence: 0.5,
+   229→        minPosePresenceConfidence: 0.5,
+   230→        minTrackingConfidence: 0.5,
+   231→      });
+   232→
+   233→      setPoseLandmarkerReady(true);
+   234→    } catch (error) {
+   235→      console.error('Failed to load MediaPipe Pose:', error);
+   236→      // Continue without pose detection - will use fallback
+   237→    }
+   238→  };
+   239→
+   240→  // PHASE 1: Recreate PoseLandmarker to reset timestamp tracking
+   241→  const recreatePoseLandmarker = async () => {
+   242→    if (poseLandmarkerRef.current) {
+   243→      poseLandmarkerRef.current.close();
+   244→    }
+   245→    lastTimestampMsRef.current = -1;
+   246→    timestampBaseOffsetRef.current = 0;
+   247→    await initializePoseLandmarker();
+   248→  };
+   249→
+   250→  const cleanup = () => {
+   251→    if (pollIntervalRef.current) {
+   252→      clearInterval(pollIntervalRef.current);
+   253→    }
+   254→    if (animationRef.current) {
+   255→      cancelAnimationFrame(animationRef.current);
+   256→    }
+   257→    if (poseLandmarkerRef.current) {
+   258→      poseLandmarkerRef.current.close();
+   259→    }
+   260→  };
+   261→
+   262→  const loadSession = async (id: string) => {
+   263→    try {
+   264→      setAnalyzing(true);
+   265→      setAnalysisState('EXTRACTING_POSE');
+   266→
+   267→      // Try new sessions table first
+   268→      const { data: sessionData, error: sessionError } = await supabase
+   269→        .from('sessions')
+   270→        .select('*')
+   271→        .eq('id', id)
+   272→        .single();
+   273→
+   274→      if (sessionError) {
+   275→        // Try legacy table
+   276→        const { data: legacyData, error: legacyError } = await supabase
+   277→          .from('analysis_results')
+   278→          .select('*')
+   279→          .eq('id', id)
+   280→          .single();
+   281→
+   282→        if (legacyError) throw legacyError;
+   283→        if (legacyData?.result_json) {
+   284→          setResult(legacyData.result_json);
+   285→          if (legacyData.result_json.video_url) {
+   286→            setVideoUrl(legacyData.result_json.video_url);
+   287→          }
+   288→        }
+   289→      } else if (sessionData) {
+   290→        // New session format
+   291→        setVideoUrl(sessionData.video_url);
+   292→
+   293→        if (sessionData.pose_data) {
+   294→          setPoseData(sessionData.pose_data);
+   295→        }
+   296→
+   297→        // Fetch issues
+   298→        const { data: issuesData } = await supabase
+   299→          .from('issues')
+   300→          .select('*')
+   301→          .eq('session_id', id);
+   302→
+   303→        if (issuesData && issuesData.length > 0) {
+   304→          setIssues(issuesData.map((issue: any) => ({
+   305→            code: issue.code,
+   306→            title: issue.title,
+   307→            severity: issue.severity,
+   308→            description: issue.description,
+   309→            timestamps: issue.timestamps || [],
+   310→            drill: issue.drill || DRILLS[issue.code?.toLowerCase().replace(/_/g, '-')],
+   311→          })));
+   312→        }
+   313→
+   314→        // Build result from session summary
+   315→        const summary = sessionData.summary || {};
+   316→        setResult({
+   317→          top_issues: issuesData?.map((i: any) => ({
+   318→            id: i.id,
+   319→            title: i.title,
+   320→            severity: i.severity,
+   321→            description: i.description,
+   322→            affected_metrics: [],
+   323→          })) || [],
+   324→          drills: issuesData?.map((i: any) => DRILLS[i.code?.toLowerCase().replace(/_/g, '-')]).filter(Boolean).map(d => ({
+   325→            id: d.id,
+   326→            name: d.name,
+   327→            description: d.description,
+   328→            duration_minutes: d.durationMinutes,
+   329→            target_metrics: d.targetMetrics,
+   330→            instructions: d.steps,
+   331→          })) || [],
+   332→          technique_summary: summary.feedback?.technique_summary || 'Analysis complete.',
+   333→          strategy_summary: summary.feedback?.strategy_summary || '',
+   334→          training_plan: [],
+   335→        });
+   336→      }
+   337→      setAnalysisState('DONE');
+   338→    } catch (err) {
+   339→      console.error('Error loading session:', err);
+   340→      setError('Failed to load session');
+   341→      setAnalysisState('ERROR');
+   342→    } finally {
+   343→      setAnalyzing(false);
+   344→    }
+   345→  };
+   346→
+   347→  // PHASE 1 FIX: Process video with strictly monotonic timestamps
+   348→  // Uses base offset approach to handle seeks without recreating PoseLandmarker
+   349→  const processVideoWithPose = async (
+   350→    videoElement: HTMLVideoElement,
+   351→    selectedTracks: number[] = [0]
+   352→  ): Promise<FrameAnalysis[]> => {
+   353→    if (!poseLandmarkerRef.current) {
+   354→      console.warn('Pose landmarker not ready');
+   355→      return [];
+   356→    }
+   357→
+   358→    // Prevent concurrent processing
+   359→    if (isProcessingRef.current) {
+   360→      console.warn('Already processing video, skipping');
+   361→      return [];
+   362→    }
+   363→    isProcessingRef.current = true;
+   364→
+   365→    const analyses: FrameAnalysis[] = [];
+   366→    const videoDuration = videoElement.duration;
+   367→    const sampleRate = 10; // Process 10 frames per second
+   368→    const totalFrames = Math.floor(videoDuration * sampleRate);
+   369→
+   370→    // PHASE 1: Reset timestamp tracking for fresh processing
+   371→    // Use base offset approach so timestamps always increase even if we restart
+   372→    timestampBaseOffsetRef.current = lastTimestampMsRef.current + 1000; // Add 1 second buffer
+   373→    let localLastTimestamp = timestampBaseOffsetRef.current;
+   374→
+   375→    let validPoseFrames = 0;
+   376→    let lowConfidenceFrames = 0;
+   377→    let noPoseFrames = 0;
+   378→
+   379→    setAnalyzeProgress(10); // Start at 10% after track detection
+   380→
+   381→    for (let i = 0; i <= totalFrames; i++) {
+   382→      const timestamp = i / sampleRate;
+   383→      videoElement.currentTime = timestamp;
+   384→
+   385→      // Wait for video to seek
+   386→      await new Promise<void>((resolve) => {
+   387→        const onSeeked = () => {
+   388→          videoElement.removeEventListener('seeked', onSeeked);
+   389→          resolve();
+   390→        };
+   391→        videoElement.addEventListener('seeked', onSeeked);
+   392→      });
+   393→
+   394→      // Give the video a moment to render the frame
+   395→      await new Promise(resolve => setTimeout(resolve, 50));
+   396→
+   397→      try {
+   398→        // PHASE 1 FIX: Ensure timestamp is strictly greater than last timestamp
+   399→        // Use base offset + local timestamp to guarantee monotonic increase
+   400→        const rawTimestampMs = Math.floor(timestamp * 1000);
+   401→        const timestampMs = timestampBaseOffsetRef.current + rawTimestampMs;
+   402→
+   403→        // Double-check monotonicity
+   404→        const safeTimestampMs = Math.max(localLastTimestamp + 1, timestampMs);
+   405→        localLastTimestamp = safeTimestampMs;
+   406→        lastTimestampMsRef.current = safeTimestampMs;
+   407→
+   408→        const results = poseLandmarkerRef.current.detectForVideo(
+   409→          videoElement,
+   410→          safeTimestampMs
+   411→        );
+   412→
+   413→        let landmarks: PoseLandmark[] | null = null;
+   414→        let evaluation: EvaluationResult | null = null;
+   415→        let metrics: PoseMetrics | null = null;
+   416→
+   417→        if (results.landmarks && results.landmarks.length > 0) {
+   418→          // Only use the selected player's landmarks
+   419→          const selectedPoseIdx = selectedTracks[0] < results.landmarks.length
+   420→            ? selectedTracks[0]
+   421→            : 0;
+   422→
+   423→          landmarks = results.landmarks[selectedPoseIdx].map((lm: any) => ({
+   424→            x: lm.x,
+   425→            y: lm.y,
+   426→            z: lm.z,
+   427→            visibility: lm.visibility ?? 1.0,
+   428→          }));
+   429→
+   430→          if (landmarks && landmarks.length > 0) {
+   431→            const avgVisibility = landmarks.reduce((sum, lm) => sum + lm.visibility, 0) / landmarks.length;
+   432→
+   433→            if (avgVisibility < 0.5) {
+   434→              lowConfidenceFrames++;
+   435→            } else {
+   436→              validPoseFrames++;
+   437→            }
+   438→            metrics = extractMetrics(landmarks);
+   439→
+   440→            // Use intermediate level for initial processing (auto-level will adjust later)
+   441→            const bandedResult = evaluateWithBands(landmarks, 'intermediate');
+   442→            evaluation = {
+   443→              passed: bandedResult.overall_band === 'green' || bandedResult.overall_band === 'yellow',
+   444→              score: bandedResult.overall_score,
+   445→              failedRules: bandedResult.overall_band === 'red' ? bandedResult.feedback.map(f => ({
+   446→                rule: { code: 'FORM', name: f, description: f, severity: 'medium' as const } as any,
+   447→                value: 0,
+   448→                feedback: f,
+   449→              })) : [],
+   450→              passedRules: [],
+   451→              highlightJoints: bandedResult.highlight_joints,
+   452→              recommendedDrills: [],
+   453→            };
+   454→          }
+   455→        } else {
+   456→          noPoseFrames++;
+   457→        }
+   458→
+   459→        analyses.push({
+   460→          timestamp,
+   461→          landmarks,
+   462→          evaluation,
+   463→          metrics,
+   464→        });
+   465→      } catch (err) {
+   466→        const errorMsg = err instanceof Error ? err.message : String(err);
+   467→        if (errorMsg.includes('timestamp') || errorMsg.includes('monotonic')) {
+   468→          console.warn(`Frame ${i}: MediaPipe timestamp error - ${errorMsg}`);
+   469→          // PHASE 1 FIX: On timestamp error, bump the base offset significantly
+   470→          timestampBaseOffsetRef.current += 10000; // Add 10 seconds
+   471→          localLastTimestamp = timestampBaseOffsetRef.current;
+   472→        } else {
+   473→          console.warn(`Frame ${i}: Error processing - ${errorMsg}`);
+   474→        }
+   475→        analyses.push({
+   476→          timestamp,
+   477→          landmarks: null,
+   478→          evaluation: null,
+   479→          metrics: null,
+   480→        });
+   481→      }
+   482→
+   483→      // Update progress (10-70%)
+   484→      setAnalyzeProgress(10 + Math.round((i / totalFrames) * 60));
+   485→    }
+   486→
+   487→    // PHASE 1: Log pose detection statistics
+   488→    const totalProcessed = totalFrames + 1;
+   489→    const validRatio = validPoseFrames / totalProcessed;
+   490→    console.log(`Pose detection stats: ${validPoseFrames}/${totalProcessed} valid (${(validRatio * 100).toFixed(1)}%), ${lowConfidenceFrames} low-confidence, ${noPoseFrames} no-pose`);
+   491→
+   492→    if (validRatio < 0.3) {
+   493→      console.warn('Low pose detection rate - video may have poor lighting or player not visible');
+   494→    }
+   495→
+   496→    isProcessingRef.current = false;
+   497→    return analyses;
+   498→  };
+   499→
+   500→  // Detect issues from frame analyses
+   501→  const detectIssuesFromAnalyses = (analyses: FrameAnalysis[]): DetectedIssue[] => {
+   502→    const issueMap: Map<string, {
+   503→      rule: any;
+   504→      timestamps: number[];
+   505→      count: number;
+   506→    }> = new Map();
+   507→
+   508→    for (const frame of analyses) {
+   509→      if (frame.evaluation && frame.evaluation.failedRules.length > 0) {
+   510→        for (const failed of frame.evaluation.failedRules) {
+   511→          const code = failed.rule.code;
+   512→          if (!issueMap.has(code)) {
+   513→            issueMap.set(code, {
+   514→              rule: failed.rule,
+   515→              timestamps: [],
+   516→              count: 0,
+   517→            });
+   518→          }
+   519→          const issue = issueMap.get(code)!;
+   520→          issue.timestamps.push(frame.timestamp);
+   521→          issue.count++;
+   522→        }
+   523→      }
+   524→    }
+   525→
+   526→    // Convert to array and sort by count
+   527→    const issues: DetectedIssue[] = Array.from(issueMap.entries())
+   528→      .map(([code, data]) => ({
+   529→        code,
+   530→        title: data.rule.name,
+   531→        severity: data.rule.severity,
+   532→        description: data.rule.description,
+   533→        timestamps: data.timestamps,
+   534→        drill: DRILLS[data.rule.drillId],
+   535→      }))
+   536→      .sort((a, b) => b.timestamps.length - a.timestamps.length)
+   537→      .slice(0, 5); // Top 5 issues
+   538→
+   539→    return issues;
+   540→  };
+   541→
+   542→  // PHASE 3: Auto-detect skill level using Gemini
+   543→  const detectSkillLevelWithGemini = async (
+   544→    analyses: FrameAnalysis[],
+   545→    detectedIssues: DetectedIssue[]
+   546→  ): Promise<AutoLevelResult> => {
+   547→    setAnalysisState('GEMINI_SCORING');
+   548→    setAnalyzeProgress(75);
+   549→
+   550→    try {
+   551→      // Extract features for Gemini analysis
+   552→      const validAnalyses = analyses.filter(a => a.metrics && a.landmarks);
+   553→
+   554→      if (validAnalyses.length < 5) {
+   555→        // Fallback if not enough data
+   556→        return {
+   557→          level: 'Intermediate',
+   558→          confidence: 0.5,
+   559→          rationaleBullets: ['Insufficient pose data for accurate assessment'],
+   560→        };
+   561→      }
+   562→
+   563→      // Calculate aggregate metrics
+   564→      const avgElbowAngle = validAnalyses.reduce((sum, a) => sum + (a.metrics?.elbow_angle || 0), 0) / validAnalyses.length;
+   565→      const avgKneeAngle = validAnalyses.reduce((sum, a) => sum + (a.metrics?.knee_angle || 0), 0) / validAnalyses.length;
+   566→      const avgStanceWidth = validAnalyses.reduce((sum, a) => sum + (a.metrics?.stance_width_norm || 0), 0) / validAnalyses.length;
+   567→      const avgRotation = validAnalyses.reduce((sum, a) => sum + (a.metrics?.shoulder_hip_rotation_proxy || 0), 0) / validAnalyses.length;
+   568→
+   569→      // Calculate consistency (standard deviation proxy)
+   570→      const elbowVariance = validAnalyses.reduce((sum, a) => sum + Math.pow((a.metrics?.elbow_angle || 0) - avgElbowAngle, 2), 0) / validAnalyses.length;
+   571→      const kneeVariance = validAnalyses.reduce((sum, a) => sum + Math.pow((a.metrics?.knee_angle || 0) - avgKneeAngle, 2), 0) / validAnalyses.length;
+   572→
+   573→      // Calculate movement intensity (velocity proxy from position changes)
+   574→      let totalMovement = 0;
+   575→      for (let i = 1; i < validAnalyses.length; i++) {
+   576→        const prev = validAnalyses[i - 1].landmarks;
+   577→        const curr = validAnalyses[i].landmarks;
+   578→        if (prev && curr) {
+   579→          const hipMovement = Math.sqrt(
+   580→            Math.pow((curr[POSE_LANDMARKS.LEFT_HIP]?.x || 0) - (prev[POSE_LANDMARKS.LEFT_HIP]?.x || 0), 2) +
+   581→            Math.pow((curr[POSE_LANDMARKS.LEFT_HIP]?.y || 0) - (prev[POSE_LANDMARKS.LEFT_HIP]?.y || 0), 2)
+   582→          );
+   583→          totalMovement += hipMovement;
+   584→        }
+   585→      }
+   586→      const avgMovement = totalMovement / (validAnalyses.length - 1);
+   587→
+   588→      // Issue frequency
+   589→      const issueFrequency = detectedIssues.reduce((sum, i) => sum + i.timestamps.length, 0) / validAnalyses.length;
+   590→
+   591→      // Call Gemini API for skill level detection
+   592→      const response = await fetch('/api/analysis/auto-level', {
+   593→        method: 'POST',
+   594→        headers: { 'Content-Type': 'application/json' },
+   595→        body: JSON.stringify({
+   596→          metrics: {
+   597→            avgElbowAngle,
+   598→            avgKneeAngle,
+   599→            avgStanceWidth,
+   600→            avgRotation,
+   601→            elbowConsistency: Math.sqrt(elbowVariance),
+   602→            kneeConsistency: Math.sqrt(kneeVariance),
+   603→            movementIntensity: avgMovement,
+   604→            issueFrequency,
+   605→            totalFrames: validAnalyses.length,
+   606→            issueCount: detectedIssues.length,
+   607→          },
+   608→          issues: detectedIssues.map(i => ({
+   609→            code: i.code,
+   610→            title: i.title,
+   611→            frequency: i.timestamps.length / validAnalyses.length,
+   612→          })),
+   613→        }),
+   614→      });
+   615→
+   616→      if (response.ok) {
+   617→        const result = await response.json();
+   618→        setAnalyzeProgress(90);
+   619→        return {
+   620→          level: result.level || 'Intermediate',
+   621→          confidence: result.confidence || 0.7,
+   622→          rationaleBullets: result.rationaleBullets || [],
+   623→          guidanceKeyframes: result.guidanceKeyframes,
+   624→        };
+   625→      }
+   626→    } catch (err) {
+   627→      console.error('Gemini auto-level detection failed:', err);
+   628→    }
+   629→
+   630→    // Fallback rule-based detection
+   631→    setAnalyzeProgress(90);
+   632→    return fallbackSkillLevelDetection(analyses, detectedIssues);
+   633→  };
+   634→
+   635→  // Fallback rule-based skill level detection
+   636→  const fallbackSkillLevelDetection = (
+   637→    analyses: FrameAnalysis[],
+   638→    detectedIssues: DetectedIssue[]
+   639→  ): AutoLevelResult => {
+   640→    const validAnalyses = analyses.filter(a => a.evaluation);
+   641→    const passedFrames = validAnalyses.filter(a => a.evaluation?.passed).length;
+   642→    const passRatio = validAnalyses.length > 0 ? passedFrames / validAnalyses.length : 0;
+   643→    const highSeverityIssues = detectedIssues.filter(i => i.severity === 'high').length;
+   644→
+   645→    if (passRatio >= 0.7 && highSeverityIssues === 0) {
+   646→      return {
+   647→        level: 'Advanced',
+   648→        confidence: 0.75,
+   649→        rationaleBullets: [
+   650→          'Consistent form across frames',
+   651→          'No major technique issues detected',
+   652→          'Good body mechanics observed',
+   653→        ],
+   654→      };
+   655→    } else if (passRatio >= 0.4 || highSeverityIssues <= 1) {
+   656→      return {
+   657→        level: 'Intermediate',
+   658→        confidence: 0.7,
+   659→        rationaleBullets: [
+   660→          'Moderate consistency in technique',
+   661→          `${highSeverityIssues} area(s) need focused improvement`,
+   662→          'Foundations are solid with room to refine',
+   663→        ],
+   664→      };
+   665→    } else {
+   666→      return {
+   667→        level: 'Beginner',
+   668→        confidence: 0.8,
+   669→        rationaleBullets: [
+   670→          'Multiple technique areas need development',
+   671→          'Focus on fundamentals before advancing',
+   672→          'Regular practice will show rapid improvement',
+   673→        ],
+   674→      };
+   675→    }
+   676→  };
+   677→
+   678→  // PHASE 4: Generate guidance keyframes from analysis
+   679→  const generateGuidanceKeyframes = (
+   680→    analyses: FrameAnalysis[],
+   681→    detectedIssues: DetectedIssue[]
+   682→  ): GuidanceKeyframe[] => {
+   683→    const keyframes: GuidanceKeyframe[] = [];
+   684→    const validAnalyses = analyses.filter(a => a.landmarks && a.landmarks.length > 0);
+   685→
+   686→    if (validAnalyses.length < 3) return keyframes;
+   687→
+   688→    // Find key moments: Setup, Contact/Action, Recovery
+   689→    // Setup: Early stable frame
+   690→    const setupIdx = Math.floor(validAnalyses.length * 0.1);
+   691→    const contactIdx = Math.floor(validAnalyses.length * 0.5);
+   692→    const recoveryIdx = Math.floor(validAnalyses.length * 0.85);
+   693→
+   694→    const setupFrame = validAnalyses[setupIdx];
+   695→    const contactFrame = validAnalyses[contactIdx];
+   696→    const recoveryFrame = validAnalyses[recoveryIdx];
+   697→
+   698→    // Determine primary issue for corrections
+   699→    const primaryIssue = detectedIssues[0];
+   700→    let correction = '';
+   701→    if (primaryIssue) {
+   702→      if (primaryIssue.code.includes('ELBOW')) {
+   703→        correction = 'Extend elbow more at contact';
+   704→      } else if (primaryIssue.code.includes('KNEE')) {
+   705→        correction = 'Maintain athletic knee bend';
+   706→      } else if (primaryIssue.code.includes('STANCE')) {
+   707→        correction = 'Widen stance for stability';
+   708→      } else if (primaryIssue.code.includes('ROTATION')) {
+   709→        correction = 'Rotate hips before shoulders';
+   710→      }
+   711→    }
+   712→
+   713→    keyframes.push({
+   714→      name: 'Setup',
+   715→      description: 'Preparation phase',
+   716→      landmarks: setupFrame?.landmarks || null,
+   717→      correction: setupFrame?.evaluation?.passed ? undefined : 'Get into ready position earlier',
+   718→    });
+   719→
+   720→    keyframes.push({
+   721→      name: 'Contact',
+   722→      description: 'Point of contact',
+   723→      landmarks: contactFrame?.landmarks || null,
+   724→      correction: correction || undefined,
+   725→    });
+   726→
+   727→    keyframes.push({
+   728→      name: 'Recovery',
+   729→      description: 'Return to ready',
+   730→      landmarks: recoveryFrame?.landmarks || null,
+   731→      correction: recoveryFrame?.evaluation?.passed ? undefined : 'Recover to center faster',
+   732→    });
+   733→
+   734→    return keyframes;
+   735→  };
+   736→
+   737→  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   738→    const file = e.target.files?.[0];
+   739→    if (!file) return;
+   740→
+   741→    if (!file.type.startsWith('video/')) {
+   742→      setError('Please select a video file');
+   743→      return;
+   744→    }
+   745→
+   746→    if (file.size > 100 * 1024 * 1024) {
+   747→      setError('File size must be less than 100MB. Please compress your video before uploading.');
+   748→      return;
+   749→    }
+   750→
+   751→    setError(null);
+   752→    setVideoFile(file);
+   753→    setResult(null);
+   754→    setIssues([]);
+   755→    setPoseData([]);
+   756→    setFrameAnalyses([]);
+   757→    setAutoLevelResult(null);
+   758→    setGuidanceKeyframes([]);
+   759→    // V4 state reset
+   760→    setGhostData(null);
+   761→    setShowGhost(false);
+   762→    setComputedSkill(null);
+   763→    setMistakeEvents([]);
+   764→    setSelectedMistake(null);
+   765→
+   766→    // Create object URL for video preview
+   767→    const objectUrl = URL.createObjectURL(file);
+   768→    setVideoUrl(objectUrl);
+   769→
+   770→    // Start analysis
+   771→    await analyzeVideo(file, objectUrl);
+   772→  };
+   773→
+   774→  // PHASE 1 FIX: Detect player tracks with monotonic timestamps
+   775→  const detectPlayerTracks = async (videoElement: HTMLVideoElement): Promise<PlayerTrackData[]> => {
+   776→    if (!poseLandmarkerRef.current) return [];
+   777→
+   778→    const tracks: Map<number, PlayerTrackData> = new Map();
+   779→    const sampleFrames = 5;
+   780→    const duration = videoElement.duration;
+   781→
+   782→    // Use separate timestamp tracking for track detection
+   783→    let trackDetectionTimestamp = lastTimestampMsRef.current + 1000;
+   784→
+   785→    for (let i = 0; i < sampleFrames; i++) {
+   786→      const timestamp = (i / sampleFrames) * duration;
+   787→      videoElement.currentTime = timestamp;
+   788→
+   789→      await new Promise<void>((resolve) => {
+   790→        const onSeeked = () => {
+   791→          videoElement.removeEventListener('seeked', onSeeked);
+   792→          resolve();
+   793→        };
+   794→        videoElement.addEventListener('seeked', onSeeked);
+   795→      });
+   796→
+   797→      await new Promise(resolve => setTimeout(resolve, 50));
+   798→
+   799→      try {
+   800→        // PHASE 1 FIX: Ensure monotonic timestamp
+   801→        trackDetectionTimestamp += 100; // 100ms between samples
+   802→        const safeTimestamp = trackDetectionTimestamp;
+   803→        lastTimestampMsRef.current = safeTimestamp;
+   804→
+   805→        const results = poseLandmarkerRef.current.detectForVideo(
+   806→          videoElement,
+   807→          safeTimestamp
+   808→        );
+   809→
+   810→        if (results.landmarks && results.landmarks.length > 0) {
+   811→          for (let poseIdx = 0; poseIdx < results.landmarks.length; poseIdx++) {
+   812→            const landmarks = results.landmarks[poseIdx];
+   813→            const bbox = calculateBoundingBox(landmarks);
+   814→
+   815→            if (!tracks.has(poseIdx)) {
+   816→              tracks.set(poseIdx, {
+   817→                track_id: poseIdx,
+   818→                bbox_samples: [],
+   819→                is_selected: false,
+   820→                confidence_avg: 0,
+   821→                frame_count: 0,
+   822→                side: bbox.y < 0.5 ? 'far' : 'near',
+   823→              });
+   824→            }
+   825→
+   826→            const track = tracks.get(poseIdx)!;
+   827→            track.bbox_samples.push({
+   828→              frame: i,
+   829→              x: bbox.x,
+   830→              y: bbox.y,
+   831→              w: bbox.w,
+   832→              h: bbox.h,
+   833→              confidence: landmarks[0].visibility || 0.5,
+   834→            });
+   835→            track.frame_count++;
+   836→            track.confidence_avg =
+   837→              (track.confidence_avg * (track.frame_count - 1) + (landmarks[0].visibility || 0.5)) /
+   838→              track.frame_count;
+   839→          }
+   840→        }
+   841→      } catch (err) {
+   842→        console.warn('Error detecting poses in frame:', err);
+   843→      }
+   844→    }
+   845→
+   846→    // Generate thumbnails
+   847→    const tracksArray = Array.from(tracks.values()).filter(t => t.frame_count >= 2);
+   848→
+   849→    if (tracksArray.length > 0) {
+   850→      const bestFrameIdx = tracksArray[0].bbox_samples[0]?.frame || 0;
+   851→      const bestTimestamp = (bestFrameIdx / sampleFrames) * duration;
+   852→      videoElement.currentTime = Math.max(0.5, bestTimestamp);
+   853→
+   854→      await new Promise<void>((resolve) => {
+   855→        const onSeeked = () => {
+   856→          videoElement.removeEventListener('seeked', onSeeked);
+   857→          resolve();
+   858→        };
+   859→        videoElement.addEventListener('seeked', onSeeked);
+   860→      });
+   861→      await new Promise(resolve => setTimeout(resolve, 100));
+   862→
+   863→      for (const track of tracksArray) {
+   864→        if (track.bbox_samples.length > 0) {
+   865→          const bestBbox = track.bbox_samples.reduce((best, current) =>
+   866→            (current.confidence || 0) > (best.confidence || 0) ? current : best
+   867→          );
+   868→
+   869→          const thumbnail = generateThumbnail(videoElement, {
+   870→            x: bestBbox.x,
+   871→            y: bestBbox.y,
+   872→            w: bestBbox.w,
+   873→            h: bestBbox.h,
+   874→          });
+   875→
+   876→          if (thumbnail) {
+   877→            track.thumbnail_url = thumbnail;
+   878→          }
+   879→        }
+   880→      }
+   881→    }
+   882→
+   883→    return tracksArray;
+   884→  };
+   885→
+   886→  // Calculate bounding box from landmarks
+   887→  const calculateBoundingBox = (landmarks: any[]): { x: number; y: number; w: number; h: number } => {
+   888→    let minX = 1, minY = 1, maxX = 0, maxY = 0;
+   889→    for (const lm of landmarks) {
+   890→      if (lm.visibility > 0.5) {
+   891→        minX = Math.min(minX, lm.x);
+   892→        minY = Math.min(minY, lm.y);
+   893→        maxX = Math.max(maxX, lm.x);
+   894→        maxY = Math.max(maxY, lm.y);
+   895→      }
+   896→    }
+   897→    return {
+   898→      x: minX,
+   899→      y: minY,
+   900→      w: maxX - minX,
+   901→      h: maxY - minY,
+   902→    };
+   903→  };
+   904→
+   905→  // Generate thumbnail from video at specific bounding box
+   906→  const generateThumbnail = (
+   907→    video: HTMLVideoElement,
+   908→    bbox: { x: number; y: number; w: number; h: number },
+   909→    padding: number = 0.1
+   910→  ): string | null => {
+   911→    try {
+   912→      const canvas = document.createElement('canvas');
+   913→      const ctx = canvas.getContext('2d');
+   914→      if (!ctx) return null;
+   915→
+   916→      const vw = video.videoWidth;
+   917→      const vh = video.videoHeight;
+   918→
+   919→      const padX = bbox.w * padding;
+   920→      const padY = bbox.h * padding;
+   921→
+   922→      const cropX = Math.max(0, Math.floor((bbox.x - padX) * vw));
+   923→      const cropY = Math.max(0, Math.floor((bbox.y - padY) * vh));
+   924→      const cropW = Math.min(vw - cropX, Math.floor((bbox.w + padX * 2) * vw));
+   925→      const cropH = Math.min(vh - cropY, Math.floor((bbox.h + padY * 2) * vh));
+   926→
+   927→      if (cropW <= 0 || cropH <= 0) return null;
+   928→
+   929→      const maxSize = 150;
+   930→      const scale = Math.min(maxSize / cropW, maxSize / cropH);
+   931→      canvas.width = Math.floor(cropW * scale);
+   932→      canvas.height = Math.floor(cropH * scale);
+   933→
+   934→      ctx.drawImage(
+   935→        video,
+   936→        cropX, cropY, cropW, cropH,
+   937→        0, 0, canvas.width, canvas.height
+   938→      );
+   939→
+   940→      return canvas.toDataURL('image/jpeg', 0.8);
+   941→    } catch (err) {
+   942→      console.warn('Error generating thumbnail:', err);
+   943→      return null;
+   944→    }
+   945→  };
+   946→
+   947→  // Handle player selection confirmation
+   948→  const handlePlayerSelectionConfirm = (
+   949→    selectedTracks: number[],
+   950→    format: 'singles' | 'doubles',
+   951→    event: string
+   952→  ) => {
+   953→    setSelectedTrackIds(selectedTracks);
+   954→    setMatchFormat(format);
+   955→    setEventType(event);
+   956→    setShowPlayerSelection(false);
+   957→
+   958→    if (processVideoRef.current && videoFile) {
+   959→      continueAnalysisWithSelection(processVideoRef.current, selectedTracks);
+   960→    }
+   961→  };
+   962→
+   963→  // Continue analysis after player selection
+   964→  const continueAnalysisWithSelection = async (
+   965→    processVideo: HTMLVideoElement,
+   966→    selectedTracks: number[]
+   967→  ) => {
+   968→    setAnalysisState('EXTRACTING_POSE');
+   969→    const analyses = await processVideoWithPose(processVideo, selectedTracks);
+   970→    setFrameAnalyses(analyses);
+   971→
+   972→    const poseArray = analyses.map(a => a.landmarks);
+   973→    setPoseData(poseArray);
+   974→
+   975→    const detectedIssues = detectIssuesFromAnalyses(analyses);
+   976→    setIssues(detectedIssues);
+   977→
+   978→    // V4 FEATURE: Detect mistake events for timeline
+   979→    const mistakes = detectMistakes(poseArray, 10);
+   980→    setMistakeEvents(mistakes);
+   981→
+   982→    // V4 FEATURE: Compute skill score from REAL pose metrics (not Gemini alone)
+   983→    const metricsHistory = analyses.map(a => a.metrics);
+   984→    const skillResult = computeSkillScore(poseArray, metricsHistory, mistakes);
+   985→    setComputedSkill(skillResult);
+   986→
+   987→    // V4 FEATURE: Initialize ghost rival data
+   988→    const ghost = initializeGhostRival(poseArray, metricsHistory, 10);
+   989→    setGhostData(ghost);
+   990→
+   991→    // PHASE 3: Also get Gemini feedback for narrative (but score comes from computed metrics)
+   992→    const levelResult = await detectSkillLevelWithGemini(analyses, detectedIssues);
+   993→    // Override level with computed score
+   994→    const finalLevel = {
+   995→      ...levelResult,
+   996→      level: skillResult.levelLabel,
+   997→      confidence: skillResult.confidencePercent / 100,
+   998→    };
+   999→    setAutoLevelResult(finalLevel);
+  1000→
+  1001→    // PHASE 4: Generate guidance keyframes
+  1002→    const guidance = levelResult.guidanceKeyframes || generateGuidanceKeyframes(analyses, detectedIssues);
+  1003→    setGuidanceKeyframes(guidance);
+  1004→
+  1005→    const passedFrames = analyses.filter(a => a.evaluation?.passed).length;
+  1006→    const totalFrames = analyses.filter(a => a.evaluation).length;
+  1007→
+  1008→    setResult({
+  1009→      top_issues: detectedIssues.map(issue => ({
+  1010→        id: issue.code,
+  1011→        title: issue.title,
+  1012→        severity: issue.severity,
+  1013→        description: issue.description || '',
+  1014→        affected_metrics: [],
+  1015→      })),
+  1016→      drills: detectedIssues.map(i => i.drill).filter(Boolean).map(d => ({
+  1017→        id: d.id,
+  1018→        name: d.name,
+  1019→        description: d.description,
+  1020→        duration_minutes: d.durationMinutes,
+  1021→        target_metrics: d.targetMetrics,
+  1022→        instructions: d.steps,
+  1023→      })),
+  1024→      technique_summary: `Analysis complete. Skill: ${skillResult.levelLabel} (${skillResult.skillScore}/100, ${skillResult.confidencePercent}% confidence). Found ${detectedIssues.length} areas and ${mistakes.length} mistake events.`,
+  1025→      strategy_summary: passedFrames > totalFrames * 0.7
+  1026→        ? 'Your form is generally good. Focus on the specific issues identified.'
+  1027→        : 'Work on maintaining consistent form throughout your movements.',
+  1028→      training_plan: [],
+  1029→    });
+  1030→
+  1031→    const saveResult = await saveAnalysisToDatabase(videoFile!, analyses, detectedIssues, skillResult.skillScore, finalLevel, mistakes, ghost.bestRepWindow);
+  1032→    if (!saveResult.success) {
+  1033→      setError(saveResult.error || 'Failed to save analysis');
+  1034→    }
+  1035→    setAnalyzing(false);
+  1036→    setAnalysisState('DONE');
+  1037→    setAnalyzeProgress(100);
+  1038→  };
+  1039→
+  1040→  const analyzeVideo = async (file: File, videoObjectUrl: string) => {
+  1041→    setAnalyzing(true);
+  1042→    setAnalyzeProgress(0);
+  1043→    setAnalysisState('DETECTING_PLAYERS');
+  1044→
+  1045→    try {
+  1046→      const processVideo = document.createElement('video');
+  1047→      processVideo.src = videoObjectUrl;
+  1048→      processVideo.muted = true;
+  1049→      processVideo.playsInline = true;
+  1050→      processVideoRef.current = processVideo;
+  1051→
+  1052→      await new Promise<void>((resolve, reject) => {
+  1053→        processVideo.onloadedmetadata = () => {
+  1054→          setDuration(processVideo.duration);
+  1055→          setFps(30);
+  1056→          resolve();
+  1057→        };
+  1058→        processVideo.onerror = () => reject(new Error('Failed to load video'));
+  1059→      });
+  1060→
+  1061→      await new Promise<void>((resolve) => {
+  1062→        if (processVideo.readyState >= 2) {
+  1063→          resolve();
+  1064→        } else {
+  1065→          processVideo.oncanplay = () => resolve();
+  1066→        }
+  1067→      });
+  1068→
+  1069→      // Detect player tracks first
+  1070→      setAnalyzeProgress(5);
+  1071→      const tracks = await detectPlayerTracks(processVideo);
+  1072→      setDetectedTracks(tracks);
+  1073→
+  1074→      const uniquePlayers = tracks.length;
+  1075→      const detectedFormat = uniquePlayers > 2 ? 'doubles' : 'singles';
+  1076→      setDetectedMatchFormat(detectedFormat);
+  1077→
+  1078→      if (tracks.length > 1) {
+  1079→        setShowPlayerSelection(true);
+  1080→        return;
+  1081→      }
+  1082→
+  1083→      if (tracks.length === 1) {
+  1084→        setSelectedTrackIds([tracks[0].track_id]);
+  1085→      }
+  1086→
+  1087→      // Process video with pose detection
+  1088→      let analyses: FrameAnalysis[] = [];
+  1089→
+  1090→      if (poseLandmarkerReady && poseLandmarkerRef.current) {
+  1091→        setAnalysisState('EXTRACTING_POSE');
+  1092→        analyses = await processVideoWithPose(processVideo, selectedTrackIds.length > 0 ? selectedTrackIds : [0]);
+  1093→        setFrameAnalyses(analyses);
+  1094→
+  1095→        const poseArray = analyses.map(a => a.landmarks);
+  1096→        setPoseData(poseArray);
+  1097→
+  1098→        const detectedIssues = detectIssuesFromAnalyses(analyses);
+  1099→        setIssues(detectedIssues);
+  1100→
+  1101→        // V4 FEATURE: Detect mistake events for timeline
+  1102→        const mistakes = detectMistakes(poseArray, 10);
+  1103→        setMistakeEvents(mistakes);
+  1104→
+  1105→        // V4 FEATURE: Compute skill score from REAL pose metrics (not Gemini alone)
+  1106→        const metricsHistory = analyses.map(a => a.metrics);
+  1107→        const skillResult = computeSkillScore(poseArray, metricsHistory, mistakes);
+  1108→        setComputedSkill(skillResult);
+  1109→
+  1110→        // V4 FEATURE: Initialize ghost rival data
+  1111→        const ghost = initializeGhostRival(poseArray, metricsHistory, 10);
+  1112→        setGhostData(ghost);
+  1113→
+  1114→        // PHASE 3: Also get Gemini feedback for narrative (but score comes from computed metrics)
+  1115→        const levelResult = await detectSkillLevelWithGemini(analyses, detectedIssues);
+  1116→        // Override level with computed score
+  1117→        const finalLevel = {
+  1118→          ...levelResult,
+  1119→          level: skillResult.levelLabel,
+  1120→          confidence: skillResult.confidencePercent / 100,
+  1121→        };
+  1122→        setAutoLevelResult(finalLevel);
+  1123→
+  1124→        // PHASE 4: Generate guidance keyframes
+  1125→        const guidance = levelResult.guidanceKeyframes || generateGuidanceKeyframes(analyses, detectedIssues);
+  1126→        setGuidanceKeyframes(guidance);
+  1127→
+  1128→        const passedFrames = analyses.filter(a => a.evaluation?.passed).length;
+  1129→        const totalFrames = analyses.filter(a => a.evaluation).length;
+  1130→
+  1131→        setResult({
+  1132→          top_issues: detectedIssues.map(issue => ({
+  1133→            id: issue.code,
+  1134→            title: issue.title,
+  1135→            severity: issue.severity,
+  1136→            description: issue.description || '',
+  1137→            affected_metrics: [],
+  1138→          })),
+  1139→          drills: detectedIssues.map(i => i.drill).filter(Boolean).map(d => ({
+  1140→            id: d.id,
+  1141→            name: d.name,
+  1142→            description: d.description,
+  1143→            duration_minutes: d.durationMinutes,
+  1144→            target_metrics: d.targetMetrics,
+  1145→            instructions: d.steps,
+  1146→          })),
+  1147→          technique_summary: `Analysis complete. Skill: ${skillResult.levelLabel} (${skillResult.skillScore}/100, ${skillResult.confidencePercent}% confidence). Found ${detectedIssues.length} areas and ${mistakes.length} mistake events.`,
+  1148→          strategy_summary: passedFrames > totalFrames * 0.7
+  1149→            ? 'Your form is generally good. Focus on the specific issues identified.'
+  1150→            : 'Work on maintaining consistent form throughout your movements.',
+  1151→          training_plan: [],
+  1152→        });
+  1153→
+  1154→        const saveResult = await saveAnalysisToDatabase(file, analyses, detectedIssues, skillResult.skillScore, finalLevel, mistakes, ghost.bestRepWindow);
+  1155→        if (!saveResult.success) {
+  1156→          setError(saveResult.error || 'Failed to save analysis. Video may not have uploaded correctly.');
+  1157→        }
+  1158→        setAnalysisState('DONE');
+  1159→      } else {
+  1160→        setError('Pose detection not available. Using demo mode.');
+  1161→        setAnalysisState('ERROR');
+  1162→
+  1163→        const demoIssues: DetectedIssue[] = [
+  1164→          {
+  1165→            code: 'ELBOW_ANGLE_OVERHEAD',
+  1166→            title: 'Elbow Extension (Overhead)',
+  1167→            severity: 'high',
+  1168→            description: 'Elbow should be nearly straight at contact point',
+  1169→            timestamps: [1.2, 3.5, 7.8],
+  1170→            drill: DRILLS['elbow-extension'],
+  1171→          },
+  1172→          {
+  1173→            code: 'KNEE_BEND',
+  1174→            title: 'Knee Bend',
+  1175→            severity: 'medium',
+  1176→            description: 'Bend knees more for power',
+  1177→            timestamps: [2.1, 5.3],
+  1178→            drill: DRILLS['lunge-practice'],
+  1179→          },
+  1180→        ];
+  1181→        setIssues(demoIssues);
+  1182→        setAutoLevelResult({
+  1183→          level: 'Intermediate',
+  1184→          confidence: 0.5,
+  1185→          rationaleBullets: ['Demo mode - upload video for real analysis'],
+  1186→        });
+  1187→        setResult({
+  1188→          top_issues: demoIssues.map(i => ({
+  1189→            id: i.code,
+  1190→            title: i.title,
+  1191→            severity: i.severity,
+  1192→            description: i.description || '',
+  1193→            affected_metrics: [],
+  1194→          })),
+  1195→          drills: demoIssues.map(i => i.drill).filter(Boolean).map(d => ({
+  1196→            id: d!.id,
+  1197→            name: d!.name,
+  1198→            description: d!.description,
+  1199→            duration_minutes: d!.durationMinutes,
+  1200→            target_metrics: d!.targetMetrics,
+  1201→            instructions: d!.steps,
+  1202→          })),
+  1203→          technique_summary: 'Demo analysis complete. Enable camera permissions for real-time pose detection.',
+  1204→          strategy_summary: '',
+  1205→          training_plan: [],
+  1206→        });
+  1207→      }
+  1208→
+  1209→    } catch (err) {
+  1210→      console.error('Analysis error:', err);
+  1211→      setError('Failed to analyze video. Please try again.');
+  1212→      setAnalysisState('ERROR');
+  1213→    } finally {
+  1214→      setAnalyzing(false);
+  1215→      setAnalyzeProgress(100);
+  1216→    }
+  1217→  };
+  1218→
+  1219→  const saveAnalysisToDatabase = async (
+  1220→    file: File,
+  1221→    analyses: FrameAnalysis[],
+  1222→    detectedIssues: DetectedIssue[],
+  1223→    avgScore: number,
+  1224→    levelResult?: AutoLevelResult,
+  1225→    mistakeEventsData?: MistakeEvent[],
+  1226→    bestRepWindowData?: { startTime: number; endTime: number; score: number; shotType?: string }
+  1227→  ): Promise<{ success: boolean; sessionId?: string; error?: string }> => {
+  1228→    try {
+  1229→      const { data: { user } } = await supabase.auth.getUser();
+  1230→      if (!user) {
+  1231→        return { success: false, error: 'Not authenticated' };
+  1232→      }
+  1233→
+  1234→      let videoPath: string | null = null;
+  1235→      let publicVideoUrl = '';
+  1236→
+  1237→      try {
+  1238→        videoPath = await uploadVideo(file, user.id, (progress) => {
+  1239→          setAnalyzeProgress(Math.min(95, 60 + Math.round(progress * 0.35)));
+  1240→        });
+  1241→
+  1242→        if (!videoPath) {
+  1243→          throw new Error('Upload returned empty path');
+  1244→        }
+  1245→
+  1246→        publicVideoUrl = getVideoUrl(videoPath);
+  1247→        console.log('Video uploaded successfully:', videoPath);
+  1248→
+  1249→      } catch (uploadError) {
+  1250→        console.error('Video upload failed:', uploadError);
+  1251→        const errorMessage = uploadError instanceof Error
+  1252→          ? uploadError.message
+  1253→          : 'Failed to upload video. Please try again.';
+  1254→        setError(errorMessage);
+  1255→        return { success: false, error: errorMessage };
+  1256→      }
+  1257→
+  1258→      const passedFrames = analyses.filter(a => a.evaluation?.passed).length;
+  1259→      const totalFrames = analyses.filter(a => a.evaluation).length;
+  1260→
+  1261→      const { data: session, error: sessionError } = await supabase
+  1262→        .from('sessions')
+  1263→        .insert({
+  1264→          user_id: user.id,
+  1265→          type: 'analytics',
+  1266→          video_path: videoPath,
+  1267→          video_url: publicVideoUrl,
+  1268→          filename: file.name,
+  1269→          frame_count: analyses.length,
+  1270→          overall_score: Math.round(avgScore),
+  1271→          pose_data: analyses.map(a => a.landmarks),
+  1272→          status: 'ready',
+  1273→          match_format: matchFormat,
+  1274→          event_type: eventType || null,
+  1275→          selected_tracks: selectedTrackIds,
+  1276→          skill_level: levelResult?.level.toLowerCase() || 'intermediate',
+  1277→          rules_version: 'v1',
+  1278→          // V4 FEATURES: Store computed skill metrics
+  1279→          skill_score: avgScore,
+  1280→          skill_confidence: levelResult?.confidence || 0.5,
+  1281→          best_rep_window: bestRepWindowData || null,
+  1282→          summary: {
+  1283→            total_frames: totalFrames,
+  1284→            green_frames: passedFrames,
+  1285→            red_frames: totalFrames - passedFrames,
+  1286→            green_ratio: totalFrames > 0 ? passedFrames / totalFrames : 0,
+  1287→            average_score: avgScore,
+  1288→            duration_seconds: duration,
+  1289→            auto_level: levelResult,
+  1290→          },
+  1291→        })
+  1292→        .select()
+  1293→        .single();
+  1294→
+  1295→      if (sessionError) {
+  1296→        console.error('Session save error:', sessionError);
+  1297→        return { success: false, error: 'Failed to save session data' };
+  1298→      }
+  1299→
+  1300→      if (session && detectedIssues.length > 0) {
+  1301→        const issueInserts = detectedIssues.map(issue => ({
+  1302→          session_id: session.id,
+  1303→          code: issue.code,
+  1304→          title: issue.title,
+  1305→          severity: issue.severity,
+  1306→          description: issue.description,
+  1307→          timestamps: issue.timestamps,
+  1308→          drill: issue.drill,
+  1309→        }));
+  1310→
+  1311→        const { error: issuesError } = await supabase.from('issues').insert(issueInserts);
+  1312→        if (issuesError) {
+  1313→          console.warn('Issues save warning:', issuesError);
+  1314→        }
+  1315→      }
+  1316→
+  1317→      // V4 FEATURE: Save mistake events for timeline
+  1318→      if (session && mistakeEventsData && mistakeEventsData.length > 0) {
+  1319→        const mistakeInserts = mistakeEventsData.map(mistake => ({
+  1320→          session_id: session.id,
+  1321→          type: mistake.type,
+  1322→          start_time_sec: mistake.startTimeSec,
+  1323→          end_time_sec: mistake.endTimeSec,
+  1324→          severity: mistake.severity,
+  1325→          confidence: mistake.confidence,
+  1326→          joints: mistake.joints,
+  1327→          summary_title: mistake.summaryTitle,
+  1328→        }));
+  1329→
+  1330→        const { error: mistakeError } = await supabase.from('mistake_events').insert(mistakeInserts);
+  1331→        if (mistakeError) {
+  1332→          console.warn('Mistake events save warning:', mistakeError);
+  1333→        }
+  1334→      }
+  1335→
+  1336→      setAnalyzeProgress(100);
+  1337→      return { success: true, sessionId: session.id };
+  1338→
+  1339→    } catch (err) {
+  1340→      console.error('Error saving to database:', err);
+  1341→      const errorMessage = err instanceof Error ? err.message : 'Failed to save analysis';
+  1342→      return { success: false, error: errorMessage };
+  1343→    }
+  1344→  };
+  1345→
+  1346→  // PHASE 2 FIX: Video frame rendering with proper canvas alignment
+  1347→  const renderFrame = useCallback(() => {
+  1348→    if (!videoRef.current || !canvasRef.current || !videoContainerRef.current) return;
+  1349→
+  1350→    const video = videoRef.current;
+  1351→    const canvas = canvasRef.current;
+  1352→    const ctx = canvas.getContext('2d');
+  1353→    if (!ctx) return;
+  1354→
+  1355→    // PHASE 2 FIX: Calculate actual rendered video dimensions (accounting for object-contain)
+  1356→    const container = videoContainerRef.current;
+  1357→    const containerRect = container.getBoundingClientRect();
+  1358→
+  1359→    if (video.videoWidth === 0 || video.videoHeight === 0) return;
+  1360→
+  1361→    const videoAspect = video.videoWidth / video.videoHeight;
+  1362→    const containerAspect = containerRect.width / containerRect.height;
+  1363→
+  1364→    let renderWidth, renderHeight, offsetX, offsetY;
+  1365→
+  1366→    if (videoAspect > containerAspect) {
+  1367→      // Video is wider - letterbox top/bottom
+  1368→      renderWidth = containerRect.width;
+  1369→      renderHeight = containerRect.width / videoAspect;
+  1370→      offsetX = 0;
+  1371→      offsetY = (containerRect.height - renderHeight) / 2;
+  1372→    } else {
+  1373→      // Video is taller - letterbox left/right
+  1374→      renderHeight = containerRect.height;
+  1375→      renderWidth = containerRect.height * videoAspect;
+  1376→      offsetX = (containerRect.width - renderWidth) / 2;
+  1377→      offsetY = 0;
+  1378→    }
+  1379→
+  1380→    // Set canvas to match container size
+  1381→    if (canvas.width !== containerRect.width || canvas.height !== containerRect.height) {
+  1382→      canvas.width = containerRect.width;
+  1383→      canvas.height = containerRect.height;
+  1384→    }
+  1385→
+  1386→    // Clear canvas
+  1387→    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  1388→
+  1389→    if (!showSkeleton) return;
+  1390→
+  1391→    // Find the closest frame analysis
+  1392→    let closestFrame: FrameAnalysis | null = null;
+  1393→    let minDiff = Infinity;
+  1394→
+  1395→    for (const frame of frameAnalyses) {
+  1396→      const diff = Math.abs(frame.timestamp - video.currentTime);
+  1397→      if (diff < minDiff) {
+  1398→        minDiff = diff;
+  1399→        closestFrame = frame;
+  1400→      }
+  1401→    }
+  1402→
+  1403→    // Also check raw poseData array (for loaded sessions)
+  1404→    if (!closestFrame && poseData.length > 0) {
+  1405→      const frameIndex = Math.floor(video.currentTime * 10);
+  1406→      const landmarks = poseData[Math.min(frameIndex, poseData.length - 1)];
+  1407→      if (landmarks) {
+  1408→        closestFrame = {
+  1409→          timestamp: video.currentTime,
+  1410→          landmarks,
+  1411→          evaluation: evaluateForm(landmarks, 'general'),
+  1412→          metrics: extractMetrics(landmarks),
+  1413→        };
+  1414→      }
+  1415→    }
+  1416→
+  1417→    if (closestFrame?.landmarks) {
+  1418→      // Get skill level from auto-detection or default to intermediate
+  1419→      const skillLevel = (autoLevelResult?.level.toLowerCase() || 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
+  1420→      const bandedResult = evaluateWithBands(closestFrame.landmarks, skillLevel);
+  1421→      setCurrentBandedScore(bandedResult);
+  1422→
+  1423→      const isGreen = bandedResult.overall_band === 'green';
+  1424→      const isYellow = bandedResult.overall_band === 'yellow';
+  1425→      const color = isGreen ? '#22c55e' : isYellow ? '#eab308' : '#ef4444';
+  1426→
+  1427→      ctx.strokeStyle = color;
+  1428→      ctx.lineWidth = 3;
+  1429→      ctx.fillStyle = color;
+  1430→
+  1431→      // PHASE 2 FIX: Draw skeleton with proper offset and scaling
+  1432→      for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+  1433→        const start = closestFrame.landmarks[startIdx];
+  1434→        const end = closestFrame.landmarks[endIdx];
+  1435→        if (start && end && start.visibility > 0.5 && end.visibility > 0.5) {
+  1436→          ctx.beginPath();
+  1437→          // Apply offset and scale to match actual video render position
+  1438→          ctx.moveTo(offsetX + start.x * renderWidth, offsetY + start.y * renderHeight);
+  1439→          ctx.lineTo(offsetX + end.x * renderWidth, offsetY + end.y * renderHeight);
+  1440→          ctx.stroke();
+  1441→        }
+  1442→      }
+  1443→
+  1444→      // Draw joints
+  1445→      for (const landmark of closestFrame.landmarks) {
+  1446→        if (landmark.visibility > 0.5) {
+  1447→          ctx.beginPath();
+  1448→          ctx.arc(
+  1449→            offsetX + landmark.x * renderWidth,
+  1450→            offsetY + landmark.y * renderHeight,
+  1451→            5,
+  1452→            0,
+  1453→            2 * Math.PI
+  1454→          );
+  1455→          ctx.fill();
+  1456→        }
+  1457→      }
+  1458→
+  1459→      // V4 FEATURE: Draw Ghost Overlay if enabled
+  1460→      if (showGhost && ghostData?.enabled && ghostData.poseSequence.length > 0) {
+  1461→        const ghostLandmarks = getGhostPoseAtTime(ghostData, video.currentTime);
+  1462→        if (ghostLandmarks) {
+  1463→          const ghostColor = 'rgba(100, 200, 255, 0.6)'; // Light blue with transparency
+  1464→
+  1465→          // Draw ghost connections
+  1466→          ctx.strokeStyle = ghostColor;
+  1467→          ctx.lineWidth = 2;
+  1468→
+  1469→          for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+  1470→            const start = ghostLandmarks[startIdx];
+  1471→            const end = ghostLandmarks[endIdx];
+  1472→            if (start && end && (start.visibility ?? 0) > 0.5 && (end.visibility ?? 0) > 0.5) {
+  1473→              ctx.beginPath();
+  1474→              ctx.moveTo(offsetX + start.x * renderWidth, offsetY + start.y * renderHeight);
+  1475→              ctx.lineTo(offsetX + end.x * renderWidth, offsetY + end.y * renderHeight);
+  1476→              ctx.stroke();
+  1477→            }
+  1478→          }
+  1479→
+  1480→          // Draw ghost joints
+  1481→          ctx.fillStyle = ghostColor;
+  1482→          for (const landmark of ghostLandmarks) {
+  1483→            if ((landmark.visibility ?? 0) > 0.5) {
+  1484→              ctx.beginPath();
+  1485→              ctx.arc(
+  1486→                offsetX + landmark.x * renderWidth,
+  1487→                offsetY + landmark.y * renderHeight,
+  1488→                4,
+  1489→                0,
+  1490→                2 * Math.PI
+  1491→              );
+  1492→              ctx.fill();
+  1493→            }
+  1494→          }
+  1495→        }
+  1496→      }
+  1497→    }
+  1498→
+  1499→    if (!video.paused) {
+  1500→      animationRef.current = requestAnimationFrame(renderFrame);
+  1501→    }
+  1502→  }, [frameAnalyses, poseData, showSkeleton, autoLevelResult, showGhost, ghostData]);
+  1503→
+  1504→  // Trigger skeleton render when poseData is loaded
+  1505→  useEffect(() => {
+  1506→    if (poseData.length > 0 && videoRef.current) {
+  1507→      const tryRender = () => {
+  1508→        if (videoRef.current && videoRef.current.readyState >= 2) {
+  1509→          renderFrame();
+  1510→        } else {
+  1511→          setTimeout(tryRender, 100);
+  1512→        }
+  1513→      };
+  1514→      tryRender();
+  1515→    }
+  1516→  }, [poseData, renderFrame]);
+  1517→
+  1518→  // Handle video time updates
+  1519→  const handleTimeUpdate = useCallback(() => {
+  1520→    if (videoRef.current) {
+  1521→      setCurrentTime(videoRef.current.currentTime);
+  1522→      renderFrame();
+  1523→    }
+  1524→  }, [renderFrame]);
+  1525→
+  1526→  // Handle video play/pause
+  1527→  const togglePlayPause = useCallback(() => {
+  1528→    if (videoRef.current) {
+  1529→      if (videoRef.current.paused) {
+  1530→        videoRef.current.play();
+  1531→        setIsPlaying(true);
+  1532→        animationRef.current = requestAnimationFrame(renderFrame);
+  1533→      } else {
+  1534→        videoRef.current.pause();
+  1535→        setIsPlaying(false);
+  1536→        if (animationRef.current) {
+  1537→          cancelAnimationFrame(animationRef.current);
+  1538→        }
+  1539→      }
+  1540→    }
+  1541→  }, [renderFrame]);
+  1542→
+  1543→  // Jump to timestamp
+  1544→  const jumpToTimestamp = useCallback((timestamp: number) => {
+  1545→    if (videoRef.current) {
+  1546→      videoRef.current.currentTime = timestamp;
+  1547→      videoRef.current.pause();
+  1548→      setIsPlaying(false);
+  1549→      setCurrentTime(timestamp);
+  1550→      setTimeout(renderFrame, 50);
+  1551→    }
+  1552→  }, [renderFrame]);
+  1553→
+  1554→  // Find next mistake
+  1555→  const goToNextMistake = useCallback(() => {
+  1556→    const allTimestamps = issues
+  1557→      .flatMap((i) => i.timestamps || [])
+  1558→      .sort((a, b) => a - b);
+  1559→
+  1560→    const nextTimestamp = allTimestamps.find((t) => t > currentTime + 0.5);
+  1561→    if (nextTimestamp !== undefined) {
+  1562→      jumpToTimestamp(nextTimestamp);
+  1563→    } else if (allTimestamps.length > 0) {
+  1564→      jumpToTimestamp(allTimestamps[0]);
+  1565→    }
+  1566→  }, [issues, currentTime, jumpToTimestamp]);
+  1567→
+  1568→  // Handle video metadata loaded
+  1569→  const handleLoadedMetadata = useCallback(() => {
+  1570→    if (videoRef.current) {
+  1571→      setDuration(videoRef.current.duration);
+  1572→      setTimeout(renderFrame, 100);
+  1573→    }
+  1574→  }, [renderFrame]);
+  1575→
+  1576→  const getSeverityColor = (severity: string) => {
+  1577→    switch (severity) {
+  1578→      case 'high':
+  1579→        return 'bg-red-50 border-red-200 text-red-800';
+  1580→      case 'medium':
+  1581→        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+  1582→      case 'low':
+  1583→        return 'bg-green-50 border-green-200 text-green-800';
+  1584→      default:
+  1585→        return 'bg-gray-50 border-gray-200 text-gray-800';
+  1586→    }
+  1587→  };
+  1588→
+  1589→  const formatTime = (seconds: number) => {
+  1590→    const mins = Math.floor(seconds / 60);
+  1591→    const secs = Math.floor(seconds % 60);
+  1592→    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  1593→  };
+  1594→
+  1595→  // Get current frame info for display
+  1596→  const getCurrentFrameInfo = () => {
+  1597→    if (frameAnalyses.length === 0) return null;
+  1598→
+  1599→    let closestFrame: FrameAnalysis | null = null;
+  1600→    let minDiff = Infinity;
+  1601→
+  1602→    for (const frame of frameAnalyses) {
+  1603→      const diff = Math.abs(frame.timestamp - currentTime);
+  1604→      if (diff < minDiff) {
+  1605→        minDiff = diff;
+  1606→        closestFrame = frame;
+  1607→      }
+  1608→    }
+  1609→
+  1610→    return closestFrame;
+  1611→  };
+  1612→
+  1613→  const currentFrameInfo = getCurrentFrameInfo();
+  1614→
+  1615→  // PHASE 5: Get analysis state message
+  1616→  const getAnalysisStateMessage = () => {
+  1617→    switch (analysisState) {
+  1618→      case 'DETECTING_PLAYERS':
+  1619→        return 'Detecting players in video...';
+  1620→      case 'EXTRACTING_POSE':
+  1621→        return 'Extracting pose data from frames...';
+  1622→      case 'GEMINI_SCORING':
+  1623→        return 'AI analyzing skill level...';
+  1624→      case 'DONE':
+  1625→        return 'Analysis complete!';
+  1626→      case 'ERROR':
+  1627→        return 'Analysis failed';
+  1628→      default:
+  1629→        return 'Ready to analyze';
+  1630→    }
+  1631→  };
+  1632→
+  1633→  return (
+  1634→    <div className="min-h-screen bg-gray-50">
+  1635→      <DashboardNav />
+  1636→
+  1637→      <main className="ml-64 p-8">
+  1638→        <div className="max-w-7xl mx-auto">
+  1639→          {/* Header */}
+  1640→          <div className="mb-8">
+  1641→            <h1 className="text-3xl font-bold text-gray-900">Video Analytics</h1>
+  1642→            <p className="text-gray-600 mt-1">
+  1643→              {sessionId ? 'Review your analysis results' : 'Upload a video for AI-powered technique analysis'}
+  1644→            </p>
+  1645→          </div>
+  1646→
+  1647→          {/* Upload Section */}
+  1648→          {!result && !videoUrl && (
+  1649→            <div className="bg-white rounded-xl p-8 shadow-sm mb-8">
+  1650→              <div
+  1651→                className={`border-2 border-dashed rounded-xl p-12 text-center transition ${
+  1652→                  uploading || analyzing
+  1653→                    ? 'border-primary-300 bg-primary-50'
+  1654→                    : 'border-gray-300 hover:border-primary-400'
+  1655→                }`}
+  1656→              >
+  1657→                {uploading ? (
+  1658→                  <div className="space-y-4">
+  1659→                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+  1660→                    <p className="text-gray-600">Uploading video...</p>
+  1661→                  </div>
+  1662→                ) : analyzing ? (
+  1663→                  // PHASE 5: Enhanced loading state with state machine
+  1664→                  <div className="space-y-4">
+  1665→                    <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto relative">
+  1666→                      <svg className="w-8 h-8 text-primary-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1667→                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  1668→                      </svg>
+  1669→                      {/* Spinning ring */}
+  1670→                      <div className="absolute inset-0 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin"></div>
+  1671→                    </div>
+  1672→                    <p className="text-gray-900 font-medium">{getAnalysisStateMessage()}</p>
+  1673→
+  1674→                    {/* Progress steps */}
+  1675→                    <div className="flex justify-center gap-2 mt-4">
+  1676→                      {['DETECTING_PLAYERS', 'EXTRACTING_POSE', 'GEMINI_SCORING', 'DONE'].map((state, idx) => (
+  1677→                        <div
+  1678→                          key={state}
+  1679→                          className={`w-3 h-3 rounded-full transition-colors ${
+  1680→                            analysisState === state
+  1681→                              ? 'bg-primary-500 animate-pulse'
+  1682→                              : ['DETECTING_PLAYERS', 'EXTRACTING_POSE', 'GEMINI_SCORING', 'DONE'].indexOf(analysisState) > idx
+  1683→                              ? 'bg-green-500'
+  1684→                              : 'bg-gray-300'
+  1685→                          }`}
+  1686→                        />
+  1687→                      ))}
+  1688→                    </div>
+  1689→                    <p className="text-gray-500 text-sm">
+  1690→                      {analysisState === 'DETECTING_PLAYERS' && 'Finding players in the video...'}
+  1691→                      {analysisState === 'EXTRACTING_POSE' && 'Processing pose detection frame by frame'}
+  1692→                      {analysisState === 'GEMINI_SCORING' && 'AI is evaluating your technique'}
+  1693→                    </p>
+  1694→
+  1695→                    <div className="w-64 mx-auto bg-gray-200 rounded-full h-2">
+  1696→                      <div
+  1697→                        className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+  1698→                        style={{ width: `${analyzeProgress}%` }}
+  1699→                      ></div>
+  1700→                    </div>
+  1701→                    <p className="text-sm text-gray-500">{analyzeProgress}% complete</p>
+  1702→                  </div>
+  1703→                ) : (
+  1704→                  <>
+  1705→                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+  1706→                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1707→                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  1708→                      </svg>
+  1709→                    </div>
+  1710→                    <h3 className="text-lg font-medium text-gray-900 mb-2">Upload your badminton video</h3>
+  1711→                    <p className="text-gray-500 mb-4">MP4, MOV, or WebM up to 100MB</p>
+  1712→                    {poseLandmarkerReady && (
+  1713→                      <p className="text-sm text-green-600 mb-4">Pose detection ready</p>
+  1714→                    )}
+  1715→                    <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
+  1716→                    <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition">
+  1717→                      Select Video
+  1718→                    </button>
+  1719→                  </>
+  1720→                )}
+  1721→              </div>
+  1722→
+  1723→              {error && (
+  1724→                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
+  1725→              )}
+  1726→            </div>
+  1727→          )}
+  1728→
+  1729→          {/* Video Player with Overlay */}
+  1730→          {videoUrl && (
+  1731→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+  1732→              <div className="lg:col-span-2">
+  1733→                <div className="bg-gray-900 rounded-xl overflow-hidden">
+  1734→                  {/* PHASE 2 FIX: Proper video container for canvas alignment */}
+  1735→                  <div ref={videoContainerRef} className="relative aspect-video">
+  1736→                    <video
+  1737→                      ref={videoRef}
+  1738→                      src={videoUrl}
+  1739→                      className="absolute inset-0 w-full h-full object-contain"
+  1740→                      onTimeUpdate={handleTimeUpdate}
+  1741→                      onLoadedMetadata={handleLoadedMetadata}
+  1742→                      onEnded={() => setIsPlaying(false)}
+  1743→                      playsInline
+  1744→                    />
+  1745→                    <canvas
+  1746→                      ref={canvasRef}
+  1747→                      className={`absolute inset-0 w-full h-full pointer-events-none ${
+  1748→                        showSkeleton ? '' : 'hidden'
+  1749→                      }`}
+  1750→                    />
+  1751→
+  1752→                    {/* Status indicator with auto-detected level */}
+  1753→                    {currentBandedScore && (
+  1754→                      <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-sm font-medium ${
+  1755→                        currentBandedScore.overall_band === 'green' ? 'bg-green-500 text-white' :
+  1756→                        currentBandedScore.overall_band === 'yellow' ? 'bg-yellow-500 text-white' :
+  1757→                        currentBandedScore.overall_band === 'red' ? 'bg-red-500 text-white' :
+  1758→                        'bg-gray-500 text-white'
+  1759→                      }`}>
+  1760→                        {SCORING_LEGEND[currentBandedScore.overall_band as keyof typeof SCORING_LEGEND]?.label || 'Unknown'}
+  1761→                        <span className="ml-2 opacity-75">
+  1762→                          {Math.round(currentBandedScore.overall_score)}%
+  1763→                        </span>
+  1764→                      </div>
+  1765→                    )}
+  1766→
+  1767→                    {/* Time display */}
+  1768→                    <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+  1769→                      {formatTime(currentTime)} / {formatTime(duration)}
+  1770→                    </div>
+  1771→
+  1772→                    {/* Current metrics display */}
+  1773→                    {currentFrameInfo?.metrics && (
+  1774→                      <div className="absolute bottom-16 left-4 bg-black/70 text-white p-3 rounded-lg text-xs">
+  1775→                        <p>Elbow: {currentFrameInfo.metrics.elbow_angle.toFixed(0)}deg</p>
+  1776→                        <p>Knee: {currentFrameInfo.metrics.knee_angle.toFixed(0)}deg</p>
+  1777→                        <p>Stance: {(currentFrameInfo.metrics.stance_width_norm * 100).toFixed(0)}%</p>
+  1778→                      </div>
+  1779→                    )}
+  1780→                  </div>
+  1781→
+  1782→                  {/* Controls - PHASE 3: Removed skill level dropdown */}
+  1783→                  <div className="p-4 flex items-center justify-between">
+  1784→                    <div className="flex items-center gap-2">
+  1785→                      <button
+  1786→                        onClick={togglePlayPause}
+  1787→                        className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+  1788→                      >
+  1789→                        {isPlaying ? (
+  1790→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1791→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  1792→                          </svg>
+  1793→                        ) : (
+  1794→                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  1795→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+  1796→                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  1797→                          </svg>
+  1798→                        )}
+  1799→                      </button>
+  1800→
+  1801→                      <button
+  1802→                        onClick={goToNextMistake}
+  1803→                        disabled={issues.length === 0 || analyzing}
+  1804→                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium disabled:opacity-50"
+  1805→                      >
+  1806→                        Next Mistake
+  1807→                      </button>
+  1808→                    </div>
+  1809→
+  1810→                    <div className="flex items-center gap-4">
+  1811→                      {/* PHASE 3: Show auto-detected level instead of dropdown */}
+  1812→                      {autoLevelResult && (
+  1813→                        <div className="flex items-center gap-2 text-white text-sm">
+  1814→                          <span className="px-2 py-1 bg-primary-600 rounded text-xs font-medium">
+  1815→                            {autoLevelResult.level}
+  1816→                          </span>
+  1817→                          <span className="text-gray-400 text-xs">
+  1818→                            {Math.round(autoLevelResult.confidence * 100)}% confidence
+  1819→                          </span>
+  1820→                        </div>
+  1821→                      )}
+  1822→
+  1823→                      <label className="flex items-center gap-2 text-white text-sm">
+  1824→                        <input
+  1825→                          type="checkbox"
+  1826→                          checked={showSkeleton}
+  1827→                          onChange={(e) => {
+  1828→                            setShowSkeleton(e.target.checked);
+  1829→                            if (e.target.checked) {
+  1830→                              setTimeout(renderFrame, 50);
+  1831→                            }
+  1832→                          }}
+  1833→                          className="rounded"
+  1834→                        />
+  1835→                        Show Skeleton
+  1836→                      </label>
+  1837→
+  1838→                      {/* V4 FEATURE: Ghost overlay toggle */}
+  1839→                      {ghostData && ghostData.poseSequence.length > 0 && (
+  1840→                        <label className="flex items-center gap-2 text-white text-sm">
+  1841→                          <input
+  1842→                            type="checkbox"
+  1843→                            checked={showGhost}
+  1844→                            onChange={(e) => {
+  1845→                              setShowGhost(e.target.checked);
+  1846→                              if (e.target.checked) {
+  1847→                                setTimeout(renderFrame, 50);
+  1848→                              }
+  1849→                            }}
+  1850→                            className="rounded accent-cyan-400"
+  1851→                          />
+  1852→                          <span className="text-cyan-400">Ghost (Best Rep)</span>
+  1853→                        </label>
+  1854→                      )}
+  1855→                    </div>
+  1856→                  </div>
+  1857→
+  1858→                  {/* Timeline scrubber */}
+  1859→                  <div className="px-4 pb-4">
+  1860→                    <input
+  1861→                      type="range"
+  1862→                      min={0}
+  1863→                      max={duration || 100}
+  1864→                      step={0.1}
+  1865→                      value={currentTime}
+  1866→                      onChange={(e) => {
+  1867→                        const time = parseFloat(e.target.value);
+  1868→                        if (videoRef.current) {
+  1869→                          videoRef.current.currentTime = time;
+  1870→                          setCurrentTime(time);
+  1871→                          setTimeout(renderFrame, 50);
+  1872→                        }
+  1873→                      }}
+  1874→                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+  1875→                    />
+  1876→                  </div>
+  1877→
+  1878→                  {/* V4 FEATURE: Mistake Timeline */}
+  1879→                  {mistakeEvents.length > 0 && duration > 0 && (
+  1880→                    <div className="px-4 pb-4">
+  1881→                      <MistakeTimeline
+  1882→                        mistakes={mistakeEvents}
+  1883→                        duration={duration}
+  1884→                        currentTime={currentTime}
+  1885→                        onSeek={(time) => {
+  1886→                          if (videoRef.current) {
+  1887→                            videoRef.current.currentTime = time;
+  1888→                            setCurrentTime(time);
+  1889→                            setTimeout(renderFrame, 50);
+  1890→                          }
+  1891→                        }}
+  1892→                        onSelectMistake={(mistake) => {
+  1893→                          setSelectedMistake(mistake);
+  1894→                          if (mistake && videoRef.current) {
+  1895→                            videoRef.current.currentTime = mistake.startTimeSec;
+  1896→                            setCurrentTime(mistake.startTimeSec);
+  1897→                            setTimeout(renderFrame, 50);
+  1898→                          }
+  1899→                        }}
+  1900→                        selectedMistakeId={selectedMistake?.id}
+  1901→                      />
+  1902→                    </div>
+  1903→                  )}
+  1904→                </div>
+  1905→
+  1906→                {/* V4 FEATURE: SkillMeter with computed metrics */}
+  1907→                {computedSkill && (
+  1908→                  <div className="mt-6">
+  1909→                    <SkillMeter skillData={computedSkill} />
+  1910→                  </div>
+  1911→                )}
+  1912→
+  1913→                {/* V4 FEATURE: FixItCard for selected mistake */}
+  1914→                {selectedMistake && (
+  1915→                  <div className="mt-6">
+  1916→                    <div className="flex items-center justify-between mb-3">
+  1917→                      <h3 className="font-semibold text-gray-900">Fix This Mistake</h3>
+  1918→                      <button
+  1919→                        onClick={() => setSelectedMistake(null)}
+  1920→                        className="text-sm text-gray-500 hover:text-gray-700"
+  1921→                      >
+  1922→                        Close
+  1923→                      </button>
+  1924→                    </div>
+  1925→                    <FixItCard
+  1926→                      mistake={selectedMistake}
+  1927→                      fixKeyframes={poseData.length > 0 ? generateFixKeyframes(selectedMistake, poseData, 10) : undefined}
+  1928→                      onClose={() => setSelectedMistake(null)}
+  1929→                    />
+  1930→                  </div>
+  1931→                )}
+  1932→
+  1933→                {/* PHASE 3: Auto-level detection result panel (Gemini rationale) */}
+  1934→                {autoLevelResult && autoLevelResult.rationaleBullets.length > 0 && (
+  1935→                  <div className="mt-6 bg-white rounded-xl p-6 shadow-sm">
+  1936→                    <div className="flex items-center justify-between mb-4">
+  1937→                      <h3 className="font-semibold text-gray-900">AI Analysis Notes</h3>
+  1938→                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+  1939→                        autoLevelResult.level === 'Advanced' ? 'bg-green-100 text-green-800' :
+  1940→                        autoLevelResult.level === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+  1941→                        'bg-blue-100 text-blue-800'
+  1942→                      }`}>
+  1943→                        {autoLevelResult.level}
+  1944→                      </span>
+  1945→                    </div>
+  1946→                    <div className="space-y-2">
+  1947→                      {autoLevelResult.rationaleBullets.map((bullet, idx) => (
+  1948→                        <div key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+  1949→                          <svg className="w-4 h-4 text-primary-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+  1950→                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  1951→                          </svg>
+  1952→                          <span>{bullet}</span>
+  1953→                        </div>
+  1954→                      ))}
+  1955→                    </div>
+  1956→                  </div>
+  1957→                )}
+  1958→
+  1959→                {/* PHASE 4: Guidance Animation */}
+  1960→                {guidanceKeyframes.length > 0 && (
+  1961→                  <div className="mt-6">
+  1962→                    <div className="flex items-center justify-between mb-4">
+  1963→                      <h3 className="font-semibold text-gray-900">Movement Guidance</h3>
+  1964→                      <button
+  1965→                        onClick={() => setShowGuidance(!showGuidance)}
+  1966→                        className="text-sm text-primary-600 hover:text-primary-700"
+  1967→                      >
+  1968→                        {showGuidance ? 'Hide' : 'Show'} Animation
+  1969→                      </button>
+  1970→                    </div>
+  1971→                    {showGuidance && (
+  1972→                      <GuidanceAnimation
+  1973→                        keyframes={guidanceKeyframes}
+  1974→                        primaryIssue={issues[0]}
+  1975→                      />
+  1976→                    )}
+  1977→                  </div>
+  1978→                )}
+  1979→
+  1980→                {/* Analysis Summary */}
+  1981→                {result && (
+  1982→                  <div className="mt-6 bg-white rounded-xl p-6 shadow-sm">
+  1983→                    <h3 className="font-semibold text-gray-900 mb-3">Analysis Summary</h3>
+  1984→                    <p className="text-gray-600">{result.technique_summary}</p>
+  1985→                    {result.strategy_summary && (
+  1986→                      <p className="text-gray-500 mt-2 text-sm">{result.strategy_summary}</p>
+  1987→                    )}
+  1988→                  </div>
+  1989→                )}
+  1990→              </div>
+  1991→
+  1992→              {/* Issues Panel */}
+  1993→              <div className="space-y-4">
+  1994→                <h3 className="font-semibold text-gray-900">Detected Issues</h3>
+  1995→                {analyzing ? (
+  1996→                  <div className="bg-white rounded-xl p-6 shadow-sm">
+  1997→                    {/* Shimmer loading animation */}
+  1998→                    <div className="animate-pulse space-y-4">
+  1999→                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+  2000→                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+  2001→                      <div className="h-20 bg-gray-200 rounded"></div>
+  2002→                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+  2003→                    </div>
+  2004→                  </div>
+  2005→                ) : issues.length > 0 ? (
+  2006→                  <div className="space-y-4 max-h-[600px] overflow-y-auto">
+  2007→                    {issues.map((issue, index) => (
+  2008→                      <DrillCard
+  2009→                        key={index}
+  2010→                        issue={issue}
+  2011→                        onTimestampClick={jumpToTimestamp}
+  2012→                        currentTime={currentTime}
+  2013→                      />
+  2014→                    ))}
+  2015→                  </div>
+  2016→                ) : (
+  2017→                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800">
+  2018→                    <p className="font-medium">Great form!</p>
+  2019→                    <p className="text-sm">No major issues detected in this video.</p>
+  2020→                  </div>
+  2021→                )}
+  2022→
+  2023→                {/* Reset button */}
+  2024→                {videoUrl && !analyzing && (
+  2025→                  <button
+  2026→                    onClick={() => {
+  2027→                      setResult(null);
+  2028→                      setVideoUrl(null);
+  2029→                      setVideoFile(null);
+  2030→                      setIssues([]);
+  2031→                      setPoseData([]);
+  2032→                      setFrameAnalyses([]);
+  2033→                      setCurrentTime(0);
+  2034→                      setDuration(0);
+  2035→                      setAutoLevelResult(null);
+  2036→                      setGuidanceKeyframes([]);
+  2037→                      setAnalysisState('IDLE');
+  2038→                      // V4 state reset
+  2039→                      setGhostData(null);
+  2040→                      setShowGhost(false);
+  2041→                      setComputedSkill(null);
+  2042→                      setMistakeEvents([]);
+  2043→                      setSelectedMistake(null);
+  2044→                    }}
+  2045→                    className="w-full py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
+  2046→                  >
+  2047→                    Analyze Another Video
+  2048→                  </button>
+  2049→                )}
+  2050→              </div>
+  2051→            </div>
+  2052→          )}
+  2053→
+  2054→          {/* Results Section (legacy format without video) */}
+  2055→          {result && !videoUrl && (
+  2056→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  2057→              {/* Left Column - Issues */}
+  2058→              <div className="space-y-6">
+  2059→                <div className="bg-white rounded-xl p-6 shadow-sm">
+  2060→                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Areas to Improve</h2>
+  2061→                  <div className="space-y-3">
+  2062→                    {result.top_issues.map((issue) => (
+  2063→                      <button
+  2064→                        key={issue.id}
+  2065→                        onClick={() => setSelectedIssue(issue)}
+  2066→                        className={`w-full text-left p-4 rounded-lg border transition ${
+  2067→                          selectedIssue?.id === issue.id ? 'ring-2 ring-primary-500' : ''
+  2068→                        } ${getSeverityColor(issue.severity)}`}
+  2069→                      >
+  2070→                        <div className="flex items-center justify-between mb-1">
+  2071→                          <span className="font-medium">{issue.title}</span>
+  2072→                          <span className="text-xs uppercase font-semibold">{issue.severity}</span>
+  2073→                        </div>
+  2074→                        <p className="text-sm opacity-80">{issue.description}</p>
+  2075→                      </button>
+  2076→                    ))}
+  2077→                  </div>
+  2078→                </div>
+  2079→
+  2080→                <div className="bg-white rounded-xl p-6 shadow-sm">
+  2081→                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Technique Summary</h2>
+  2082→                  <p className="text-gray-600">{result.technique_summary}</p>
+  2083→                </div>
+  2084→              </div>
+  2085→
+  2086→              {/* Right Column - Drills */}
+  2087→              <div className="space-y-6">
+  2088→                <div className="bg-white rounded-xl p-6 shadow-sm">
+  2089→                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Recommended Drills</h2>
+  2090→                  <div className="space-y-3">
+  2091→                    {result.drills.map((drill) => (
+  2092→                      <button
+  2093→                        key={drill.id}
+  2094→                        onClick={() => setSelectedDrill(drill)}
+  2095→                        className={`w-full text-left p-4 rounded-lg border border-gray-200 hover:border-primary-300 transition ${
+  2096→                          selectedDrill?.id === drill.id ? 'ring-2 ring-primary-500 border-primary-300' : ''
+  2097→                        }`}
+  2098→                      >
+  2099→                        <div className="flex items-center justify-between mb-1">
+  2100→                          <span className="font-medium text-gray-900">{drill.name}</span>
+  2101→                          <span className="text-sm text-gray-500">{drill.duration_minutes} min</span>
+  2102→                        </div>
+  2103→                        <p className="text-sm text-gray-600">{drill.description}</p>
+  2104→                      </button>
+  2105→                    ))}
+  2106→                  </div>
+  2107→                </div>
+  2108→
+  2109→                {selectedDrill && (
+  2110→                  <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-6">
+  2111→                    <div className="flex items-center justify-between mb-4">
+  2112→                      <h3 className="text-lg font-semibold text-gray-900">{selectedDrill.name}</h3>
+  2113→                      <Link
+  2114→                        href={`/practice?drill=${selectedDrill.id}`}
+  2115→                        className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition"
+  2116→                      >
+  2117→                        Let&apos;s Practice
+  2118→                      </Link>
+  2119→                    </div>
+  2120→                    <div className="space-y-3">
+  2121→                      <p className="text-gray-700">{selectedDrill.description}</p>
+  2122→                      <div>
+  2123→                        <p className="font-medium text-gray-900 mb-2">Instructions:</p>
+  2124→                        <ol className="list-decimal list-inside space-y-1 text-gray-700">
+  2125→                          {selectedDrill.instructions.map((instruction, i) => (
+  2126→                            <li key={i}>{instruction}</li>
+  2127→                          ))}
+  2128→                        </ol>
+  2129→                      </div>
+  2130→                    </div>
+  2131→                  </div>
+  2132→                )}
+  2133→
+  2134→                <button
+  2135→                  onClick={() => {
+  2136→                    setResult(null);
+  2137→                    setSelectedIssue(null);
+  2138→                    setSelectedDrill(null);
+  2139→                    setVideoUrl(null);
+  2140→                    setPoseData([]);
+  2141→                    setIssues([]);
+  2142→                    setAutoLevelResult(null);
+  2143→                    setGuidanceKeyframes([]);
+  2144→                    setAnalysisState('IDLE');
+  2145→                    // V4 state reset
+  2146→                    setGhostData(null);
+  2147→                    setShowGhost(false);
+  2148→                    setComputedSkill(null);
+  2149→                    setMistakeEvents([]);
+  2150→                    setSelectedMistake(null);
+  2151→                  }}
+  2152→                  className="w-full py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
+  2153→                >
+  2154→                  Analyze Another Video
+  2155→                </button>
+  2156→              </div>
+  2157→            </div>
+  2158→          )}
+  2159→        </div>
+  2160→      </main>
+  2161→
+  2162→      {/* Player Selection Modal */}
+  2163→      <PlayerSelectionModal
+  2164→        isOpen={showPlayerSelection}
+  2165→        onClose={() => {
+  2166→          setShowPlayerSelection(false);
+  2167→          setAnalyzing(false);
+  2168→          setVideoUrl(null);
+  2169→          setVideoFile(null);
+  2170→          setAnalysisState('IDLE');
+  2171→          // V4 state reset
+  2172→          setGhostData(null);
+  2173→          setShowGhost(false);
+  2174→          setComputedSkill(null);
+  2175→          setMistakeEvents([]);
+  2176→          setSelectedMistake(null);
+  2177→        }}
+  2178→        onConfirm={handlePlayerSelectionConfirm}
+  2179→        tracks={detectedTracks}
+  2180→        detectedFormat={detectedMatchFormat}
+  2181→      />
+  2182→    </div>
+  2183→  );
+  2184→}
+  2185→
+  2186→function AnalyticsLoading() {
+  2187→  return (
+  2188→    <div className="min-h-screen bg-gray-50">
+  2189→      <DashboardNav />
+  2190→      <main className="ml-64 p-8">
+  2191→        <div className="max-w-7xl mx-auto">
+  2192→          <div className="animate-pulse">
+  2193→            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+  2194→            <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+  2195→            <div className="bg-gray-200 rounded-xl h-96"></div>
+  2196→          </div>
+  2197→        </div>
+  2198→      </main>
+  2199→    </div>
+  2200→  );
+  2201→}
+  2202→
+  2203→export default function AnalyticsPage() {
+  2204→  return (
+  2205→    <Suspense fallback={<AnalyticsLoading />}>
+  2206→      <AnalyticsContent />
+  2207→    </Suspense>
+  2208→  );
+  2209→}
+  2210→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

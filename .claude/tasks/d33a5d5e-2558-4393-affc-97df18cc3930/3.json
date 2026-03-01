@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Feature 3: Auto Skill Score + Confidence Meters",
+  "description": "Implement real skill scoring from pose metrics:\n1. Compute skillScore (0-100) from pose consistency, recovery speed, form quality\n2. Derive confidence from landmark visibility (not invented numbers)\n3. Add SkillMeter component with badge + confidence bar\n4. Remove manual level selection UI\n5. Update Gemini prompts to reference computed metrics",
+  "activeForm": "Implementing Auto Skill Scoring",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": []
+}

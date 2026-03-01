@@ -1,0 +1,545 @@
+     1→/**
+     2→ * Rules Engine for Badminton Form Evaluation
+     3→ * Provides form rules, drill recommendations, and keyframe generation
+     4→ */
+     5→
+     6→import type { PoseLandmark, PoseMetrics } from './types';
+     7→import { calculateAngle, calculateDistance, POSE_LANDMARKS } from './pose-utils';
+     8→
+     9→// ============================================
+    10→// Form Rules Configuration
+    11→// ============================================
+    12→
+    13→export interface FormRule {
+    14→  code: string;
+    15→  name: string;
+    16→  description: string;
+    17→  compute: (landmarks: PoseLandmark[], width?: number) => number;
+    18→  threshold: { min: number; max: number };
+    19→  severity: 'low' | 'medium' | 'high';
+    20→  drillId: string;
+    21→  drillTypes: string[];
+    22→  feedback: {
+    23→    tooLow: string;
+    24→    tooHigh: string;
+    25→    good: string;
+    26→  };
+    27→}
+    28→
+    29→export const FORM_RULES: Record<string, FormRule> = {
+    30→  ELBOW_ANGLE_OVERHEAD: {
+    31→    code: 'ELBOW_ANGLE_OVERHEAD',
+    32→    name: 'Elbow Extension (Overhead)',
+    33→    description: 'Elbow should be nearly straight at contact point for overhead shots',
+    34→    compute: (landmarks) => {
+    35→      const shoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+    36→      const elbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+    37→      const wrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+    38→      return calculateAngle(shoulder, elbow, wrist);
+    39→    },
+    40→    threshold: { min: 150, max: 180 },
+    41→    severity: 'high',
+    42→    drillId: 'elbow-extension',
+    43→    drillTypes: ['smash', 'clear'],
+    44→    feedback: {
+    45→      tooLow: 'Extend your elbow more at contact',
+    46→      tooHigh: 'Good extension!',
+    47→      good: 'Perfect elbow extension!',
+    48→    },
+    49→  },
+    50→  ELBOW_ANGLE_DRIVE: {
+    51→    code: 'ELBOW_ANGLE_DRIVE',
+    52→    name: 'Elbow Angle (Drive)',
+    53→    description: 'Elbow should be at 90-120 degrees for drive shots',
+    54→    compute: (landmarks) => {
+    55→      const shoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+    56→      const elbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+    57→      const wrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+    58→      return calculateAngle(shoulder, elbow, wrist);
+    59→    },
+    60→    threshold: { min: 90, max: 120 },
+    61→    severity: 'medium',
+    62→    drillId: 'drive-technique',
+    63→    drillTypes: ['drive', 'netshot'],
+    64→    feedback: {
+    65→      tooLow: 'Extend your elbow slightly more',
+    66→      tooHigh: 'Bend your elbow more for control',
+    67→      good: 'Good elbow position!',
+    68→    },
+    69→  },
+    70→  STANCE_WIDTH: {
+    71→    code: 'STANCE_WIDTH',
+    72→    name: 'Stance Width',
+    73→    description: 'Feet should be shoulder-width apart for stability',
+    74→    compute: (landmarks, width = 640) => {
+    75→      const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+    76→      const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+    77→      const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+    78→      const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+    79→      const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+    80→      const ankleWidth = calculateDistance(leftAnkle, rightAnkle);
+    81→      return shoulderWidth > 0 ? ankleWidth / shoulderWidth : 0;
+    82→    },
+    83→    threshold: { min: 0.8, max: 1.5 },
+    84→    severity: 'medium',
+    85→    drillId: 'footwork-basics',
+    86→    drillTypes: ['footwork', 'general'],
+    87→    feedback: {
+    88→      tooLow: 'Widen your stance for better balance',
+    89→      tooHigh: 'Narrow your stance slightly',
+    90→      good: 'Good stance width!',
+    91→    },
+    92→  },
+    93→  KNEE_BEND: {
+    94→    code: 'KNEE_BEND',
+    95→    name: 'Knee Bend',
+    96→    description: 'Knees should be bent for ready position and lunges',
+    97→    compute: (landmarks) => {
+    98→      const hip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+    99→      const knee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+   100→      const ankle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+   101→      return calculateAngle(hip, knee, ankle);
+   102→    },
+   103→    threshold: { min: 100, max: 160 },
+   104→    severity: 'high',
+   105→    drillId: 'lunge-practice',
+   106→    drillTypes: ['netshot', 'footwork', 'general'],
+   107→    feedback: {
+   108→      tooLow: 'Straighten your legs a bit more',
+   109→      tooHigh: 'Bend your knees more for power',
+   110→      good: 'Good knee bend!',
+   111→    },
+   112→  },
+   113→  BODY_ROTATION: {
+   114→    code: 'BODY_ROTATION',
+   115→    name: 'Body Rotation',
+   116→    description: 'Proper hip-shoulder separation for power generation',
+   117→    compute: (landmarks) => {
+   118→      const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+   119→      const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+   120→      const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+   121→      const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+   122→      const shoulderAngle = Math.atan2(
+   123→        rightShoulder.y - leftShoulder.y,
+   124→        rightShoulder.x - leftShoulder.x
+   125→      );
+   126→      const hipAngle = Math.atan2(rightHip.y - leftHip.y, rightHip.x - leftHip.x);
+   127→      return Math.abs(shoulderAngle - hipAngle) * (180 / Math.PI);
+   128→    },
+   129→    threshold: { min: 10, max: 45 },
+   130→    severity: 'medium',
+   131→    drillId: 'rotation-drill',
+   132→    drillTypes: ['smash', 'clear'],
+   133→    feedback: {
+   134→      tooLow: 'Rotate your body more for power',
+   135→      tooHigh: 'Control your rotation',
+   136→      good: 'Good body rotation!',
+   137→    },
+   138→  },
+   139→};
+   140→
+   141→// ============================================
+   142→// Drill Definitions
+   143→// ============================================
+   144→
+   145→export interface DrillDefinition {
+   146→  id: string;
+   147→  name: string;
+   148→  description: string;
+   149→  steps: string[];
+   150→  tips: string[];
+   151→  durationMinutes: number;
+   152→  targetMetrics: string[];
+   153→  keyframeType: 'smash' | 'clear' | 'netshot' | 'footwork' | 'drive';
+   154→}
+   155→
+   156→export const DRILLS: Record<string, DrillDefinition> = {
+   157→  'elbow-extension': {
+   158→    id: 'elbow-extension',
+   159→    name: 'Elbow Extension Drill',
+   160→    description: 'Practice full arm extension for powerful overhead shots',
+   161→    steps: [
+   162→      'Stand with racket arm extended overhead',
+   163→      'Practice full extension motion slowly',
+   164→      'Focus on locking elbow at contact point',
+   165→      'Repeat 20 times with shadow swing',
+   166→    ],
+   167→    tips: ['Keep wrist relaxed', 'Use mirror for feedback', 'Focus on smooth motion'],
+   168→    durationMinutes: 5,
+   169→    targetMetrics: ['elbow_angle'],
+   170→    keyframeType: 'smash',
+   171→  },
+   172→  'lunge-practice': {
+   173→    id: 'lunge-practice',
+   174→    name: 'Lunge Practice Drill',
+   175→    description: 'Develop proper lunge technique for net play',
+   176→    steps: [
+   177→      'Start in ready stance',
+   178→      'Step forward with lead leg',
+   179→      'Bend knee to 90 degrees',
+   180→      'Push back to starting position',
+   181→    ],
+   182→    tips: ['Keep back straight', 'Push through heel', 'Stay low'],
+   183→    durationMinutes: 10,
+   184→    targetMetrics: ['knee_angle', 'stance_width'],
+   185→    keyframeType: 'netshot',
+   186→  },
+   187→  'footwork-basics': {
+   188→    id: 'footwork-basics',
+   189→    name: 'Footwork Basics',
+   190→    description: 'Master the fundamental footwork patterns',
+   191→    steps: [
+   192→      'Start in center position',
+   193→      'Move to each corner using proper footwork',
+   194→      'Return to center after each move',
+   195→      'Focus on split step timing',
+   196→    ],
+   197→    tips: ['Stay on balls of feet', 'Keep center of gravity low', 'Use small, quick steps'],
+   198→    durationMinutes: 15,
+   199→    targetMetrics: ['stance_width', 'knee_angle'],
+   200→    keyframeType: 'footwork',
+   201→  },
+   202→  'rotation-drill': {
+   203→    id: 'rotation-drill',
+   204→    name: 'Body Rotation Drill',
+   205→    description: 'Develop hip-shoulder separation for power',
+   206→    steps: [
+   207→      'Stand sideways to the net',
+   208→      'Rotate hips first, then shoulders',
+   209→      'Practice the throwing motion',
+   210→      'Add racket swing gradually',
+   211→    ],
+   212→    tips: ['Lead with hips', 'Keep eye on shuttle', 'Follow through completely'],
+   213→    durationMinutes: 10,
+   214→    targetMetrics: ['body_rotation'],
+   215→    keyframeType: 'smash',
+   216→  },
+   217→  'drive-technique': {
+   218→    id: 'drive-technique',
+   219→    name: 'Drive Shot Technique',
+   220→    description: 'Practice flat, fast drive shots',
+   221→    steps: [
+   222→      'Position racket at shoulder height',
+   223→      'Use short, punchy swing',
+   224→      'Contact shuttle in front of body',
+   225→      'Follow through towards target',
+   226→    ],
+   227→    tips: ['Keep grip relaxed', 'Use forearm rotation', 'Stay compact'],
+   228→    durationMinutes: 10,
+   229→    targetMetrics: ['elbow_angle'],
+   230→    keyframeType: 'drive',
+   231→  },
+   232→};
+   233→
+   234→// ============================================
+   235→// Evaluation Functions
+   236→// ============================================
+   237→
+   238→export interface EvaluationResult {
+   239→  passed: boolean;
+   240→  score: number;
+   241→  failedRules: Array<{
+   242→    rule: FormRule;
+   243→    value: number;
+   244→    feedback: string;
+   245→  }>;
+   246→  passedRules: Array<{
+   247→    rule: FormRule;
+   248→    value: number;
+   249→  }>;
+   250→  highlightJoints: number[];
+   251→  recommendedDrills: DrillDefinition[];
+   252→}
+   253→
+   254→export function evaluateForm(
+   255→  landmarks: PoseLandmark[],
+   256→  drillType: string = 'general',
+   257→  canvasWidth: number = 640
+   258→): EvaluationResult {
+   259→  const failedRules: EvaluationResult['failedRules'] = [];
+   260→  const passedRules: EvaluationResult['passedRules'] = [];
+   261→  const highlightJoints: number[] = [];
+   262→  const drillIds = new Set<string>();
+   263→
+   264→  // Get rules applicable to this drill type
+   265→  const applicableRules = Object.values(FORM_RULES).filter(
+   266→    (rule) => rule.drillTypes.includes(drillType) || rule.drillTypes.includes('general')
+   267→  );
+   268→
+   269→  for (const rule of applicableRules) {
+   270→    const value = rule.compute(landmarks, canvasWidth);
+   271→    const { min, max } = rule.threshold;
+   272→
+   273→    if (value >= min && value <= max) {
+   274→      passedRules.push({ rule, value });
+   275→    } else {
+   276→      const feedback = value < min ? rule.feedback.tooLow : rule.feedback.tooHigh;
+   277→      failedRules.push({ rule, value, feedback });
+   278→      drillIds.add(rule.drillId);
+   279→
+   280→      // Add joints to highlight based on rule
+   281→      if (rule.code.includes('ELBOW')) {
+   282→        highlightJoints.push(POSE_LANDMARKS.RIGHT_ELBOW, POSE_LANDMARKS.RIGHT_WRIST);
+   283→      }
+   284→      if (rule.code.includes('KNEE')) {
+   285→        highlightJoints.push(POSE_LANDMARKS.RIGHT_KNEE, POSE_LANDMARKS.LEFT_KNEE);
+   286→      }
+   287→      if (rule.code.includes('STANCE')) {
+   288→        highlightJoints.push(POSE_LANDMARKS.LEFT_ANKLE, POSE_LANDMARKS.RIGHT_ANKLE);
+   289→      }
+   290→    }
+   291→  }
+   292→
+   293→  const totalRules = applicableRules.length;
+   294→  const score = totalRules > 0 ? (passedRules.length / totalRules) * 100 : 100;
+   295→  const passed = score >= 75; // Pass if 75% or more rules pass
+   296→
+   297→  // Get recommended drills
+   298→  const recommendedDrills = Array.from(drillIds)
+   299→    .map((id) => DRILLS[id])
+   300→    .filter(Boolean);
+   301→
+   302→  return {
+   303→    passed,
+   304→    score,
+   305→    failedRules,
+   306→    passedRules,
+   307→    highlightJoints,
+   308→    recommendedDrills,
+   309→  };
+   310→}
+   311→
+   312→// ============================================
+   313→// SVG Keyframe Generation
+   314→// ============================================
+   315→
+   316→const IDEAL_POSES: Record<string, Array<{ x: number; y: number }>> = {
+   317→  smash: [
+   318→    // Frame 1: Preparation
+   319→    { x: 0.5, y: 0.15 }, // nose
+   320→    { x: 0.45, y: 0.25 }, // left shoulder
+   321→    { x: 0.55, y: 0.25 }, // right shoulder
+   322→    { x: 0.35, y: 0.35 }, // left elbow
+   323→    { x: 0.75, y: 0.15 }, // right elbow (raised)
+   324→    { x: 0.25, y: 0.45 }, // left wrist
+   325→    { x: 0.85, y: 0.1 }, // right wrist (racket back)
+   326→    { x: 0.45, y: 0.5 }, // left hip
+   327→    { x: 0.55, y: 0.5 }, // right hip
+   328→    { x: 0.4, y: 0.75 }, // left knee
+   329→    { x: 0.6, y: 0.7 }, // right knee
+   330→    { x: 0.35, y: 0.95 }, // left ankle
+   331→    { x: 0.65, y: 0.95 }, // right ankle
+   332→  ],
+   333→  clear: [
+   334→    { x: 0.5, y: 0.15 },
+   335→    { x: 0.45, y: 0.25 },
+   336→    { x: 0.55, y: 0.25 },
+   337→    { x: 0.35, y: 0.35 },
+   338→    { x: 0.7, y: 0.2 },
+   339→    { x: 0.25, y: 0.45 },
+   340→    { x: 0.8, y: 0.1 },
+   341→    { x: 0.45, y: 0.5 },
+   342→    { x: 0.55, y: 0.5 },
+   343→    { x: 0.4, y: 0.75 },
+   344→    { x: 0.6, y: 0.7 },
+   345→    { x: 0.35, y: 0.95 },
+   346→    { x: 0.65, y: 0.95 },
+   347→  ],
+   348→  netshot: [
+   349→    { x: 0.5, y: 0.2 },
+   350→    { x: 0.45, y: 0.3 },
+   351→    { x: 0.55, y: 0.3 },
+   352→    { x: 0.4, y: 0.4 },
+   353→    { x: 0.65, y: 0.35 },
+   354→    { x: 0.35, y: 0.5 },
+   355→    { x: 0.75, y: 0.4 },
+   356→    { x: 0.45, y: 0.55 },
+   357→    { x: 0.55, y: 0.55 },
+   358→    { x: 0.35, y: 0.75 },
+   359→    { x: 0.7, y: 0.65 },
+   360→    { x: 0.3, y: 0.95 },
+   361→    { x: 0.8, y: 0.85 },
+   362→  ],
+   363→  footwork: [
+   364→    { x: 0.5, y: 0.15 },
+   365→    { x: 0.4, y: 0.25 },
+   366→    { x: 0.6, y: 0.25 },
+   367→    { x: 0.35, y: 0.4 },
+   368→    { x: 0.65, y: 0.4 },
+   369→    { x: 0.3, y: 0.5 },
+   370→    { x: 0.7, y: 0.5 },
+   371→    { x: 0.42, y: 0.5 },
+   372→    { x: 0.58, y: 0.5 },
+   373→    { x: 0.35, y: 0.75 },
+   374→    { x: 0.65, y: 0.75 },
+   375→    { x: 0.3, y: 0.95 },
+   376→    { x: 0.7, y: 0.95 },
+   377→  ],
+   378→  drive: [
+   379→    { x: 0.5, y: 0.15 },
+   380→    { x: 0.45, y: 0.25 },
+   381→    { x: 0.55, y: 0.25 },
+   382→    { x: 0.4, y: 0.35 },
+   383→    { x: 0.65, y: 0.3 },
+   384→    { x: 0.35, y: 0.45 },
+   385→    { x: 0.8, y: 0.3 },
+   386→    { x: 0.45, y: 0.5 },
+   387→    { x: 0.55, y: 0.5 },
+   388→    { x: 0.4, y: 0.75 },
+   389→    { x: 0.6, y: 0.75 },
+   390→    { x: 0.35, y: 0.95 },
+   391→    { x: 0.65, y: 0.95 },
+   392→  ],
+   393→};
+   394→
+   395→const SKELETON_CONNECTIONS = [
+   396→  [0, 1], [0, 2], // Head to shoulders
+   397→  [1, 2], // Shoulder to shoulder
+   398→  [1, 3], [3, 5], // Left arm
+   399→  [2, 4], [4, 6], // Right arm
+   400→  [1, 7], [2, 8], // Shoulders to hips
+   401→  [7, 8], // Hip to hip
+   402→  [7, 9], [9, 11], // Left leg
+   403→  [8, 10], [10, 12], // Right leg
+   404→];
+   405→
+   406→export function generateKeyframeSVG(
+   407→  drillType: 'smash' | 'clear' | 'netshot' | 'footwork' | 'drive',
+   408→  frame: number = 0,
+   409→  options: { width?: number; height?: number; color?: string } = {}
+   410→): string {
+   411→  const { width = 120, height = 180, color = '#0ea5e9' } = options;
+   412→  const pose = IDEAL_POSES[drillType] || IDEAL_POSES.footwork;
+   413→
+   414→  // Simple frame variation (slightly different poses)
+   415→  const offset = frame * 0.02;
+   416→
+   417→  let pathD = '';
+   418→  for (const [i, j] of SKELETON_CONNECTIONS) {
+   419→    const p1 = pose[i];
+   420→    const p2 = pose[j];
+   421→    if (p1 && p2) {
+   422→      const x1 = (p1.x + offset) * width;
+   423→      const y1 = p1.y * height;
+   424→      const x2 = (p2.x + offset) * width;
+   425→      const y2 = p2.y * height;
+   426→      pathD += `M${x1},${y1}L${x2},${y2}`;
+   427→    }
+   428→  }
+   429→
+   430→  let circles = '';
+   431→  for (const point of pose) {
+   432→    const x = (point.x + offset) * width;
+   433→    const y = point.y * height;
+   434→    circles += `<circle cx="${x}" cy="${y}" r="4" fill="${color}"/>`;
+   435→  }
+   436→
+   437→  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+   438→    <rect width="${width}" height="${height}" fill="#f8fafc" rx="8"/>
+   439→    <path d="${pathD}" stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round"/>
+   440→    ${circles}
+   441→  </svg>`;
+   442→}
+   443→
+   444→export function getKeyframeSVGs(
+   445→  drillType: 'smash' | 'clear' | 'netshot' | 'footwork' | 'drive',
+   446→  options: { width?: number; height?: number } = {}
+   447→): Array<{ svg: string; label: string }> {
+   448→  const labels = {
+   449→    smash: ['Setup', 'Load', 'Strike'],
+   450→    clear: ['Prepare', 'Reach', 'Follow'],
+   451→    netshot: ['Approach', 'Extend', 'Tap'],
+   452→    footwork: ['Ready', 'Step', 'Return'],
+   453→    drive: ['Position', 'Contact', 'Follow'],
+   454→  };
+   455→
+   456→  return [0, 1, 2].map((frame) => ({
+   457→    svg: generateKeyframeSVG(drillType, frame, options),
+   458→    label: labels[drillType]?.[frame] || `Step ${frame + 1}`,
+   459→  }));
+   460→}
+   461→
+   462→// ============================================
+   463→// Session Stats Aggregation
+   464→// ============================================
+   465→
+   466→export interface SessionStats {
+   467→  totalFrames: number;
+   468→  greenFrames: number;
+   469→  redFrames: number;
+   470→  greenRatio: number;
+   471→  avgScore: number;
+   472→  topIssues: Array<{ code: string; count: number }>;
+   473→  recommendedDrills: DrillDefinition[];
+   474→}
+   475→
+   476→export function aggregateSessionStats(
+   477→  frameResults: EvaluationResult[]
+   478→): SessionStats {
+   479→  const totalFrames = frameResults.length;
+   480→  const greenFrames = frameResults.filter((r) => r.passed).length;
+   481→  const redFrames = totalFrames - greenFrames;
+   482→  const greenRatio = totalFrames > 0 ? greenFrames / totalFrames : 0;
+   483→  const avgScore = totalFrames > 0
+   484→    ? frameResults.reduce((sum, r) => sum + r.score, 0) / totalFrames
+   485→    : 0;
+   486→
+   487→  // Count issues
+   488→  const issueCounts: Record<string, number> = {};
+   489→  for (const result of frameResults) {
+   490→    for (const failed of result.failedRules) {
+   491→      const code = failed.rule.code;
+   492→      issueCounts[code] = (issueCounts[code] || 0) + 1;
+   493→    }
+   494→  }
+   495→
+   496→  const topIssues = Object.entries(issueCounts)
+   497→    .map(([code, count]) => ({ code, count }))
+   498→    .sort((a, b) => b.count - a.count)
+   499→    .slice(0, 5);
+   500→
+   501→  // Get unique recommended drills
+   502→  const drillIds = new Set<string>();
+   503→  for (const result of frameResults) {
+   504→    for (const drill of result.recommendedDrills) {
+   505→      drillIds.add(drill.id);
+   506→    }
+   507→  }
+   508→  const recommendedDrills = Array.from(drillIds)
+   509→    .map((id) => DRILLS[id])
+   510→    .filter(Boolean)
+   511→    .slice(0, 3);
+   512→
+   513→  return {
+   514→    totalFrames,
+   515→    greenFrames,
+   516→    redFrames,
+   517→    greenRatio,
+   518→    avgScore,
+   519→    topIssues,
+   520→    recommendedDrills,
+   521→  };
+   522→}
+   523→
+   524→// ============================================
+   525→// Timestamp Violation Detection
+   526→// ============================================
+   527→
+   528→export function findViolationTimestamps(
+   529→  frameResults: Array<{ timestamp: number; result: EvaluationResult }>,
+   530→  ruleCode?: string
+   531→): number[] {
+   532→  return frameResults
+   533→    .filter((frame) => {
+   534→      if (ruleCode) {
+   535→        return frame.result.failedRules.some((f) => f.rule.code === ruleCode);
+   536→      }
+   537→      return !frame.result.passed;
+   538→    })
+   539→    .map((frame) => frame.timestamp);
+   540→}
+   541→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

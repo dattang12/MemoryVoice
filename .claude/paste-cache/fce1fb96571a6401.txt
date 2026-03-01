@@ -1,0 +1,68 @@
+You are a senior UI/UX + Frontend refactor engineer for a Next.js + React + Tailwind project.
+
+GOAL:
+Apply a full visual redesign using the provided RallyCoach UI concept (dark hero, energetic badminton aesthetic, animated cards/sections, modern dashboard styling), while preserving 100% of existing business logic, modes, and behavior.
+
+CRITICAL NON-NEGOTIABLE RULES:
+1) DO NOT remove or alter core functionality in any mode.
+2) DO NOT change functional behavior, state flow, API integration, data contracts, scoring logic, auth flow, or analysis logic.
+3) DO NOT break routing. Every route must still navigate to the correct page.
+4) UI-only refactor: styling, layout, visual hierarchy, animations, component composition improvements are allowed.
+5) Preserve existing mode/page purpose exactly:
+   - /dashboard (overview and stats)
+   - /analytics (video analysis flow)
+   - /practice (live practice coaching)
+   - /strategy (tactical/trajectory analysis)
+   - /history (session history + details)
+   - /racket (recommendation flow)
+   - /login and /signup auth flows
+6) Keep all existing interactions working (buttons, tabs, links, section jumps, modals, uploads, canvas overlays, playback controls, etc.).
+7) No dead links. No placeholder routes. Route mapping must remain correct.
+8) If a visual redesign conflicts with functionality, functionality wins.
+
+DESIGN DIRECTION (BASE ON PROVIDED UI):
+- Brand mood: Fresh, energetic, professional badminton platform.
+- Palette style: blue/green primary accents, strong contrast hero, clean whites in app surfaces.
+- Hero style: cinematic/dark layered background, bold italic heading, clear CTA hierarchy.
+- Motion: tasteful scroll reveal, hover lift, subtle transitions (no jank).
+- Cards: modern rounded geometry, stronger depth hierarchy, informative micro-labels.
+- Dashboard shell: premium left nav, sticky top bar, clean data blocks.
+- Keep accessibility: adequate contrast, focus states, semantic structure.
+
+IMPLEMENTATION REQUIREMENTS:
+A) Keep route integrity:
+   - Maintain current href targets and section anchors.
+   - Preserve auth gating patterns (e.g., user ? feature route : /signup) where currently used.
+B) Keep mode integrity:
+   - Do not rename/remove mode entry points.
+   - Do not remove internal tools/components used by analytics/practice/strategy logic.
+C) Refactor approach:
+   - Prefer extracting reusable presentational components.
+   - Keep logic hooks and data operations untouched whenever possible.
+   - Separate presentational changes from logic changes.
+D) Performance:
+   - Avoid unnecessary re-renders.
+   - Keep heavy pages (analytics/strategy/practice) operationally identical.
+E) Quality checks after changes:
+   - Route-by-route smoke test.
+   - Verify nav links and CTA links.
+   - Verify login/signup redirects.
+   - Verify dashboard nav active-state behavior.
+   - Verify no TypeScript/build errors.
+
+DELIVERABLE FORMAT:
+1) A brief plan of changed UI components/pages.
+2) Implemented code updates (UI only).
+3) A verification checklist confirming:
+   - all routes still correct
+   - all modes still functioning
+   - no business-logic regression
+4) A short changelog per file (what changed visually).
+5) If any requested visual cannot be done without logic change, explain and provide safe alternative.
+
+STRICTLY FORBIDDEN:
+- Deleting mode-specific logic.
+- Modifying analysis/practice/strategy algorithms.
+- Changing API contracts or Supabase logic.
+- Breaking current route structure.
+- Converting working features into static mockups.

@@ -1,0 +1,837 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+     4→import { useSearchParams } from 'next/navigation';
+     5→import DashboardNav from '@/components/DashboardNav';
+     6→import { supabase } from '@/lib/supabase';
+     7→import {
+     8→  extractMetrics,
+     9→  drawSkeleton,
+    10→  generateMockMetrics,
+    11→  evaluateMetrics,
+    12→  DEFAULT_THRESHOLDS,
+    13→} from '@/lib/pose-utils';
+    14→import {
+    15→  evaluateForm,
+    16→  DRILLS,
+    17→  FORM_RULES,
+    18→  type EvaluationResult,
+    19→} from '@/lib/rules-engine';
+    20→import type { PoseMetrics, PoseLandmark, TickResponse } from '@/lib/types';
+    21→
+    22→// MediaPipe Tasks Vision types
+    23→type PoseLandmarker = any;
+    24→type FilesetResolver = any;
+    25→
+    26→function PracticeContent() {
+    27→  const searchParams = useSearchParams();
+    28→  const drillId = searchParams.get('drill');
+    29→
+    30→  const videoRef = useRef<HTMLVideoElement>(null);
+    31→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    32→  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+    33→  const animationRef = useRef<number | null>(null);
+    34→  const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    35→  const sessionIdRef = useRef<string | null>(null);
+    36→  const lastVideoTimeRef = useRef<number>(-1);
+    37→  // PHASE 1: Track last MediaPipe timestamp to ensure strictly monotonic
+    38→  const lastTimestampMsRef = useRef<number>(-1);
+    39→  const currentLandmarksRef = useRef<PoseLandmark[] | null>(null);
+    40→  // Use ref to avoid stale closure in requestAnimationFrame
+    41→  const isActiveRef = useRef(false);
+    42→  const showSkeletonRef = useRef(true);
+    43→  const useMockDataRef = useRef(false);
+    44→
+    45→  const [isActive, setIsActive] = useState(false);
+    46→  const [isPoseLoaded, setPoseLoaded] = useState(false);
+    47→  const [poseError, setPoseError] = useState<string | null>(null);
+    48→  const [useMockData, setUseMockData] = useState(false);
+    49→  const [showSkeleton, setShowSkeleton] = useState(true);
+    50→
+    51→  const [currentMetrics, setCurrentMetrics] = useState<PoseMetrics | null>(null);
+    52→  const [currentEvaluation, setCurrentEvaluation] = useState<EvaluationResult | null>(null);
+    53→  const [isGreen, setIsGreen] = useState(true);
+    54→  const [coachingCue, setCoachingCue] = useState('Get ready to start!');
+    55→  const [focusMetric, setFocusMetric] = useState('');
+    56→  const [failingRules, setFailingRules] = useState<string[]>([]);
+    57→
+    58→  const [greenCount, setGreenCount] = useState(0);
+    59→  const [redCount, setRedCount] = useState(0);
+    60→  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+    61→
+    62→  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
+    63→
+    64→  // Get drill info if a drill is selected
+    65→  const currentDrill = drillId ? DRILLS[drillId] : null;
+    66→
+    67→  // Keep refs in sync with state to avoid stale closures in requestAnimationFrame
+    68→  useEffect(() => {
+    69→    isActiveRef.current = isActive;
+    70→  }, [isActive]);
+    71→
+    72→  useEffect(() => {
+    73→    showSkeletonRef.current = showSkeleton;
+    74→  }, [showSkeleton]);
+    75→
+    76→  useEffect(() => {
+    77→    useMockDataRef.current = useMockData;
+    78→  }, [useMockData]);
+    79→
+    80→  // Initialize MediaPipe Pose Landmarker
+    81→  useEffect(() => {
+    82→    initializePose();
+    83→    return () => {
+    84→      cleanup();
+    85→    };
+    86→  }, []);
+    87→
+    88→  const initializePose = async () => {
+    89→    try {
+    90→      // Dynamically import MediaPipe Tasks Vision
+    91→      const vision = await import('@mediapipe/tasks-vision');
+    92→      const { PoseLandmarker, FilesetResolver } = vision;
+    93→
+    94→      // Load the vision WASM files
+    95→      const filesetResolver = await FilesetResolver.forVisionTasks(
+    96→        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    97→      );
+    98→
+    99→      // Create the pose landmarker
+   100→      poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
+   101→        baseOptions: {
+   102→          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+   103→          delegate: 'GPU',
+   104→        },
+   105→        runningMode: 'VIDEO',
+   106→        numPoses: 1,
+   107→        minPoseDetectionConfidence: 0.5,
+   108→        minPosePresenceConfidence: 0.5,
+   109→        minTrackingConfidence: 0.5,
+   110→      });
+   111→
+   112→      setPoseLoaded(true);
+   113→    } catch (error) {
+   114→      console.error('Failed to load MediaPipe Pose:', error);
+   115→      setPoseError('Pose detection failed to load. Demo mode enabled.');
+   116→      useMockDataRef.current = true;
+   117→      setUseMockData(true);
+   118→      setPoseLoaded(true);
+   119→    }
+   120→  };
+   121→
+   122→  const cleanup = () => {
+   123→    isActiveRef.current = false;
+   124→    if (animationRef.current) {
+   125→      cancelAnimationFrame(animationRef.current);
+   126→      animationRef.current = null;
+   127→    }
+   128→    if (tickIntervalRef.current) {
+   129→      clearInterval(tickIntervalRef.current);
+   130→      tickIntervalRef.current = null;
+   131→    }
+   132→    if (poseLandmarkerRef.current) {
+   133→      poseLandmarkerRef.current.close();
+   134→      poseLandmarkerRef.current = null;
+   135→    }
+   136→    stopCamera();
+   137→  };
+   138→
+   139→  const startCamera = async () => {
+   140→    try {
+   141→      const stream = await navigator.mediaDevices.getUserMedia({
+   142→        video: { width: 640, height: 480, facingMode: 'user' },
+   143→      });
+   144→
+   145→      if (videoRef.current) {
+   146→        videoRef.current.srcObject = stream;
+   147→        await videoRef.current.play();
+   148→      }
+   149→    } catch (error) {
+   150→      console.error('Camera error:', error);
+   151→      setPoseError('Could not access camera. Demo mode enabled.');
+   152→      useMockDataRef.current = true;
+   153→      setUseMockData(true);
+   154→    }
+   155→  };
+   156→
+   157→  const stopCamera = () => {
+   158→    if (videoRef.current?.srcObject) {
+   159→      const stream = videoRef.current.srcObject as MediaStream;
+   160→      stream.getTracks().forEach((track) => track.stop());
+   161→      videoRef.current.srcObject = null;
+   162→    }
+   163→  };
+   164→
+   165→  const processFrame = useCallback(() => {
+   166→    // Use refs to avoid stale closure issues
+   167→    if (!isActiveRef.current) return;
+   168→
+   169→    if (useMockDataRef.current) {
+   170→      // Generate mock data for demo
+   171→      const metrics = generateMockMetrics();
+   172→      setCurrentMetrics(metrics);
+   173→
+   174→      const { isGreen: green } = evaluateMetrics(metrics);
+   175→      setIsGreen(green);
+   176→
+   177→      if (green) {
+   178→        setGreenCount((c) => c + 1);
+   179→        setFailingRules([]);
+   180→      } else {
+   181→        setRedCount((c) => c + 1);
+   182→        setFailingRules(['Demo: Adjust form']);
+   183→      }
+   184→
+   185→      // Draw mock skeleton on canvas
+   186→      if (canvasRef.current && showSkeletonRef.current) {
+   187→        const ctx = canvasRef.current.getContext('2d');
+   188→        if (ctx) {
+   189→          ctx.fillStyle = '#1f2937';
+   190→          ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+   191→
+   192→          // Draw simple mock skeleton
+   193→          const color = green ? '#22c55e' : '#ef4444';
+   194→          ctx.strokeStyle = color;
+   195→          ctx.lineWidth = 3;
+   196→          ctx.fillStyle = color;
+   197→
+   198→          // Simple stick figure
+   199→          const cx = 320;
+   200→          const cy = 200;
+   201→
+   202→          // Head
+   203→          ctx.beginPath();
+   204→          ctx.arc(cx, cy - 60, 20, 0, Math.PI * 2);
+   205→          ctx.fill();
+   206→
+   207→          // Body
+   208→          ctx.beginPath();
+   209→          ctx.moveTo(cx, cy - 40);
+   210→          ctx.lineTo(cx, cy + 40);
+   211→          ctx.stroke();
+   212→
+   213→          // Arms
+   214→          ctx.beginPath();
+   215→          ctx.moveTo(cx - 50, cy - 10);
+   216→          ctx.lineTo(cx, cy - 20);
+   217→          ctx.lineTo(cx + 60, cy - 40);
+   218→          ctx.stroke();
+   219→
+   220→          // Legs
+   221→          ctx.beginPath();
+   222→          ctx.moveTo(cx - 30, cy + 100);
+   223→          ctx.lineTo(cx, cy + 40);
+   224→          ctx.lineTo(cx + 30, cy + 100);
+   225→          ctx.stroke();
+   226→        }
+   227→      }
+   228→    } else if (poseLandmarkerRef.current && videoRef.current && canvasRef.current) {
+   229→      const video = videoRef.current;
+   230→      const canvas = canvasRef.current;
+   231→      const ctx = canvas.getContext('2d');
+   232→
+   233→      // Only process if we have a new frame
+   234→      if (video.currentTime !== lastVideoTimeRef.current && ctx) {
+   235→        lastVideoTimeRef.current = video.currentTime;
+   236→
+   237→        try {
+   238→          // PHASE 1 FIX: Ensure timestamps are strictly monotonically increasing
+   239→          // to prevent MediaPipe "Packet timestamp mismatch" errors
+   240→          const rawTimestampMs = Math.floor(performance.now());
+   241→          const timestampMs = Math.max(lastTimestampMsRef.current + 1, rawTimestampMs);
+   242→          lastTimestampMsRef.current = timestampMs;
+   243→
+   244→          // Detect pose
+   245→          const results = poseLandmarkerRef.current.detectForVideo(video, timestampMs);
+   246→
+   247→          // Clear canvas (transparent background - video shows through)
+   248→          ctx.clearRect(0, 0, canvas.width, canvas.height);
+   249→
+   250→          if (results.landmarks && results.landmarks.length > 0) {
+   251→            const poseLandmarks = results.landmarks[0];
+   252→
+   253→            // Convert to our format
+   254→            const landmarks: PoseLandmark[] = poseLandmarks.map((lm: any) => ({
+   255→              x: lm.x,
+   256→              y: lm.y,
+   257→              z: lm.z,
+   258→              visibility: lm.visibility ?? 1.0,
+   259→            }));
+   260→
+   261→            // Store current landmarks
+   262→            currentLandmarksRef.current = landmarks;
+   263→
+   264→            const metrics = extractMetrics(landmarks);
+   265→            setCurrentMetrics(metrics);
+   266→
+   267→            // Use rules engine for evaluation
+   268→            const drillType = currentDrill?.keyframeType || 'general';
+   269→            const evaluation = evaluateForm(landmarks, drillType, canvas.width);
+   270→            setCurrentEvaluation(evaluation);
+   271→
+   272→            // Update green/red state
+   273→            const green = evaluation.passed;
+   274→            setIsGreen(green);
+   275→
+   276→            // Track failing rules
+   277→            if (evaluation.failedRules.length > 0) {
+   278→              setFailingRules(evaluation.failedRules.map(f => f.feedback));
+   279→              setFocusMetric(evaluation.failedRules[0].rule.name);
+   280→            } else {
+   281→              setFailingRules([]);
+   282→              setFocusMetric('');
+   283→            }
+   284→
+   285→            // Update counts
+   286→            if (green) {
+   287→              setGreenCount((c) => c + 1);
+   288→            } else {
+   289→              setRedCount((c) => c + 1);
+   290→            }
+   291→
+   292→            // Draw skeleton if enabled
+   293→            if (showSkeletonRef.current) {
+   294→              drawSkeleton(ctx, landmarks, green, canvas.width, canvas.height);
+   295→            }
+   296→          }
+   297→        } catch (error) {
+   298→          console.error('Error processing frame:', error);
+   299→        }
+   300→      }
+   301→    }
+   302→
+   303→    // Continue animation loop
+   304→    if (isActiveRef.current) {
+   305→      animationRef.current = requestAnimationFrame(processFrame);
+   306→    }
+   307→  }, [currentDrill]);
+   308→
+   309→  const sendTick = async () => {
+   310→    if (!currentMetrics) return;
+   311→
+   312→    try {
+   313→      const response = await fetch('/api/practice/tick', {
+   314→        method: 'POST',
+   315→        headers: { 'Content-Type': 'application/json' },
+   316→        body: JSON.stringify({
+   317→          metrics_snapshot: currentMetrics,
+   318→          drill_id: drillId || undefined,
+   319→          session_id: sessionIdRef.current,
+   320→        }),
+   321→      });
+   322→
+   323→      if (response.ok) {
+   324→        const data: TickResponse = await response.json();
+   325→        setCoachingCue(data.cue);
+   326→        if (data.focus_metric) {
+   327→          setFocusMetric(data.focus_metric);
+   328→        }
+   329→        setIsGreen(data.is_green);
+   330→        if (data.green_thresholds) {
+   331→          setThresholds(data.green_thresholds as typeof DEFAULT_THRESHOLDS);
+   332→        }
+   333→      }
+   334→    } catch (error) {
+   335→      // Use local evaluation if API fails
+   336→      if (currentEvaluation) {
+   337→        if (currentEvaluation.failedRules.length > 0) {
+   338→          setCoachingCue(currentEvaluation.failedRules[0].feedback);
+   339→        } else {
+   340→          setCoachingCue('Great form! Keep it up!');
+   341→        }
+   342→      }
+   343→    }
+   344→  };
+   345→
+   346→  const startSession = async () => {
+   347→    // Create session in database
+   348→    const { data: { user } } = await supabase.auth.getUser();
+   349→
+   350→    if (user) {
+   351→      const { data, error } = await supabase
+   352→        .from('sessions')
+   353→        .insert({
+   354→          user_id: user.id,
+   355→          type: 'practice',
+   356→          // created_at is auto-generated by database
+   357→        })
+   358→        .select()
+   359→        .single();
+   360→
+   361→      if (!error && data) {
+   362→        sessionIdRef.current = data.id;
+   363→      }
+   364→    }
+   365→
+   366→    // Set ref BEFORE state to ensure processFrame has correct value immediately
+   367→    isActiveRef.current = true;
+   368→    setIsActive(true);
+   369→    setGreenCount(0);
+   370→    setRedCount(0);
+   371→    setSessionStartTime(new Date());
+   372→    setCoachingCue('Let\'s go! Start your movement.');
+   373→    setFailingRules([]);
+   374→
+   375→    if (!useMockDataRef.current) {
+   376→      await startCamera();
+   377→    }
+   378→
+   379→    // Start frame processing after camera is ready
+   380→    setTimeout(() => {
+   381→      if (isActiveRef.current) {
+   382→        animationRef.current = requestAnimationFrame(processFrame);
+   383→      }
+   384→    }, 100);
+   385→
+   386→    // Start tick interval (every 1 second)
+   387→    tickIntervalRef.current = setInterval(sendTick, 1000);
+   388→  };
+   389→
+   390→  const stopSession = async () => {
+   391→    // Set ref BEFORE state to stop animation loop immediately
+   392→    isActiveRef.current = false;
+   393→    setIsActive(false);
+   394→
+   395→    if (animationRef.current) {
+   396→      cancelAnimationFrame(animationRef.current);
+   397→      animationRef.current = null;
+   398→    }
+   399→    if (tickIntervalRef.current) {
+   400→      clearInterval(tickIntervalRef.current);
+   401→      tickIntervalRef.current = null;
+   402→    }
+   403→
+   404→    stopCamera();
+   405→
+   406→    // Save session summary
+   407→    const { data: { user } } = await supabase.auth.getUser();
+   408→    if (user && sessionIdRef.current) {
+   409→      const totalFrames = greenCount + redCount;
+   410→      const avgScore = totalFrames > 0 ? (greenCount / totalFrames) * 100 : 0;
+   411→      const durationSeconds = sessionStartTime ? (Date.now() - sessionStartTime.getTime()) / 1000 : 0;
+   412→
+   413→      await supabase
+   414→        .from('sessions')
+   415→        .update({
+   416→          overall_score: Math.round(avgScore),
+   417→          summary: {
+   418→            green_count: greenCount,
+   419→            green_frames: greenCount,
+   420→            red_count: redCount,
+   421→            red_frames: redCount,
+   422→            total_frames: totalFrames,
+   423→            average_score: avgScore,
+   424→            green_ratio: totalFrames > 0 ? greenCount / totalFrames : 0,
+   425→            drill_id: drillId,
+   426→            drill_type: drillId || 'general',
+   427→            duration_seconds: durationSeconds,
+   428→          },
+   429→        })
+   430→        .eq('id', sessionIdRef.current);
+   431→    }
+   432→
+   433→    setCoachingCue('Great session! Check your stats below.');
+   434→    sessionIdRef.current = null;
+   435→  };
+   436→
+   437→  const getElapsedTime = () => {
+   438→    if (!sessionStartTime) return '0:00';
+   439→    const elapsed = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
+   440→    const minutes = Math.floor(elapsed / 60);
+   441→    const seconds = elapsed % 60;
+   442→    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+   443→  };
+   444→
+   445→  const totalFrames = greenCount + redCount;
+   446→  const greenRatio = totalFrames > 0 ? ((greenCount / totalFrames) * 100).toFixed(1) : '0';
+   447→
+   448→  return (
+   449→    <div className="min-h-screen bg-gray-50">
+   450→      <DashboardNav />
+   451→
+   452→      <main className="ml-64 p-8">
+   453→        <div className="max-w-7xl mx-auto">
+   454→          {/* Header */}
+   455→          <div className="mb-8">
+   456→            <h1 className="text-3xl font-bold text-gray-900">Practice Mode</h1>
+   457→            <p className="text-gray-600 mt-1">
+   458→              {currentDrill
+   459→                ? `Practicing: ${currentDrill.name}`
+   460→                : 'Real-time form coaching with AI feedback'}
+   461→            </p>
+   462→          </div>
+   463→
+   464→          {/* Warning if using mock data */}
+   465→          {poseError && (
+   466→            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+   467→              <div className="flex items-center space-x-3">
+   468→                <svg
+   469→                  className="w-5 h-5 text-yellow-500"
+   470→                  fill="none"
+   471→                  stroke="currentColor"
+   472→                  viewBox="0 0 24 24"
+   473→                >
+   474→                  <path
+   475→                    strokeLinecap="round"
+   476→                    strokeLinejoin="round"
+   477→                    strokeWidth={2}
+   478→                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+   479→                  />
+   480→                </svg>
+   481→                <div>
+   482→                  <p className="font-medium text-yellow-800">Demo Mode Active</p>
+   483→                  <p className="text-sm text-yellow-700">
+   484→                    {poseError} Using simulated pose data for demonstration.
+   485→                  </p>
+   486→                </div>
+   487→              </div>
+   488→            </div>
+   489→          )}
+   490→
+   491→          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+   492→            {/* Video/Canvas Section */}
+   493→            <div className="lg:col-span-2">
+   494→              <div className="bg-gray-900 rounded-xl overflow-hidden">
+   495→                <div className="relative aspect-video">
+   496→                  <video
+   497→                    ref={videoRef}
+   498→                    className="absolute inset-0 w-full h-full object-cover"
+   499→                    style={{ display: useMockData ? 'none' : 'block', zIndex: 1 }}
+   500→                    playsInline
+   501→                    muted
+   502→                  />
+   503→                  <canvas
+   504→                    ref={canvasRef}
+   505→                    width={640}
+   506→                    height={480}
+   507→                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+   508→                    style={{ display: showSkeleton ? 'block' : 'none', zIndex: 2 }}
+   509→                  />
+   510→
+   511→                  {/* Status overlay */}
+   512→                  {isActive && (
+   513→                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+   514→                      <div className="flex items-center space-x-2">
+   515→                        <div
+   516→                          className={`w-3 h-3 rounded-full ${
+   517→                            isGreen ? 'bg-accent-green' : 'bg-accent-red'
+   518→                          } animate-pulse`}
+   519→                        ></div>
+   520→                        <span className="text-white text-sm font-medium">
+   521→                          {isGreen ? 'Good Form' : 'Adjust Form'}
+   522→                        </span>
+   523→                      </div>
+   524→                      <div className="text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+   525→                        {getElapsedTime()}
+   526→                      </div>
+   527→                    </div>
+   528→                  )}
+   529→
+   530→                  {/* Failing rules indicator */}
+   531→                  {isActive && failingRules.length > 0 && (
+   532→                    <div className="absolute top-14 left-4 bg-red-500/90 text-white px-3 py-2 rounded-lg max-w-xs">
+   533→                      <p className="text-xs font-medium mb-1">Failing:</p>
+   534→                      {failingRules.slice(0, 2).map((rule, i) => (
+   535→                        <p key={i} className="text-sm">{rule}</p>
+   536→                      ))}
+   537→                    </div>
+   538→                  )}
+   539→
+   540→                  {/* Coaching cue */}
+   541→                  {isActive && (
+   542→                    <div
+   543→                      className={`absolute bottom-4 left-4 right-4 p-4 rounded-lg ${
+   544→                        isGreen ? 'bg-accent-green/90' : 'bg-accent-red/90'
+   545→                      }`}
+   546→                    >
+   547→                      <p className="text-white font-medium text-center">
+   548→                        {coachingCue}
+   549→                      </p>
+   550→                      {focusMetric && (
+   551→                        <p className="text-white/80 text-sm text-center mt-1">
+   552→                          Focus: {focusMetric.replace(/_/g, ' ')}
+   553→                        </p>
+   554→                      )}
+   555→                    </div>
+   556→                  )}
+   557→
+   558→                  {/* Start prompt */}
+   559→                  {!isActive && (
+   560→                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+   561→                      <div className="text-center">
+   562→                        <div className="w-20 h-20 bg-primary-500 rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-primary-600 transition"
+   563→                             onClick={isPoseLoaded ? startSession : undefined}>
+   564→                          <svg
+   565→                            className="w-10 h-10 text-white"
+   566→                            fill="none"
+   567→                            stroke="currentColor"
+   568→                            viewBox="0 0 24 24"
+   569→                          >
+   570→                            <path
+   571→                              strokeLinecap="round"
+   572→                              strokeLinejoin="round"
+   573→                              strokeWidth={2}
+   574→                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+   575→                            />
+   576→                            <path
+   577→                              strokeLinecap="round"
+   578→                              strokeLinejoin="round"
+   579→                              strokeWidth={2}
+   580→                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+   581→                            />
+   582→                          </svg>
+   583→                        </div>
+   584→                        <p className="text-white font-medium">
+   585→                          {isPoseLoaded
+   586→                            ? 'Click to start practice'
+   587→                            : 'Loading pose detection...'}
+   588→                        </p>
+   589→                      </div>
+   590→                    </div>
+   591→                  )}
+   592→                </div>
+   593→
+   594→                {/* Controls */}
+   595→                <div className="p-4 flex items-center justify-between">
+   596→                  <div className="flex items-center gap-4">
+   597→                    {isActive ? (
+   598→                      <button
+   599→                        onClick={stopSession}
+   600→                        className="px-8 py-3 bg-accent-red text-white rounded-lg font-medium hover:bg-red-600 transition"
+   601→                      >
+   602→                        Stop Session
+   603→                      </button>
+   604→                    ) : (
+   605→                      <button
+   606→                        onClick={startSession}
+   607→                        disabled={!isPoseLoaded}
+   608→                        className="px-8 py-3 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+   609→                      >
+   610→                        {isPoseLoaded ? 'Start Practice' : 'Loading...'}
+   611→                      </button>
+   612→                    )}
+   613→                  </div>
+   614→
+   615→                  {/* Show skeleton toggle */}
+   616→                  <label className="flex items-center gap-2 text-white text-sm">
+   617→                    <input
+   618→                      type="checkbox"
+   619→                      checked={showSkeleton}
+   620→                      onChange={(e) => {
+   621→                        showSkeletonRef.current = e.target.checked;
+   622→                        setShowSkeleton(e.target.checked);
+   623→                      }}
+   624→                      className="rounded"
+   625→                    />
+   626→                    Show Skeleton
+   627→                  </label>
+   628→                </div>
+   629→              </div>
+   630→
+   631→              {/* Drill info card */}
+   632→              {currentDrill && (
+   633→                <div className="mt-6 bg-white rounded-xl p-6 shadow-sm">
+   634→                  <h3 className="font-semibold text-gray-900 mb-3">{currentDrill.name}</h3>
+   635→                  <p className="text-gray-600 text-sm mb-4">{currentDrill.description}</p>
+   636→                  <div className="space-y-2">
+   637→                    <p className="text-sm font-medium text-gray-900">Steps:</p>
+   638→                    <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+   639→                      {currentDrill.steps.map((step, i) => (
+   640→                        <li key={i}>{step}</li>
+   641→                      ))}
+   642→                    </ol>
+   643→                  </div>
+   644→                  {currentDrill.tips.length > 0 && (
+   645→                    <div className="mt-4 flex flex-wrap gap-2">
+   646→                      {currentDrill.tips.map((tip, i) => (
+   647→                        <span key={i} className="text-xs px-2 py-1 bg-primary-50 text-primary-700 rounded">
+   648→                          {tip}
+   649→                        </span>
+   650→                      ))}
+   651→                    </div>
+   652→                  )}
+   653→                </div>
+   654→              )}
+   655→            </div>
+   656→
+   657→            {/* Stats Sidebar */}
+   658→            <div className="space-y-6">
+   659→              {/* Session Stats */}
+   660→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   661→                <h3 className="font-semibold text-gray-900 mb-4">Session Stats</h3>
+   662→                <div className="space-y-4">
+   663→                  <div className="flex justify-between items-center">
+   664→                    <span className="text-gray-600">Green Frames</span>
+   665→                    <span className="font-bold text-accent-green">{greenCount}</span>
+   666→                  </div>
+   667→                  <div className="flex justify-between items-center">
+   668→                    <span className="text-gray-600">Red Frames</span>
+   669→                    <span className="font-bold text-accent-red">{redCount}</span>
+   670→                  </div>
+   671→                  <div className="h-px bg-gray-200"></div>
+   672→                  <div className="flex justify-between items-center">
+   673→                    <span className="text-gray-600">Green Ratio</span>
+   674→                    <span className="font-bold text-gray-900">{greenRatio}%</span>
+   675→                  </div>
+   676→                  <div className="w-full bg-gray-200 rounded-full h-3">
+   677→                    <div
+   678→                      className="bg-accent-green rounded-full h-3 transition-all"
+   679→                      style={{ width: `${greenRatio}%` }}
+   680→                    ></div>
+   681→                  </div>
+   682→                </div>
+   683→              </div>
+   684→
+   685→              {/* Current Metrics */}
+   686→              <div className="bg-white rounded-xl p-6 shadow-sm">
+   687→                <h3 className="font-semibold text-gray-900 mb-4">Current Metrics</h3>
+   688→                {currentMetrics ? (
+   689→                  <div className="space-y-3">
+   690→                    <MetricRow
+   691→                      label="Elbow Angle"
+   692→                      value={currentMetrics.elbow_angle}
+   693→                      unit="°"
+   694→                      min={thresholds.elbow_angle.min}
+   695→                      max={thresholds.elbow_angle.max}
+   696→                    />
+   697→                    <MetricRow
+   698→                      label="Knee Angle"
+   699→                      value={currentMetrics.knee_angle}
+   700→                      unit="°"
+   701→                      min={thresholds.knee_angle.min}
+   702→                      max={thresholds.knee_angle.max}
+   703→                    />
+   704→                    <MetricRow
+   705→                      label="Stance Width"
+   706→                      value={currentMetrics.stance_width_norm}
+   707→                      unit=""
+   708→                      min={thresholds.stance_width_norm.min}
+   709→                      max={thresholds.stance_width_norm.max}
+   710→                    />
+   711→                    <MetricRow
+   712→                      label="Rotation"
+   713→                      value={currentMetrics.shoulder_hip_rotation_proxy}
+   714→                      unit=""
+   715→                      min={thresholds.shoulder_hip_rotation_proxy.min}
+   716→                      max={thresholds.shoulder_hip_rotation_proxy.max}
+   717→                    />
+   718→                  </div>
+   719→                ) : (
+   720→                  <p className="text-gray-500 text-sm">
+   721→                    Start a session to see metrics
+   722→                  </p>
+   723→                )}
+   724→              </div>
+   725→
+   726→              {/* Score */}
+   727→              {currentEvaluation && (
+   728→                <div className="bg-white rounded-xl p-6 shadow-sm">
+   729→                  <h3 className="font-semibold text-gray-900 mb-2">Form Score</h3>
+   730→                  <div className="text-4xl font-bold text-primary-500">
+   731→                    {currentEvaluation.score.toFixed(0)}%
+   732→                  </div>
+   733→                  <p className="text-sm text-gray-500 mt-1">
+   734→                    {currentEvaluation.passedRules.length} of {currentEvaluation.passedRules.length + currentEvaluation.failedRules.length} checks passing
+   735→                  </p>
+   736→                </div>
+   737→              )}
+   738→
+   739→              {/* Tips */}
+   740→              <div className="bg-primary-50 rounded-xl p-6">
+   741→                <h3 className="font-semibold text-gray-900 mb-3">Quick Tips</h3>
+   742→                <ul className="space-y-2 text-sm text-gray-700">
+   743→                  <li className="flex items-start space-x-2">
+   744→                    <span className="text-primary-500">•</span>
+   745→                    <span>Stand 6-8 feet from your camera</span>
+   746→                  </li>
+   747→                  <li className="flex items-start space-x-2">
+   748→                    <span className="text-primary-500">•</span>
+   749→                    <span>Ensure good lighting on your body</span>
+   750→                  </li>
+   751→                  <li className="flex items-start space-x-2">
+   752→                    <span className="text-primary-500">•</span>
+   753→                    <span>Wear fitted clothing for better tracking</span>
+   754→                  </li>
+   755→                  <li className="flex items-start space-x-2">
+   756→                    <span className="text-primary-500">•</span>
+   757→                    <span>Keep your full body in frame</span>
+   758→                  </li>
+   759→                </ul>
+   760→              </div>
+   761→            </div>
+   762→          </div>
+   763→        </div>
+   764→      </main>
+   765→    </div>
+   766→  );
+   767→}
+   768→
+   769→// Metric row component
+   770→function MetricRow({
+   771→  label,
+   772→  value,
+   773→  unit,
+   774→  min,
+   775→  max,
+   776→}: {
+   777→  label: string;
+   778→  value: number;
+   779→  unit: string;
+   780→  min: number;
+   781→  max: number;
+   782→}) {
+   783→  const isInRange = value >= min && value <= max;
+   784→
+   785→  return (
+   786→    <div className="flex items-center justify-between">
+   787→      <span className="text-gray-600 text-sm">{label}</span>
+   788→      <div className="flex items-center space-x-2">
+   789→        <span
+   790→          className={`font-mono text-sm ${
+   791→            isInRange ? 'text-accent-green' : 'text-accent-red'
+   792→          }`}
+   793→        >
+   794→          {value.toFixed(1)}
+   795→          {unit}
+   796→        </span>
+   797→        <div
+   798→          className={`w-2 h-2 rounded-full ${
+   799→            isInRange ? 'bg-accent-green' : 'bg-accent-red'
+   800→          }`}
+   801→        ></div>
+   802→      </div>
+   803→    </div>
+   804→  );
+   805→}
+   806→
+   807→// Loading fallback
+   808→function PracticeLoading() {
+   809→  return (
+   810→    <div className="min-h-screen bg-gray-50">
+   811→      <DashboardNav />
+   812→      <main className="ml-64 p-8">
+   813→        <div className="max-w-7xl mx-auto">
+   814→          <div className="animate-pulse">
+   815→            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+   816→            <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+   817→            <div className="bg-gray-200 rounded-xl aspect-video"></div>
+   818→          </div>
+   819→        </div>
+   820→      </main>
+   821→    </div>
+   822→  );
+   823→}
+   824→
+   825→// Export with Suspense boundary
+   826→export default function PracticePage() {
+   827→  return (
+   828→    <Suspense fallback={<PracticeLoading />}>
+   829→      <PracticeContent />
+   830→    </Suspense>
+   831→  );
+   832→}
+   833→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

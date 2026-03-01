@@ -1,0 +1,91 @@
+---
+name: growthops-ab-testing
+description: >
+  A/B testing engine for email subjects, outreach messages, and content variants.
+  Use when asked to "A/B test", "split test", "test variants", "compare subjects",
+  "optimize conversion", or any experimentation task. Tracks variants, declares winners,
+  and auto-promotes best performers.
+tools: Bash
+metadata: {"openclaw":{"emoji":"🧪"}}
+---
+
+# A/B Testing Skill
+
+## What You Do
+Design, run, and analyze A/B tests across email subjects, outreach messages, LinkedIn posts, and XHS content. Track results, declare winners with statistical confidence, and auto-promote winning variants.
+
+## Test Types
+
+### Email Subject Lines
+- Create 2 variants per campaign
+- Split 50/50 across recipients
+- Track: open rate, reply rate, click rate
+- Declare winner after 100 sends per variant (or 50 if clear signal)
+
+### Outreach Messages
+- Test connection request copy (LinkedIn drafts)
+- Test DM opening lines
+- Track: acceptance rate, reply rate, positive reply rate
+
+### Content Hooks
+- Test 2 hook variants per XHS/LinkedIn post
+- Measure: engagement rate (likes + comments + saves / views)
+
+## Running a Test
+
+### 1. Create Test
+Save to `workspace/ab-tests/active/{test-id}.md`:
+
+```markdown
+# A/B Test: {test-id}
+- **Type**: email-subject / outreach-message / content-hook
+- **Hypothesis**: {what you expect}
+- **Start Date**: {date}
+- **Target Sample**: {N per variant}
+
+## Variant A (Control)
+{content}
+
+## Variant B (Challenger)
+{content}
+
+## Results
+| Metric | Variant A | Variant B |
+|--------|-----------|-----------|
+| Sent/Shown | 0 | 0 |
+| Opens/Views | 0 | 0 |
+| Clicks/Engagement | 0 | 0 |
+| Replies/Conversions | 0 | 0 |
+| Rate | 0% | 0% |
+
+## Status: RUNNING / WINNER_A / WINNER_B / NO_DIFFERENCE
+```
+
+### 2. Update Results
+After each batch send or content post, update the results table.
+
+### 3. Declare Winner
+- Minimum sample: 50 per variant (100 preferred)
+- Winner needs ≥20% relative improvement
+- If <20% difference after 200 total sends: declare NO_DIFFERENCE, pick simpler variant
+- Move completed test to `workspace/ab-tests/completed/`
+
+### 4. Apply Winner
+- Email: update template in email-engine skill
+- Outreach: update template in linkedin-ops or dm-outreach skill
+- Content: use winning hook pattern for future content
+
+## Test Ideas Queue
+
+Maintain `workspace/ab-tests/ideas.md` with upcoming tests:
+```
+1. Subject: Question vs Statement format
+2. CTA: "Upload now" vs "See examples first"
+3. Social proof: Specific number vs Vague ("many founders")
+4. Personalization: Company name in subject vs Not
+5. Length: Short (2 sentences) vs Medium (4 sentences)
+```
+
+## Reporting
+- Weekly: summarize all active tests and recent winners
+- Include in weekly report skill output

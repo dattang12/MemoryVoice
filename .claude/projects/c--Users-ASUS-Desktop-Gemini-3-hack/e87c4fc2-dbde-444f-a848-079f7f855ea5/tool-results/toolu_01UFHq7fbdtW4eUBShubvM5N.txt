@@ -1,0 +1,728 @@
+     1→/**
+     2→ * Banded Scoring Rules Configuration
+     3→ *
+     4→ * This module provides configurable scoring rules with:
+     5→ * - Skill level-based tolerance bands (beginner/intermediate/advanced)
+     6→ * - Three-tier scoring: Green (good), Yellow (minor deviation), Red (major deviation)
+     7→ * - Confidence gating: Low confidence poses are marked as "unknown" instead of red
+     8→ * - Phase-aware checks: Different rules for ready vs lunge vs recovery phases
+     9→ *
+    10→ * Version: v1
+    11→ */
+    12→
+    13→import type {
+    14→  ScoringRulesConfig,
+    15→  ScoreBand,
+    16→  BandedScore,
+    17→  PoseLandmark,
+    18→  PoseMetrics
+    19→} from './types';
+    20→import { calculateAngle, calculateDistance, POSE_LANDMARKS } from './pose-utils';
+    21→
+    22→// ============================================
+    23→// Rules Configuration (versioned)
+    24→// ============================================
+    25→
+    26→export const SCORING_RULES_CONFIG: ScoringRulesConfig = {
+    27→  version: 'v1',
+    28→
+    29→  // How much wider the acceptable bands are for each skill level
+    30→  skill_bands: {
+    31→    beginner: {
+    32→      green_tolerance: 0.40, // 40% wider green band
+    33→      yellow_tolerance: 0.60, // 60% wider than ideal for yellow
+    34→    },
+    35→    intermediate: {
+    36→      green_tolerance: 0.25, // 25% wider green band
+    37→      yellow_tolerance: 0.40, // 40% wider for yellow
+    38→    },
+    39→    advanced: {
+    40→      green_tolerance: 0.10, // 10% wider green band (strict)
+    41→      yellow_tolerance: 0.20, // 20% wider for yellow
+    42→    },
+    43→  },
+    44→
+    45→  // Minimum confidence threshold - below this, mark as "unknown"
+    46→  confidence_threshold: 0.5,
+    47→
+    48→  // Phase-specific rules
+    49→  phase_rules: {
+    50→    ready: {
+    51→      name: 'Ready Position',
+    52→      applicable_metrics: ['knee_angle', 'stance_width'],
+    53→      thresholds: {
+    54→        knee_angle: { min: 130, max: 160 },
+    55→        stance_width: { min: 0.8, max: 1.3 },
+    56→      },
+    57→    },
+    58→    lunge: {
+    59→      name: 'Lunge/Reach',
+    60→      applicable_metrics: ['knee_angle', 'stance_width', 'elbow_angle'],
+    61→      thresholds: {
+    62→        knee_angle: { min: 90, max: 140 },
+    63→        stance_width: { min: 1.0, max: 2.0 },
+    64→        elbow_angle: { min: 100, max: 160 },
+    65→      },
+    66→    },
+    67→    overhead: {
+    68→      name: 'Overhead Shot',
+    69→      applicable_metrics: ['elbow_angle', 'body_rotation'],
+    70→      thresholds: {
+    71→        elbow_angle: { min: 150, max: 180 },
+    72→        body_rotation: { min: 15, max: 50 },
+    73→      },
+    74→    },
+    75→    recovery: {
+    76→      name: 'Recovery',
+    77→      applicable_metrics: ['knee_angle', 'stance_width'],
+    78→      thresholds: {
+    79→        knee_angle: { min: 120, max: 155 },
+    80→        stance_width: { min: 0.7, max: 1.4 },
+    81→      },
+    82→    },
+    83→  },
+    84→};
+    85→
+    86→// ============================================
+    87→// Metric Definitions with Ideal Ranges
+    88→// ============================================
+    89→
+    90→export interface MetricDefinition {
+    91→  code: string;
+    92→  name: string;
+    93→  unit: string;
+    94→  ideal: { min: number; max: number };
+    95→  description: string;
+    96→  feedback: {
+    97→    green: string;
+    98→    yellow_low: string;
+    99→    yellow_high: string;
+   100→    red_low: string;
+   101→    red_high: string;
+   102→  };
+   103→}
+   104→
+   105→export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
+   106→  elbow_angle: {
+   107→    code: 'elbow_angle',
+   108→    name: 'Elbow Angle',
+   109→    unit: 'degrees',
+   110→    ideal: { min: 90, max: 130 }, // General ideal for most shots
+   111→    description: 'Angle at the elbow joint during stroke',
+   112→    feedback: {
+   113→      green: 'Good elbow position!',
+   114→      yellow_low: 'Try extending your elbow a bit more',
+   115→      yellow_high: 'Slight over-extension, maintain control',
+   116→      red_low: 'Elbow too bent - extend more for power',
+   117→      red_high: 'Elbow locked - keep slight flex for control',
+   118→    },
+   119→  },
+   120→  knee_angle: {
+   121→    code: 'knee_angle',
+   122→    name: 'Knee Bend',
+   123→    unit: 'degrees',
+   124→    ideal: { min: 120, max: 155 },
+   125→    description: 'Angle at the knee for athletic stance',
+   126→    feedback: {
+   127→      green: 'Great knee position!',
+   128→      yellow_low: 'Knees slightly too bent',
+   129→      yellow_high: 'Could bend knees more',
+   130→      red_low: 'Too deep - may slow recovery',
+   131→      red_high: 'Legs too straight - bend for explosiveness',
+   132→    },
+   133→  },
+   134→  stance_width: {
+   135→    code: 'stance_width',
+   136→    name: 'Stance Width',
+   137→    unit: 'ratio',
+   138→    ideal: { min: 0.8, max: 1.4 }, // Ratio of ankle width to shoulder width
+   139→    description: 'Foot separation relative to shoulder width',
+   140→    feedback: {
+   141→      green: 'Good stance width!',
+   142→      yellow_low: 'Stance slightly narrow',
+   143→      yellow_high: 'Stance slightly wide',
+   144→      red_low: 'Feet too close - widen for stability',
+   145→      red_high: 'Overly wide stance - may limit mobility',
+   146→    },
+   147→  },
+   148→  body_rotation: {
+   149→    code: 'body_rotation',
+   150→    name: 'Body Rotation',
+   151→    unit: 'degrees',
+   152→    ideal: { min: 10, max: 40 },
+   153→    description: 'Hip-shoulder separation for power generation',
+   154→    feedback: {
+   155→      green: 'Excellent rotation!',
+   156→      yellow_low: 'Could rotate more for power',
+   157→      yellow_high: 'Slight over-rotation',
+   158→      red_low: 'Not enough rotation - use your hips',
+   159→      red_high: 'Too much rotation - control your swing',
+   160→    },
+   161→  },
+   162→};
+   163→
+   164→// ============================================
+   165→// Banded Scoring Functions
+   166→// ============================================
+   167→
+   168→/**
+   169→ * Calculate the score band for a given metric value
+   170→ */
+   171→export function calculateBand(
+   172→  value: number,
+   173→  ideal: { min: number; max: number },
+   174→  skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+   175→  confidence: number = 1.0
+   176→): BandedScore {
+   177→  const config = SCORING_RULES_CONFIG;
+   178→  const skillConfig = config.skill_bands[skillLevel];
+   179→
+   180→  // Confidence gating - if too low, return unknown
+   181→  if (confidence < config.confidence_threshold) {
+   182→    return {
+   183→      band: 'unknown',
+   184→      value,
+   185→      confidence,
+   186→      feedback: 'Pose confidence too low to evaluate',
+   187→    };
+   188→  }
+   189→
+   190→  const idealRange = ideal.max - ideal.min;
+   191→  const idealMid = (ideal.min + ideal.max) / 2;
+   192→
+   193→  // Calculate tolerance ranges
+   194→  const greenTolerance = idealRange * skillConfig.green_tolerance;
+   195→  const yellowTolerance = idealRange * skillConfig.yellow_tolerance;
+   196→
+   197→  const greenMin = ideal.min - greenTolerance / 2;
+   198→  const greenMax = ideal.max + greenTolerance / 2;
+   199→  const yellowMin = ideal.min - yellowTolerance / 2;
+   200→  const yellowMax = ideal.max + yellowTolerance / 2;
+   201→
+   202→  // Determine band
+   203→  if (value >= greenMin && value <= greenMax) {
+   204→    return {
+   205→      band: 'green',
+   206→      value,
+   207→      confidence,
+   208→    };
+   209→  } else if (value >= yellowMin && value <= yellowMax) {
+   210→    return {
+   211→      band: 'yellow',
+   212→      value,
+   213→      confidence,
+   214→    };
+   215→  } else {
+   216→    return {
+   217→      band: 'red',
+   218→      value,
+   219→      confidence,
+   220→    };
+   221→  }
+   222→}
+   223→
+   224→/**
+   225→ * Get feedback message for a banded score
+   226→ */
+   227→export function getBandedFeedback(
+   228→  metricCode: string,
+   229→  score: BandedScore
+   230→): string {
+   231→  const metric = METRIC_DEFINITIONS[metricCode];
+   232→  if (!metric) return '';
+   233→
+   234→  const { band, value } = score;
+   235→  const { ideal, feedback } = metric;
+   236→  const mid = (ideal.min + ideal.max) / 2;
+   237→
+   238→  switch (band) {
+   239→    case 'green':
+   240→      return feedback.green;
+   241→    case 'yellow':
+   242→      return value < mid ? feedback.yellow_low : feedback.yellow_high;
+   243→    case 'red':
+   244→      return value < ideal.min ? feedback.red_low : feedback.red_high;
+   245→    case 'unknown':
+   246→    default:
+   247→      return 'Unable to evaluate - check camera position';
+   248→  }
+   249→}
+   250→
+   251→// ============================================
+   252→// Phase Detection
+   253→// ============================================
+   254→
+   255→export type MovementPhase = 'ready' | 'lunge' | 'overhead' | 'recovery' | 'general';
+   256→
+   257→/**
+   258→ * Detect the current movement phase from pose landmarks
+   259→ */
+   260→export function detectPhase(landmarks: PoseLandmark[]): MovementPhase {
+   261→  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+   262→  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+   263→  const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+   264→  const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+   265→  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+   266→
+   267→  // Check if arm is raised (overhead shot)
+   268→  if (rightWrist.y < rightShoulder.y - 0.1) {
+   269→    return 'overhead';
+   270→  }
+   271→
+   272→  // Check knee angle for lunge detection
+   273→  const kneeAngle = calculateAngle(rightHip, rightKnee, landmarks[POSE_LANDMARKS.RIGHT_ANKLE]);
+   274→  if (kneeAngle < 120) {
+   275→    return 'lunge';
+   276→  }
+   277→
+   278→  // Check if in ready position (knees slightly bent, centered)
+   279→  if (kneeAngle >= 130 && kneeAngle <= 160) {
+   280→    return 'ready';
+   281→  }
+   282→
+   283→  // Default to general
+   284→  return 'general';
+   285→}
+   286→
+   287→// ============================================
+   288→// Comprehensive Banded Evaluation
+   289→// ============================================
+   290→
+   291→export interface BandedEvaluationResult {
+   292→  phase: MovementPhase;
+   293→  overall_band: ScoreBand;
+   294→  overall_score: number; // 0-100
+   295→  metrics: Record<string, BandedScore>;
+   296→  feedback: string[];
+   297→  highlight_joints: number[];
+   298→}
+   299→
+   300→/**
+   301→ * Evaluate pose with banded scoring
+   302→ */
+   303→export function evaluateWithBands(
+   304→  landmarks: PoseLandmark[],
+   305→  skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+   306→  forcePhase?: MovementPhase
+   307→): BandedEvaluationResult {
+   308→  // Calculate average confidence
+   309→  const avgConfidence = landmarks.reduce((sum, l) => sum + (l.visibility || 0), 0) / landmarks.length;
+   310→
+   311→  // Detect phase
+   312→  const phase = forcePhase || detectPhase(landmarks);
+   313→  const phaseRule = SCORING_RULES_CONFIG.phase_rules[phase];
+   314→
+   315→  // Calculate metrics
+   316→  const metrics: Record<string, BandedScore> = {};
+   317→  const feedback: string[] = [];
+   318→  const highlightJoints: number[] = [];
+   319→  let totalScore = 0;
+   320→  let metricCount = 0;
+   321→
+   322→  // Elbow angle
+   323→  const shoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+   324→  const elbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+   325→  const wrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+   326→  const elbowAngle = calculateAngle(shoulder, elbow, wrist);
+   327→  const elbowConfidence = Math.min(shoulder.visibility, elbow.visibility, wrist.visibility);
+   328→
+   329→  const elbowIdeal = phaseRule?.thresholds?.elbow_angle || METRIC_DEFINITIONS.elbow_angle.ideal;
+   330→  metrics.elbow_angle = calculateBand(elbowAngle, elbowIdeal, skillLevel, elbowConfidence);
+   331→  metrics.elbow_angle.feedback = getBandedFeedback('elbow_angle', metrics.elbow_angle);
+   332→
+   333→  if (metrics.elbow_angle.band !== 'green' && metrics.elbow_angle.band !== 'unknown') {
+   334→    feedback.push(metrics.elbow_angle.feedback!);
+   335→    highlightJoints.push(POSE_LANDMARKS.RIGHT_ELBOW, POSE_LANDMARKS.RIGHT_WRIST);
+   336→  }
+   337→
+   338→  // Knee angle
+   339→  const hip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+   340→  const knee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+   341→  const ankle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+   342→  const kneeAngle = calculateAngle(hip, knee, ankle);
+   343→  const kneeConfidence = Math.min(hip.visibility, knee.visibility, ankle.visibility);
+   344→
+   345→  const kneeIdeal = phaseRule?.thresholds?.knee_angle || METRIC_DEFINITIONS.knee_angle.ideal;
+   346→  metrics.knee_angle = calculateBand(kneeAngle, kneeIdeal, skillLevel, kneeConfidence);
+   347→  metrics.knee_angle.feedback = getBandedFeedback('knee_angle', metrics.knee_angle);
+   348→
+   349→  if (metrics.knee_angle.band !== 'green' && metrics.knee_angle.band !== 'unknown') {
+   350→    feedback.push(metrics.knee_angle.feedback!);
+   351→    highlightJoints.push(POSE_LANDMARKS.RIGHT_KNEE, POSE_LANDMARKS.LEFT_KNEE);
+   352→  }
+   353→
+   354→  // Stance width
+   355→  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+   356→  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+   357→  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+   358→  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+   359→  const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+   360→  const ankleWidth = calculateDistance(leftAnkle, rightAnkle);
+   361→  const stanceWidth = shoulderWidth > 0 ? ankleWidth / shoulderWidth : 0;
+   362→  const stanceConfidence = Math.min(leftAnkle.visibility, rightAnkle.visibility);
+   363→
+   364→  const stanceIdeal = phaseRule?.thresholds?.stance_width || METRIC_DEFINITIONS.stance_width.ideal;
+   365→  metrics.stance_width = calculateBand(stanceWidth, stanceIdeal, skillLevel, stanceConfidence);
+   366→  metrics.stance_width.feedback = getBandedFeedback('stance_width', metrics.stance_width);
+   367→
+   368→  if (metrics.stance_width.band !== 'green' && metrics.stance_width.band !== 'unknown') {
+   369→    feedback.push(metrics.stance_width.feedback!);
+   370→    highlightJoints.push(POSE_LANDMARKS.LEFT_ANKLE, POSE_LANDMARKS.RIGHT_ANKLE);
+   371→  }
+   372→
+   373→  // Body rotation (for overhead phase)
+   374→  if (phase === 'overhead' || !phaseRule) {
+   375→    const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+   376→    const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+   377→    const shoulderAngle = Math.atan2(
+   378→      rightShoulder.y - leftShoulder.y,
+   379→      rightShoulder.x - leftShoulder.x
+   380→    );
+   381→    const hipAngle = Math.atan2(rightHip.y - leftHip.y, rightHip.x - leftHip.x);
+   382→    const rotation = Math.abs(shoulderAngle - hipAngle) * (180 / Math.PI);
+   383→    const rotationConfidence = Math.min(
+   384→      leftShoulder.visibility, rightShoulder.visibility,
+   385→      leftHip.visibility, rightHip.visibility
+   386→    );
+   387→
+   388→    const rotationIdeal = phaseRule?.thresholds?.body_rotation || METRIC_DEFINITIONS.body_rotation.ideal;
+   389→    metrics.body_rotation = calculateBand(rotation, rotationIdeal, skillLevel, rotationConfidence);
+   390→    metrics.body_rotation.feedback = getBandedFeedback('body_rotation', metrics.body_rotation);
+   391→
+   392→    if (metrics.body_rotation.band !== 'green' && metrics.body_rotation.band !== 'unknown') {
+   393→      feedback.push(metrics.body_rotation.feedback!);
+   394→    }
+   395→  }
+   396→
+   397→  // Calculate overall score
+   398→  const bandScores: Record<ScoreBand, number> = {
+   399→    green: 100,
+   400→    yellow: 70,
+   401→    red: 30,
+   402→    unknown: 50, // Neutral
+   403→  };
+   404→
+   405→  Object.values(metrics).forEach(m => {
+   406→    if (m.band !== 'unknown') {
+   407→      totalScore += bandScores[m.band];
+   408→      metricCount++;
+   409→    }
+   410→  });
+   411→
+   412→  const overallScore = metricCount > 0 ? totalScore / metricCount : 50;
+   413→
+   414→  // Determine overall band
+   415→  let overallBand: ScoreBand;
+   416→  const greenCount = Object.values(metrics).filter(m => m.band === 'green').length;
+   417→  const redCount = Object.values(metrics).filter(m => m.band === 'red').length;
+   418→  const validCount = Object.values(metrics).filter(m => m.band !== 'unknown').length;
+   419→
+   420→  if (validCount === 0) {
+   421→    overallBand = 'unknown';
+   422→  } else if (redCount > 0) {
+   423→    overallBand = redCount > 1 ? 'red' : 'yellow';
+   424→  } else if (greenCount === validCount) {
+   425→    overallBand = 'green';
+   426→  } else {
+   427→    overallBand = 'yellow';
+   428→  }
+   429→
+   430→  // Add encouraging feedback if all green
+   431→  if (overallBand === 'green' && feedback.length === 0) {
+   432→    feedback.push('Excellent form! Keep it up!');
+   433→  }
+   434→
+   435→  return {
+   436→    phase,
+   437→    overall_band: overallBand,
+   438→    overall_score: overallScore,
+   439→    metrics,
+   440→    feedback,
+   441→    highlight_joints: highlightJoints,
+   442→  };
+   443→}
+   444→
+   445→// ============================================
+   446→// Legend/Documentation for UI
+   447→// ============================================
+   448→
+   449→export const SCORING_LEGEND = {
+   450→  green: {
+   451→    label: 'Good',
+   452→    description: 'Within coach-approved range for your skill level',
+   453→    color: '#22c55e',
+   454→    bgColor: '#dcfce7',
+   455→  },
+   456→  yellow: {
+   457→    label: 'Minor Deviation',
+   458→    description: 'Slightly outside ideal range - minor adjustment needed',
+   459→    color: '#eab308',
+   460→    bgColor: '#fef9c3',
+   461→  },
+   462→  red: {
+   463→    label: 'Major Deviation',
+   464→    description: 'Significantly outside ideal range - focus on this area',
+   465→    color: '#ef4444',
+   466→    bgColor: '#fee2e2',
+   467→  },
+   468→  unknown: {
+   469→    label: 'Unknown',
+   470→    description: 'Pose confidence too low to evaluate accurately',
+   471→    color: '#9ca3af',
+   472→    bgColor: '#f3f4f6',
+   473→  },
+   474→};
+   475→
+   476→export const SKILL_LEVEL_DESCRIPTIONS = {
+   477→  beginner: {
+   478→    label: 'Beginner',
+   479→    description: 'Wider tolerance bands - focus on basic form',
+   480→    recommendation: 'Good for learning fundamentals without frustration',
+   481→  },
+   482→  intermediate: {
+   483→    label: 'Intermediate',
+   484→    description: 'Standard tolerance bands - balanced feedback',
+   485→    recommendation: 'Ideal for most club-level players',
+   486→  },
+   487→  advanced: {
+   488→    label: 'Advanced',
+   489→    description: 'Strict tolerance bands - precision feedback',
+   490→    recommendation: 'For competitive players seeking fine-tuning',
+   491→  },
+   492→};
+   493→
+   494→// ============================================
+   495→// PHASE 3: Session-Level Validation
+   496→// ============================================
+   497→
+   498→// Minimum thresholds for valid analysis
+   499→export const VALIDATION_THRESHOLDS = {
+   500→  // Minimum ratio of frames with valid pose detection
+   501→  MIN_POSE_COVERAGE: 0.7, // 70%
+   502→  // Minimum average confidence across valid frames
+   503→  MIN_CONFIDENCE: 0.5,
+   504→  // Minimum number of consecutive frames to confirm an issue
+   505→  MIN_ISSUE_PERSISTENCE: 3,
+   506→  // Minimum number of frames with a deviation to report it
+   507→  MIN_DEVIATION_FRAMES: 5,
+   508→};
+   509→
+   510→export interface SessionValidationResult {
+   511→  isValid: boolean;
+   512→  validPoseRatio: number;
+   513→  avgConfidence: number;
+   514→  totalFrames: number;
+   515→  validPoseFrames: number;
+   516→  lowConfidenceFrames: number;
+   517→  noPoseFrames: number;
+   518→  message: string;
+   519→}
+   520→
+   521→/**
+   522→ * PHASE 3: Validate that a session has sufficient pose data for reliable analysis
+   523→ * Returns validation result with coverage stats and whether "Great form" can be shown
+   524→ */
+   525→export function validateSessionPoseData(
+   526→  poseData: (PoseLandmark[] | null)[],
+   527→  minCoverage: number = VALIDATION_THRESHOLDS.MIN_POSE_COVERAGE,
+   528→  minConfidence: number = VALIDATION_THRESHOLDS.MIN_CONFIDENCE
+   529→): SessionValidationResult {
+   530→  const totalFrames = poseData.length;
+   531→  let validPoseFrames = 0;
+   532→  let lowConfidenceFrames = 0;
+   533→  let noPoseFrames = 0;
+   534→  let totalConfidence = 0;
+   535→
+   536→  for (const landmarks of poseData) {
+   537→    if (!landmarks || landmarks.length === 0) {
+   538→      noPoseFrames++;
+   539→      continue;
+   540→    }
+   541→
+   542→    // Calculate average visibility for this frame
+   543→    const avgVisibility = landmarks.reduce((sum, lm) => sum + (lm.visibility || 0), 0) / landmarks.length;
+   544→
+   545→    if (avgVisibility >= minConfidence) {
+   546→      validPoseFrames++;
+   547→      totalConfidence += avgVisibility;
+   548→    } else {
+   549→      lowConfidenceFrames++;
+   550→      totalConfidence += avgVisibility;
+   551→    }
+   552→  }
+   553→
+   554→  const validPoseRatio = totalFrames > 0 ? validPoseFrames / totalFrames : 0;
+   555→  const avgConfidence = (validPoseFrames + lowConfidenceFrames) > 0
+   556→    ? totalConfidence / (validPoseFrames + lowConfidenceFrames)
+   557→    : 0;
+   558→
+   559→  // Determine if session is valid for scoring
+   560→  const isValid = validPoseRatio >= minCoverage && avgConfidence >= minConfidence;
+   561→
+   562→  // Generate appropriate message
+   563→  let message: string;
+   564→  if (isValid) {
+   565→    message = 'Sufficient pose data for reliable analysis';
+   566→  } else if (validPoseRatio < minCoverage && avgConfidence < minConfidence) {
+   567→    message = `Low pose coverage (${(validPoseRatio * 100).toFixed(0)}%) and low confidence (${(avgConfidence * 100).toFixed(0)}%). Results may not be accurate.`;
+   568→  } else if (validPoseRatio < minCoverage) {
+   569→    message = `Low pose coverage (${(validPoseRatio * 100).toFixed(0)}%). Ensure player is visible throughout the video.`;
+   570→  } else {
+   571→    message = `Low detection confidence (${(avgConfidence * 100).toFixed(0)}%). Check lighting and camera angle.`;
+   572→  }
+   573→
+   574→  return {
+   575→    isValid,
+   576→    validPoseRatio,
+   577→    avgConfidence,
+   578→    totalFrames,
+   579→    validPoseFrames,
+   580→    lowConfidenceFrames,
+   581→    noPoseFrames,
+   582→    message,
+   583→  };
+   584→}
+   585→
+   586→export interface SessionScoringResult {
+   587→  validation: SessionValidationResult;
+   588→  overall_band: ScoreBand;
+   589→  overall_score: number;
+   590→  greenFrameRatio: number;
+   591→  yellowFrameRatio: number;
+   592→  redFrameRatio: number;
+   593→  persistentIssues: string[];
+   594→  canShowGreatForm: boolean;
+   595→  displayMessage: string;
+   596→}
+   597→
+   598→/**
+   599→ * PHASE 3: Evaluate a full session with validation and persistence checks
+   600→ * This prevents false "Great form!" when pose data is insufficient
+   601→ */
+   602→export function evaluateSessionWithValidation(
+   603→  poseData: (PoseLandmark[] | null)[],
+   604→  skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
+   605→): SessionScoringResult {
+   606→  // First validate the session has sufficient pose data
+   607→  const validation = validateSessionPoseData(poseData);
+   608→
+   609→  // If not enough valid data, return unknown with explanation
+   610→  if (!validation.isValid) {
+   611→    return {
+   612→      validation,
+   613→      overall_band: 'unknown',
+   614→      overall_score: 0,
+   615→      greenFrameRatio: 0,
+   616→      yellowFrameRatio: 0,
+   617→      redFrameRatio: 0,
+   618→      persistentIssues: [],
+   619→      canShowGreatForm: false,
+   620→      displayMessage: validation.message,
+   621→    };
+   622→  }
+   623→
+   624→  // Evaluate each valid frame
+   625→  let greenFrames = 0;
+   626→  let yellowFrames = 0;
+   627→  let redFrames = 0;
+   628→  let totalScore = 0;
+   629→  let scoredFrames = 0;
+   630→
+   631→  // Track issue persistence across frames
+   632→  const issueCounts: Record<string, number> = {};
+   633→  let consecutiveIssue: Record<string, number> = {};
+   634→
+   635→  for (const landmarks of poseData) {
+   636→    if (!landmarks || landmarks.length === 0) continue;
+   637→
+   638→    const avgVisibility = landmarks.reduce((sum, lm) => sum + (lm.visibility || 0), 0) / landmarks.length;
+   639→    if (avgVisibility < VALIDATION_THRESHOLDS.MIN_CONFIDENCE) continue;
+   640→
+   641→    const evaluation = evaluateWithBands(landmarks, skillLevel);
+   642→    scoredFrames++;
+   643→    totalScore += evaluation.overall_score;
+   644→
+   645→    switch (evaluation.overall_band) {
+   646→      case 'green':
+   647→        greenFrames++;
+   648→        // Reset consecutive issue counters
+   649→        consecutiveIssue = {};
+   650→        break;
+   651→      case 'yellow':
+   652→        yellowFrames++;
+   653→        break;
+   654→      case 'red':
+   655→        redFrames++;
+   656→        break;
+   657→    }
+   658→
+   659→    // Track issue persistence
+   660→    for (const fb of evaluation.feedback) {
+   661→      if (fb !== 'Excellent form! Keep it up!') {
+   662→        issueCounts[fb] = (issueCounts[fb] || 0) + 1;
+   663→        consecutiveIssue[fb] = (consecutiveIssue[fb] || 0) + 1;
+   664→      }
+   665→    }
+   666→  }
+   667→
+   668→  // Calculate ratios
+   669→  const greenFrameRatio = scoredFrames > 0 ? greenFrames / scoredFrames : 0;
+   670→  const yellowFrameRatio = scoredFrames > 0 ? yellowFrames / scoredFrames : 0;
+   671→  const redFrameRatio = scoredFrames > 0 ? redFrames / scoredFrames : 0;
+   672→  const avgScore = scoredFrames > 0 ? totalScore / scoredFrames : 0;
+   673→
+   674→  // Find persistent issues (appear in multiple frames)
+   675→  const persistentIssues = Object.entries(issueCounts)
+   676→    .filter(([_, count]) => count >= VALIDATION_THRESHOLDS.MIN_DEVIATION_FRAMES)
+   677→    .sort((a, b) => b[1] - a[1])
+   678→    .map(([issue, _]) => issue);
+   679→
+   680→  // Determine overall band
+   681→  let overall_band: ScoreBand;
+   682→  if (greenFrameRatio >= 0.7) {
+   683→    overall_band = 'green';
+   684→  } else if (greenFrameRatio >= 0.5 || yellowFrameRatio >= 0.5) {
+   685→    overall_band = 'yellow';
+   686→  } else {
+   687→    overall_band = 'red';
+   688→  }
+   689→
+   690→  // PHASE 3 FIX: Can only show "Great form" if:
+   691→  // 1. Session validation passed (70%+ coverage, 50%+ confidence)
+   692→  // 2. 70%+ of frames are green
+   693→  // 3. No persistent red-level issues
+   694→  const canShowGreatForm = validation.isValid &&
+   695→    greenFrameRatio >= 0.7 &&
+   696→    persistentIssues.length === 0;
+   697→
+   698→  // Generate appropriate display message
+   699→  let displayMessage: string;
+   700→  if (canShowGreatForm) {
+   701→    displayMessage = 'Great form! No major issues detected.';
+   702→  } else if (!validation.isValid) {
+   703→    displayMessage = validation.message;
+   704→  } else if (persistentIssues.length > 0) {
+   705→    displayMessage = `${persistentIssues.length} issue${persistentIssues.length > 1 ? 's' : ''} detected. Focus on: ${persistentIssues[0]}`;
+   706→  } else if (overall_band === 'yellow') {
+   707→    displayMessage = 'Minor adjustments needed - review the highlighted areas.';
+   708→  } else {
+   709→    displayMessage = 'Form needs work - watch the tutorial videos for guidance.';
+   710→  }
+   711→
+   712→  return {
+   713→    validation,
+   714→    overall_band,
+   715→    overall_score: avgScore,
+   716→    greenFrameRatio,
+   717→    yellowFrameRatio,
+   718→    redFrameRatio,
+   719→    persistentIssues,
+   720→    canShowGreatForm,
+   721→    displayMessage,
+   722→  };
+   723→}
+   724→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

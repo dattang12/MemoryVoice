@@ -1,0 +1,77 @@
+# Heartbeat Checks
+
+## Comment Monitoring (every 30 minutes, 8 AM - 11 PM US time)
+- Check ALL platforms for new comments on our posts
+- Reply to high-intent comments IMMEDIATELY (auto-approved)
+- Reply to medium-intent comments within cycle
+- Log all comments to workspace/comments/
+- Create leads from high-intent commenters
+- Flag any negative/crisis comments for human review
+
+## DM Monitoring (every 30 minutes, 8 AM - 11 PM US time)
+- Check all platforms for new inbound DMs
+- Reply to founders who messaged us first (auto-approved for ongoing conversations)
+- Queue new outbound DM drafts for approval
+- Continue active conversations
+- Log all conversations to workspace/dm-outreach/conversations/
+
+## Founder Discovery (every 6 hours, 8 AM - 10 PM)
+- Check Product Hunt for new launches
+- Check Hacker News for "Show HN" and "Launch HN" posts
+- Browse BetaList for new startups
+- Monitor Twitter for #buildinpublic, "just launched" signals
+- Monitor Reddit r/startups for new founder posts
+- Score all new leads immediately
+- Save to workspace/leads/
+
+## Email Monitoring (every 2 hours, 8 AM - 8 PM)
+- Check for email replies (positive, negative, bounce)
+- Update suppression list with bounces and unsubscribes
+- Move positive replies to HOT tier → queue DM follow-up
+- Trigger follow-up emails for sequences due today (queue for approval)
+
+## Approval Queue Check (every 1 hour, 8 AM - 10 PM)
+- Count pending items in approval queue
+- If items have been pending > 4 hours, remind human
+- If items approved, execute immediately
+- Log all approved/rejected items
+
+## Content Ideas Scan (every 12 hours)
+- Review comment threads for recurring questions → content ideas
+- Check trending topics on XHS, LinkedIn, Twitter
+- Generate 2-3 draft post ideas → save to workspace/content-ideas/
+- Queue best idea for human approval
+
+## Account Health (every 24 hours at 9 AM)
+- Check all social accounts for restrictions or warnings
+- Monitor follower growth / engagement rate trends
+- Alert if any account shows signs of restriction
+- Verify all accounts accessible
+
+## Warmup Tracker (every 24 hours at 9 AM)
+- Check domain age and update daily email sending limit
+- Log previous day's email performance
+- Alert if bounce rate exceeds 5%
+
+## Lead Scoring Refresh (every 24 hours at 10 AM)
+- Re-score leads that received new signals
+- Update tier classifications
+- Move upgraded leads to appropriate outreach queues
+
+## Competitor Watch (every 24 hours at 7 AM)
+- Quick scan for competitor news mentions
+- Check competitor social accounts
+- Alert on significant competitive changes
+
+## Weekly Report (every Friday at 5 PM)
+- Compile all weekly data into performance report
+- Include content performance analysis
+- Review A/B test results
+- Recommend next week priorities
+- Save to workspace/reports/weekly/
+
+## Content Learnings Review (every Sunday at 10 AM)
+- Analyze past week's content performance
+- Identify top/bottom performing posts
+- Extract patterns → add to content-learnings if confirmed
+- Recommend content adjustments for next week

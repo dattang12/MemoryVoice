@@ -1,0 +1,44 @@
+     1→{
+     2→  "name": "rallycoach",
+     3→  "version": "0.1.0",
+     4→  "private": true,
+     5→  "scripts": {
+     6→    "dev": "next dev",
+     7→    "build": "next build",
+     8→    "start": "next start",
+     9→    "lint": "next lint"
+    10→  },
+    11→  "dependencies": {
+    12→    "@google/genai": "^1.0.1",
+    13→    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
+    14→    "@react-three/drei": "^9.88.17",
+    15→    "@react-three/fiber": "^8.15.19",
+    16→    "@supabase/supabase-js": "^2.45.0",
+    17→    "next": "14.2.5",
+    18→    "react": "^18.3.1",
+    19→    "react-dom": "^18.3.1",
+    20→    "recharts": "^2.12.7",
+    21→    "three": "^0.159.0",
+    22→    "tus-js-client": "^4.3.1",
+    23→    "uuid": "^10.0.0"
+    24→  },
+    25→  "devDependencies": {
+    26→    "@types/node": "^20.14.0",
+    27→    "@types/react": "^18.3.3",
+    28→    "@types/react-dom": "^18.3.0",
+    29→    "@types/three": "^0.159.0",
+    30→    "@types/uuid": "^10.0.0",
+    31→    "autoprefixer": "^10.4.19",
+    32→    "eslint": "^8.57.0",
+    33→    "eslint-config-next": "14.2.5",
+    34→    "postcss": "^8.4.38",
+    35→    "tailwindcss": "^3.4.4",
+    36→    "typescript": "^5.4.5",
+    37→    "vitest": "^4.0.18"
+    38→  }
+    39→}
+    40→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

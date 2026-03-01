@@ -1,0 +1,22 @@
+{
+  "name": "MemoryVoice",
+  "short_name": "MemoryVoice",
+  "description": "AI-powered memory companion for dementia care",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0a1e",
+  "theme_color": "#0f0a1e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "xr_main_scene": {
+    "default_size": {
+      "width": 1280,
+      "height": 800
+    }
+  }
+}

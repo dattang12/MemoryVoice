@@ -1,0 +1,27 @@
+Failed to read config at C:\Users\ASUS\.openclaw\openclaw.json MissingEnvVarError: Missing env var "MOONSHOT_API_KEY" referenced at config path: models.providers.moonshot.apiKey
+    at substituteString (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:646:56)
+    at substituteAny (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:686:40)
+    at substituteAny (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:690:65)
+    at substituteAny (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:690:65)
+    at substituteAny (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:690:65)
+    at substituteAny (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:690:65)
+    at resolveConfigEnvVars (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:704:9)
+    at resolveConfigForRead (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:5171:22)
+    at Object.loadConfig (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:5193:50)
+    at loadConfig (file:///C:/Users/ASUS/AppData/Roaming/npm/node_modules/openclaw/dist/config-BJWIHf6x.js:5576:20) {
+  varName: 'MOONSHOT_API_KEY',
+  configPath: 'models.providers.moonshot.apiKey'
+}
+
+🦞 OpenClaw 2026.2.13 (203b5bd) — Your task has been queued; your dignity has been deprecated.
+
+|
+o  Config ---------------------------------------------------+
+|                                                            |
+|  Config invalid; doctor will run with best-effort config.  |
+|                                                            |
++------------------------------------------------------------+
+Config invalid
+File: ~\.openclaw\openclaw.json
+Problem:
+  - <root>: Missing env var "MOONSHOT_API_KEY" referenced at config path: models.providers.moonshot.apiKey

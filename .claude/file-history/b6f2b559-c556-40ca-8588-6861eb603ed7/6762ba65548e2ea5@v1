@@ -1,0 +1,288 @@
+/**
+ * BWF Standard Badminton Court Specification
+ * All dimensions in meters
+ *
+ * Reference: Badminton World Federation (BWF) Laws of Badminton
+ *
+ * Court Layout (y=0 at bottom baseline, x=0 at left sideline):
+ *
+ *    x=0                    x=3.05               x=6.1
+ *    |                        |                    |
+ *    +------------------------+--------------------+ y=13.4 (far baseline)
+ *    |                        |                    |
+ *    |  Far Back             |       Far Back     | y=12.64 (doubles long service)
+ *    |  Service Box          |       Service Box  |
+ *    |        (L)            |         (R)        |
+ *    +------------------------+--------------------+ y=8.68 (far short service)
+ *    |                                             |
+ *    |              (No center line                |
+ *    |               in this zone)                 |
+ *    |                                             |
+ *    +---------------------------------------------+ y=6.7 (NET)
+ *    |                                             |
+ *    |              (No center line                |
+ *    |               in this zone)                 |
+ *    |                                             |
+ *    +------------------------+--------------------+ y=4.72 (near short service)
+ *    |                        |                    |
+ *    |  Near Front           |      Near Front    | y=0.76 (doubles long service)
+ *    |  Service Box          |      Service Box   |
+ *    |        (L)            |         (R)        |
+ *    +------------------------+--------------------+ y=0 (near baseline)
+ *
+ *    |<---- 0.46m --->|      Singles sidelines at x=0.46 and x=5.64
+ */
+
+// ===========================================
+// Court Dimensions (meters)
+// ===========================================
+
+/** Full court length (baseline to baseline) */
+export const COURT_LENGTH = 13.4;
+
+/** Doubles court width (sideline to sideline) */
+export const COURT_WIDTH = 6.1;
+
+/** Singles court width */
+export const SINGLES_WIDTH = 5.18;
+
+/** Inset from doubles sideline to singles sideline */
+export const SINGLES_INSET = (COURT_WIDTH - SINGLES_WIDTH) / 2; // 0.46m
+
+/** Net line position (center of court) */
+export const NET_Y = COURT_LENGTH / 2; // 6.7m
+
+/** Distance from net to short service line */
+export const SHORT_SERVICE_DIST = 1.98;
+
+/** Distance from baseline to doubles long service line */
+export const LONG_SERVICE_DIST = 0.76;
+
+/** Net height at center */
+export const NET_HEIGHT_CENTER = 1.524; // 1.524m at center
+
+/** Net height at posts */
+export const NET_HEIGHT_POSTS = 1.55; // 1.55m at posts
+
+/** Line thickness (40mm = 0.04m, but render wider for visibility) */
+export const LINE_THICKNESS = 0.04;
+
+// ===========================================
+// Computed Y-positions (from baseline y=0)
+// ===========================================
+
+/** Near short service line (1.98m from net toward y=0) */
+export const NEAR_SHORT_SERVICE_Y = NET_Y - SHORT_SERVICE_DIST; // 4.72m
+
+/** Far short service line (1.98m from net toward y=13.4) */
+export const FAR_SHORT_SERVICE_Y = NET_Y + SHORT_SERVICE_DIST; // 8.68m
+
+/** Near doubles long service line (0.76m from near baseline) */
+export const NEAR_LONG_SERVICE_Y = LONG_SERVICE_DIST; // 0.76m
+
+/** Far doubles long service line (0.76m from far baseline) */
+export const FAR_LONG_SERVICE_Y = COURT_LENGTH - LONG_SERVICE_DIST; // 12.64m
+
+/** Center line x-position */
+export const CENTER_X = COURT_WIDTH / 2; // 3.05m
+
+/** Singles sideline positions */
+export const SINGLES_LEFT_X = SINGLES_INSET; // 0.46m
+export const SINGLES_RIGHT_X = COURT_WIDTH - SINGLES_INSET; // 5.64m
+
+// ===========================================
+// Court Specification Object
+// ===========================================
+
+export interface CourtSpec {
+  // Dimensions
+  length: number;
+  width: number;
+  singlesWidth: number;
+  singlesInset: number;
+
+  // Key Y positions
+  netY: number;
+  nearShortServiceY: number;
+  farShortServiceY: number;
+  nearLongServiceY: number;
+  farLongServiceY: number;
+
+  // Key X positions
+  centerX: number;
+  singlesLeftX: number;
+  singlesRightX: number;
+
+  // Net
+  netHeightCenter: number;
+  netHeightPosts: number;
+
+  // Line
+  lineThickness: number;
+}
+
+export const COURT_SPEC: CourtSpec = {
+  length: COURT_LENGTH,
+  width: COURT_WIDTH,
+  singlesWidth: SINGLES_WIDTH,
+  singlesInset: SINGLES_INSET,
+
+  netY: NET_Y,
+  nearShortServiceY: NEAR_SHORT_SERVICE_Y,
+  farShortServiceY: FAR_SHORT_SERVICE_Y,
+  nearLongServiceY: NEAR_LONG_SERVICE_Y,
+  farLongServiceY: FAR_LONG_SERVICE_Y,
+
+  centerX: CENTER_X,
+  singlesLeftX: SINGLES_LEFT_X,
+  singlesRightX: SINGLES_RIGHT_X,
+
+  netHeightCenter: NET_HEIGHT_CENTER,
+  netHeightPosts: NET_HEIGHT_POSTS,
+
+  lineThickness: LINE_THICKNESS,
+};
+
+// ===========================================
+// Coordinate Conversion Helpers
+// ===========================================
+
+/**
+ * Convert normalized coordinates (0-1) to court meters.
+ * Normalized coordinates have origin at top-left (0,0) and go to bottom-right (1,1).
+ * Court coordinates have origin at bottom-left (0,0) in meters.
+ *
+ * @param normX Normalized x (0-1, 0=left, 1=right)
+ * @param normY Normalized y (0-1, 0=top/far, 1=bottom/near)
+ * @returns Court coordinates in meters
+ */
+export function normalizedToMeters(normX: number, normY: number): { x: number; y: number } {
+  return {
+    x: normX * COURT_WIDTH,
+    y: (1 - normY) * COURT_LENGTH, // Flip Y: normalized 0=far, court 0=near
+  };
+}
+
+/**
+ * Convert court meters to normalized coordinates (0-1).
+ *
+ * @param meterX Court x in meters (0=left sideline)
+ * @param meterY Court y in meters (0=near baseline)
+ * @returns Normalized coordinates (0-1)
+ */
+export function metersToNormalized(meterX: number, meterY: number): { x: number; y: number } {
+  return {
+    x: meterX / COURT_WIDTH,
+    y: 1 - (meterY / COURT_LENGTH), // Flip Y
+  };
+}
+
+/**
+ * Convert court meters to 3D scene coordinates.
+ * 3D scene has origin at court center, x=left-right, z=near-far.
+ *
+ * @param meterX Court x in meters (0=left sideline)
+ * @param meterY Court y in meters (0=near baseline)
+ * @returns 3D scene coordinates { x, z } (y is height)
+ */
+export function metersTo3D(meterX: number, meterY: number): { x: number; z: number } {
+  return {
+    x: meterX - COURT_WIDTH / 2,  // Center at 0
+    z: meterY - COURT_LENGTH / 2, // Center at 0
+  };
+}
+
+/**
+ * Convert normalized coordinates directly to 3D scene coordinates.
+ *
+ * @param normX Normalized x (0-1)
+ * @param normY Normalized y (0-1)
+ * @returns 3D scene coordinates { x, z }
+ */
+export function normalizedTo3D(normX: number, normY: number): { x: number; z: number } {
+  const meters = normalizedToMeters(normX, normY);
+  return metersTo3D(meters.x, meters.y);
+}
+
+/**
+ * Calculate proper scale to fit court in viewport while maintaining aspect ratio.
+ *
+ * @param viewportWidth Available width in pixels
+ * @param viewportHeight Available height in pixels
+ * @param padding Padding in pixels on each side
+ * @returns Scale factor (pixels per meter) and offsets
+ */
+export function calculateCourtScale(
+  viewportWidth: number,
+  viewportHeight: number,
+  padding: number = 40
+): {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  courtPixelWidth: number;
+  courtPixelHeight: number;
+} {
+  const availableWidth = viewportWidth - 2 * padding;
+  const availableHeight = viewportHeight - 2 * padding;
+
+  // Calculate scale to fit court while maintaining aspect ratio
+  const scaleX = availableWidth / COURT_WIDTH;
+  const scaleY = availableHeight / COURT_LENGTH;
+  const scale = Math.min(scaleX, scaleY);
+
+  // Calculate actual court dimensions in pixels
+  const courtPixelWidth = COURT_WIDTH * scale;
+  const courtPixelHeight = COURT_LENGTH * scale;
+
+  // Center the court in the viewport
+  const offsetX = padding + (availableWidth - courtPixelWidth) / 2;
+  const offsetY = padding + (availableHeight - courtPixelHeight) / 2;
+
+  return {
+    scale,
+    offsetX,
+    offsetY,
+    courtPixelWidth,
+    courtPixelHeight,
+  };
+}
+
+/**
+ * Convert court meters to canvas pixels for 2D rendering.
+ *
+ * @param meterX Court x in meters
+ * @param meterY Court y in meters
+ * @param scale Pixels per meter
+ * @param offsetX X offset in pixels
+ * @param offsetY Y offset in pixels
+ * @returns Canvas pixel coordinates
+ */
+export function metersToCanvas(
+  meterX: number,
+  meterY: number,
+  scale: number,
+  offsetX: number,
+  offsetY: number
+): { x: number; y: number } {
+  return {
+    x: offsetX + meterX * scale,
+    // Canvas Y is inverted (0 at top), court Y has 0 at near baseline
+    // So far baseline (y=13.4m) should be at top of canvas
+    y: offsetY + (COURT_LENGTH - meterY) * scale,
+  };
+}
+
+/**
+ * Convert normalized coordinates to canvas pixels.
+ */
+export function normalizedToCanvas(
+  normX: number,
+  normY: number,
+  scale: number,
+  offsetX: number,
+  offsetY: number
+): { x: number; y: number } {
+  const meters = normalizedToMeters(normX, normY);
+  return metersToCanvas(meters.x, meters.y, scale, offsetX, offsetY);
+}

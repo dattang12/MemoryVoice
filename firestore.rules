@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------
+    // Memories collection
+    // Read: public via share-link (demo access)
+    // Write: authenticated users only
+    // --------------------------------------------------------
+    match /memories/{memoryId} {
+      allow read: if true;
+      // Backend uses Admin SDK (bypasses rules). Allow authenticated creates
+      // from frontend without requiring fields the backend never writes directly.
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      // Photos sub-collection
+      match /photos/{photoId} {
+        allow read: if true;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null;
+      }
+
+      // Voice recordings sub-collection
+      match /voice_recordings/{recordingId} {
+        allow read: if true;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null;
+      }
+
+      // Embeddings sub-collection (AI vectors — backend writes only)
+      match /embeddings/{embeddingId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
+
+      // Semantic graph sub-collection (read for visualization, write via backend)
+      match /graph/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // --------------------------------------------------------
+    // Block all other collections explicitly
+    // --------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

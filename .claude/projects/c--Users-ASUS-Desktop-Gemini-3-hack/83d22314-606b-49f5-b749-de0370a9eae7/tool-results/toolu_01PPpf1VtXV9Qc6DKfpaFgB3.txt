@@ -1,0 +1,35 @@
+     1→/** @type {import('next').NextConfig} */
+     2→const nextConfig = {
+     3→  images: {
+     4→    remotePatterns: [
+     5→      {
+     6→        protocol: "https",
+     7→        hostname: "**",
+     8→      },
+     9→    ],
+    10→  },
+    11→  async headers() {
+    12→    return [
+    13→      {
+    14→        source: "/(.*)",
+    15→        headers: [
+    16→          {
+    17→            key: "Cross-Origin-Embedder-Policy",
+    18→            value: "credentialless",
+    19→          },
+    20→          {
+    21→            key: "Cross-Origin-Opener-Policy",
+    22→            value: "same-origin",
+    23→          },
+    24→        ],
+    25→      },
+    26→    ];
+    27→  },
+    28→};
+    29→
+    30→module.exports = nextConfig;
+    31→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

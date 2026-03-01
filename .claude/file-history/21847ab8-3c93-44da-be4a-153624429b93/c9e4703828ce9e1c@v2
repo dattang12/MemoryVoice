@@ -1,0 +1,19 @@
+# Account Status
+
+> Updated daily by account-manager skill.
+
+## Accounts
+
+| Platform | Username | Created | Warmup Week | Followers | Status |
+|----------|----------|---------|-------------|-----------|--------|
+| LinkedIn | — | — | — | — | 🔴 Not Created |
+| Twitter/X | — | — | — | — | 🔴 Not Created |
+| 小红书 | — | — | — | — | 🔴 Not Created |
+| Reddit | — | — | — | — | 🔴 Not Created |
+| Product Hunt | — | — | — | — | 🔴 Not Created |
+| Indie Hackers | — | — | — | — | 🔴 Not Created |
+
+## Next Steps
+1. User provides Gmail for account creation
+2. Create accounts (requires approval for each)
+3. Begin warmup schedule (Week 1: no outreach, credibility building only)

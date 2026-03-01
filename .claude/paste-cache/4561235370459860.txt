@@ -1,0 +1,16 @@
+🦞 OpenClaw 2026.2.13 (203b5bd) — I'll butter your workflow like a lobster roll: messy, delicious, effective.
+
+09:04:49 [canvas] host mounted at http://127.0.0.1:18789/__openclaw__/canvas/ (root C:\Users\ASUS\.openclaw\canvas)
+09:04:49 [heartbeat] started
+09:04:49 [gateway] agent model: anthropic/claude-opus-4-6
+09:04:49 [gateway] listening on ws://127.0.0.1:18789 (PID 7996)
+09:04:49 [gateway] listening on ws://[::1]:18789
+09:04:49 [gateway] log file: \tmp\openclaw\openclaw-2026-02-15.log
+09:04:49 [browser/service] Browser control service ready (profiles=2)
+09:04:49 [hooks:loader] Registered hook: boot-md -> gateway:startup
+09:04:49 [hooks:loader] Registered hook: bootstrap-extra-files -> agent:bootstrap
+09:04:49 [hooks:loader] Registered hook: command-logger -> command
+09:04:49 [hooks:loader] Registered hook: session-memory -> command:new
+09:04:49 [hooks] loaded 4 internal hook handlers
+09:04:50 [telegram] [default] starting provider (@DragonBowlBot)
+09:04:50 [telegram] autoSelectFamily=false (default-node22)

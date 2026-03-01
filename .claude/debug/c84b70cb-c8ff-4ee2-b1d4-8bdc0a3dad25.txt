@@ -1,0 +1,683 @@
+2026-02-21T08:05:54.905Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-21T08:05:54.906Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-21T08:05:54.906Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-21T08:05:54.906Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-21T08:05:54.933Z [DEBUG] Using bash path: "C:\Program Files\Git\bin\bash.exe"
+2026-02-21T08:05:54.943Z [DEBUG] Applying permission update: Adding 2 allow rule(s) to destination 'userSettings': ["Bash(dir:*)","mcp__pencil"]
+2026-02-21T08:05:54.943Z [DEBUG] Applying permission update: Adding 2 allow rule(s) to destination 'projectSettings': ["Bash(dir:*)","mcp__pencil"]
+2026-02-21T08:05:54.944Z [DEBUG] Applying permission update: Adding 29 allow rule(s) to destination 'localSettings': ["WebSearch","WebFetch(domain:github.com)","Bash(powershell:*)","WebFetch(domain:www.digitalocean.com)","WebFetch(domain:marketingagent.blog)","Bash(where:*)","Bash(openclaw --version:*)","WebFetch(domain:docs.openclaw.ai)","WebFetch(domain:openclaw-ai.online)","Bash(openclaw --help:*)","Bash(npx openclaw --help:*)","Bash(openclaw models:*)","Bash(openclaw config:*)","Bash(openclaw dashboard:*)","Bash(openclaw logs:*)","Bash(openclaw tui:*)","Bash(openclaw status:*)","Bash(openclaw health:*)","Bash(openclaw sessions:*)","Bash(openclaw doctor:*)","Bash(openclaw agents --help:*)","Bash(openclaw agents list:*)","WebFetch(domain:platform.moonshot.ai)","Bash(netstat:*)","WebFetch(domain:webspatial.dev)","WebFetch(domain:tpac2025.webspatial.dev)","WebFetch(domain:www.w3.org)","Bash(echo:*)","Bash(powershell.exe -Command \"Get-ChildItem -Path ''$env:USERPROFILE\\\\.claude'' -Recurse -File | Select-Object FullName\")"]
+2026-02-21T08:05:54.946Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-21T08:05:54.952Z [DEBUG] [ToolSearch:optimistic] mode=tst-auto, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-02-21T08:05:54.952Z [DEBUG] [STARTUP] Running setup()...
+2026-02-21T08:05:54.968Z [DEBUG] Loading skills from: managed=C:\ProgramData\ClaudeCode\.claude\skills, user=C:\Users\ASUS\.claude\skills, project=[]
+2026-02-21T08:05:54.969Z [DEBUG] Error log sink initialized
+2026-02-21T08:05:55.006Z [DEBUG] [Claude in Chrome] Found chrome profiles: Default
+2026-02-21T08:05:55.012Z [DEBUG] [Claude in Chrome] Extension fcoeoabgfenejglbffodgkkbkcdhcgfn found in chrome Default
+2026-02-21T08:05:55.016Z [DEBUG] Loaded 0 unique skills (0 unconditional, 0 conditional, managed: 0, user: 0, project: 0, additional: 0, legacy commands: 0)
+2026-02-21T08:05:55.023Z [DEBUG] Git remote URL: null
+2026-02-21T08:05:55.024Z [DEBUG] No git remote URL found
+2026-02-21T08:05:55.033Z [DEBUG] Loading plugin figma from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"}
+2026-02-21T08:05:55.033Z [DEBUG] No version found for figma@claude-plugins-official, using 'unknown'
+2026-02-21T08:05:55.034Z [DEBUG] Loading plugin claude-code-setup from source: "./plugins/claude-code-setup"
+2026-02-21T08:05:55.035Z [DEBUG] Loading plugin frontend-design from source: "./plugins/frontend-design"
+2026-02-21T08:05:55.035Z [DEBUG] Loading plugin context7 from source: "./external_plugins/context7"
+2026-02-21T08:05:55.054Z [DEBUG] Caching plugin from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"} to temporary path C:\Users\ASUS\.claude\plugins\cache\temp_git_1771661155054_k68y3w
+2026-02-21T08:05:55.126Z [DEBUG] Using manifest version for claude-code-setup@claude-plugins-official: 1.0.0
+2026-02-21T08:05:55.128Z [DEBUG] Plugin claude-code-setup@claude-plugins-official version 1.0.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-21T08:05:55.128Z [DEBUG] Resolved local plugin claude-code-setup to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-21T08:05:55.132Z [DEBUG] [STARTUP] setup() completed in 180ms
+2026-02-21T08:05:55.132Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-02-21T08:05:55.269Z [DEBUG] Using git SHA for frontend-design@claude-plugins-official: aa296ec81e8c
+2026-02-21T08:05:55.287Z [DEBUG] Using git SHA for context7@claude-plugins-official: aa296ec81e8c
+2026-02-21T08:05:55.288Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=C:\Users\ASUS\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\vendor\ripgrep\x64-win32\rg.exe)
+2026-02-21T08:05:55.289Z [DEBUG] Plugin frontend-design@claude-plugins-official version aa296ec81e8c already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c
+2026-02-21T08:05:55.289Z [DEBUG] Resolved local plugin frontend-design to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c
+2026-02-21T08:05:55.290Z [DEBUG] Plugin context7@claude-plugins-official version aa296ec81e8c already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\context7\aa296ec81e8c
+2026-02-21T08:05:55.290Z [DEBUG] Resolved local plugin context7 to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\context7\aa296ec81e8c
+2026-02-21T08:05:55.305Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661155305
+2026-02-21T08:05:55.305Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:55.305Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T08:05:55.305Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:55.305Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661155305 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:55.306Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.373Z [DEBUG] Cloned repository from https://github.com/figma/mcp-server-guide.git to C:\Users\ASUS\.claude\plugins\cache\temp_git_1771661155054_k68y3w
+2026-02-21T08:05:56.374Z [DEBUG] Successfully cached plugin figma to C:\Users\ASUS\.claude\plugins\cache\figma
+2026-02-21T08:05:56.374Z [DEBUG] Using manifest version for figma@claude-plugins-official: 1.1.0
+2026-02-21T08:05:56.374Z [DEBUG] Plugin figma@claude-plugins-official version 1.1.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.1.0
+2026-02-21T08:05:56.380Z [DEBUG] Found 4 plugins (4 enabled, 0 disabled)
+2026-02-21T08:05:56.381Z [DEBUG] getPluginSkills: Processing 4 enabled plugins
+2026-02-21T08:05:56.381Z [DEBUG] Checking plugin figma: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T08:05:56.381Z [DEBUG] Attempting to load skills from plugin figma default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.1.0\skills
+2026-02-21T08:05:56.383Z [DEBUG] Total plugin commands loaded: 0
+2026-02-21T08:05:56.383Z [DEBUG] Registered 0 hooks from 4 plugins
+2026-02-21T08:05:56.383Z [DEBUG] Total plugin agents loaded: 0
+2026-02-21T08:05:56.384Z [DEBUG] Loaded 3 skills from plugin figma default directory
+2026-02-21T08:05:56.384Z [DEBUG] Checking plugin claude-code-setup: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T08:05:56.384Z [DEBUG] Attempting to load skills from plugin claude-code-setup default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0\skills
+2026-02-21T08:05:56.388Z [DEBUG] Loaded 1 skills from plugin claude-code-setup default directory
+2026-02-21T08:05:56.388Z [DEBUG] Checking plugin frontend-design: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T08:05:56.388Z [DEBUG] Attempting to load skills from plugin frontend-design default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c\skills
+2026-02-21T08:05:56.389Z [DEBUG] Loaded 1 skills from plugin frontend-design default directory
+2026-02-21T08:05:56.389Z [DEBUG] Checking plugin context7: skillsPath=none, skillsPaths=0 paths
+2026-02-21T08:05:56.389Z [DEBUG] Total plugin skills loaded: 5
+2026-02-21T08:05:56.389Z [DEBUG] getSkills returning: 0 skill dir commands, 5 plugin skills, 3 bundled skills
+2026-02-21T08:05:56.390Z [DEBUG] [STARTUP] Commands and agents loaded in 1258ms
+2026-02-21T08:05:56.393Z [DEBUG] [STARTUP] Running showSetupScreens()...
+2026-02-21T08:05:56.418Z [DEBUG] Grove: Using fresh cached config
+2026-02-21T08:05:56.418Z [DEBUG] Not in a GitHub repository, skipping path mapping update
+2026-02-21T08:05:56.430Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-02-21T08:05:56.430Z [DEBUG] [3P telemetry] isTelemetryEnabled=false (CLAUDE_CODE_ENABLE_TELEMETRY=undefined)
+2026-02-21T08:05:56.436Z [DEBUG] [keybindings] KeybindingSetup initialized with 103 bindings, 0 warnings
+2026-02-21T08:05:56.453Z [DEBUG] [keybindings] Watching for changes to C:\Users\ASUS\.claude\keybindings.json
+2026-02-21T08:05:56.605Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661156605
+2026-02-21T08:05:56.606Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:56.606Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T08:05:56.607Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:56.607Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661156605 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:56.607Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.629Z [DEBUG] [STARTUP] showSetupScreens() completed in 236ms
+2026-02-21T08:05:56.629Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-02-21T08:05:56.629Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-02-21T08:05:56.629Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-02-21T08:05:56.630Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:05:56.630Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:05:56.634Z [DEBUG] [STARTUP] MCP configs loaded in 1688ms
+2026-02-21T08:05:56.643Z [DEBUG] MCP server "plugin:context7:context7": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.661Z [DEBUG] MCP server "pencil": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.681Z [DEBUG] All plugins already exist, skipping migration
+2026-02-21T08:05:56.684Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2026-02-21T08:05:56.684Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:05:56.684Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2026-02-21T08:05:56.685Z [DEBUG] Loaded 5 installed plugins from C:\Users\ASUS\.claude\plugins\installed_plugins.json
+2026-02-21T08:05:56.685Z [DEBUG] Initialized versioned plugins system with 5 plugins
+2026-02-21T08:05:56.689Z [DEBUG] [Reconnection] computeInitialTeamContext: No teammate context set (not a teammate)
+2026-02-21T08:05:56.690Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661156690
+2026-02-21T08:05:56.690Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:56.691Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T08:05:56.691Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:56.691Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661156690 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:56.691Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.691Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:05:56.713Z [DEBUG] [keybindings] KeybindingSetup initialized with 103 bindings, 0 warnings
+2026-02-21T08:05:56.743Z [DEBUG] High write ratio: blit=0, write=1217 (100.0% writes), screen=22x120
+2026-02-21T08:05:56.748Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661156748
+2026-02-21T08:05:56.748Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:56.749Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T08:05:56.749Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:56.749Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661156748 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:56.749Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.753Z [DEBUG] [REPL:mount] REPL mounted, disabled=false
+2026-02-21T08:05:56.755Z [DEBUG] Official marketplace auto-install skipped: already_attempted
+2026-02-21T08:05:56.755Z [DEBUG] performStartupChecks called
+2026-02-21T08:05:56.757Z [DEBUG] Starting background plugin installations
+2026-02-21T08:05:56.758Z [DEBUG] performBackgroundPluginInstallations called
+2026-02-21T08:05:56.760Z [DEBUG] Loaded 9 CLAUDE.md/rules files:
+  [User] C:\Users\ASUS\.claude\rules\agents.md (1540 chars)
+  [User] C:\Users\ASUS\.claude\rules\coding-style.md (704 chars)
+  [User] C:\Users\ASUS\.claude\rules\git-workflow.md (1114 chars)
+  [User] C:\Users\ASUS\.claude\rules\hooks.md (394 chars)
+  [User] C:\Users\ASUS\.claude\rules\patterns.md (813 chars)
+  [User] C:\Users\ASUS\.claude\rules\performance.md (1654 chars)
+  [User] C:\Users\ASUS\.claude\rules\security.md (505 chars)
+  [User] C:\Users\ASUS\.claude\rules\testing.md (570 chars)
+  [AutoMem] C:\Users\ASUS\.claude\projects\C--Users-ASUS\memory\MEMORY.md (381 chars)
+2026-02-21T08:05:56.763Z [DEBUG] Watching for changes in setting files C:\Users\ASUS\.claude\settings.json, C:\Users\ASUS\.claude\settings.local.json...
+2026-02-21T08:05:56.764Z [DEBUG] [FileIndex] getProjectFiles called, respectGitignore=true
+2026-02-21T08:05:56.764Z [DEBUG] [FileIndex] getFilesUsingGit called
+2026-02-21T08:05:56.764Z [DEBUG] AutoUpdaterWrapper: Installation type: npm-global
+2026-02-21T08:05:56.770Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661156770
+2026-02-21T08:05:56.770Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:56.771Z [DEBUG] Temp file written successfully, size: 14026 bytes
+2026-02-21T08:05:56.771Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:56.771Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661156770 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:56.771Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.797Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-21T08:05:56.797Z [DEBUG] [claudeai-mcp] Gate returned: true
+2026-02-21T08:05:56.797Z [DEBUG] [claudeai-mcp] Fetching from https://api.anthropic.com/v1/mcp_servers?limit=1000
+2026-02-21T08:05:56.829Z [DEBUG] MCP server "plugin:figma:figma": Initializing HTTP transport to https://mcp.figma.com/mcp
+2026-02-21T08:05:56.829Z [DEBUG] MCP server "plugin:figma:figma": Node version: v24.11.0, Platform: win32
+2026-02-21T08:05:56.829Z [DEBUG] MCP server "plugin:figma:figma": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": Proxy options: default
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport options: {"url":"https://mcp.figma.com/mcp","headers":{"User-Agent":"claude-code/2.1.50 (cli)"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport created successfully
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": Client created, setting up request handler
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": Testing basic HTTP connectivity to https://mcp.figma.com/mcp
+2026-02-21T08:05:56.830Z [DEBUG] MCP server "plugin:figma:figma": Parsed URL: host=mcp.figma.com, port=default, protocol=https:
+2026-02-21T08:05:56.831Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-21T08:05:56.832Z [DEBUG] MCP server "plugin:figma:figma-desktop": Initializing HTTP transport to http://127.0.0.1:3845/mcp
+2026-02-21T08:05:56.832Z [DEBUG] MCP server "plugin:figma:figma-desktop": Node version: v24.11.0, Platform: win32
+2026-02-21T08:05:56.832Z [DEBUG] MCP server "plugin:figma:figma-desktop": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-21T08:05:56.832Z [DEBUG] MCP server "plugin:figma:figma-desktop": Proxy options: default
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport options: {"url":"http://127.0.0.1:3845/mcp","headers":{"User-Agent":"claude-code/2.1.50 (cli)"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport created successfully
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": Client created, setting up request handler
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": Testing basic HTTP connectivity to http://127.0.0.1:3845/mcp
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": Parsed URL: host=127.0.0.1, port=3845, protocol=http:
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": Using loopback address: 127.0.0.1
+2026-02-21T08:05:56.833Z [DEBUG] MCP server "plugin:figma:figma-desktop": No token data found
+2026-02-21T08:05:56.836Z [DEBUG] [FileIndex] git ls-files (tracked) took 71ms
+2026-02-21T08:05:56.836Z [DEBUG] [FileIndex] git ls-files: 0 tracked files in 72ms
+2026-02-21T08:05:56.839Z [DEBUG] [FileIndex] using git ls-files result (0 files)
+2026-02-21T08:05:56.841Z [ERROR] MCP server "pencil" Server stderr: 2026/02/21 00:05:56 [MCP] Starting server in stdio mode
+2026/02/21 00:05:56 [WebSocketClient] server connected to WebSocket server
+2026/02/21 00:05:56 [WebSocketClient] received client ID: 0de06323-8243-4357-bc36-ca1ca0575d65
+2026-02-21T08:05:56.841Z [DEBUG] MCP server "pencil": Successfully connected to stdio server in 181ms
+2026-02-21T08:05:56.841Z [DEBUG] MCP server "pencil": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"pencil","version":"1.0.0"}}
+2026-02-21T08:05:56.841Z [DEBUG] [MCP] Server "pencil" connected with subscribe=false
+2026-02-21T08:05:56.847Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP Connection failed after 15ms: fetch failed (code: none, errno: none)
+2026-02-21T08:05:56.847Z [ERROR] MCP server "plugin:figma:figma-desktop" TypeError: fetch failed
+2026-02-21T08:05:56.859Z [DEBUG] MCP server "plugin:figma:figma-desktop": Connection failed after 27ms: fetch failed
+2026-02-21T08:05:56.859Z [ERROR] MCP server "plugin:figma:figma-desktop" Connection failed: fetch failed
+2026-02-21T08:05:56.879Z [DEBUG] Total LSP servers loaded: 0
+2026-02-21T08:05:56.879Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-02-21T08:05:56.879Z [DEBUG] LSP manager initialized with 0 servers
+2026-02-21T08:05:56.879Z [DEBUG] LSP server manager initialized successfully
+2026-02-21T08:05:56.879Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-02-21T08:05:56.879Z [DEBUG] Found 4 enabled plugins
+2026-02-21T08:05:56.880Z [DEBUG] All plugins already exist, skipping migration
+2026-02-21T08:05:56.880Z [DEBUG] Found 5 installed plugins (V2 format)
+2026-02-21T08:05:56.880Z [DEBUG] Found 0 missing plugins (not installed):
+2026-02-21T08:05:56.880Z [DEBUG] Setting installation status: 0 marketplaces, 0 installable plugins, 0 uninstallable plugins
+2026-02-21T08:05:56.880Z [DEBUG] Watching for changes in skill/command directories: C:\Users\ASUS\.claude\skills, C:\Users\ASUS\.claude\skills...
+2026-02-21T08:05:56.890Z [DEBUG] Security messages are fresh (<1h old), skipping fetch
+2026-02-21T08:05:56.897Z [DEBUG] [FileIndex] Not in bundled mode, using Fuse.js fallback
+2026-02-21T08:05:56.897Z [DEBUG] [FileIndex] cache refresh completed in 133ms (24 files)
+2026-02-21T08:05:56.902Z [DEBUG] Loaded plugins - Enabled: 4, Disabled: 0, Commands: 0, Agents: 0, Errors: 0
+2026-02-21T08:05:56.905Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661156905
+2026-02-21T08:05:56.905Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:05:56.906Z [DEBUG] Temp file written successfully, size: 14026 bytes
+2026-02-21T08:05:56.906Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:05:56.906Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661156905 to C:\Users\ASUS\.claude.json
+2026-02-21T08:05:56.906Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:05:56.914Z [DEBUG] [claudeai-mcp] Fetched 8 servers
+2026-02-21T08:05:56.921Z [DEBUG] MCP server "claude.ai Slack": Initializing claude.ai proxy transport for server mcpsrv_01C6mb6LdnXjLmbDwN1pMGkY
+2026-02-21T08:05:56.921Z [DEBUG] MCP server "claude.ai Slack": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01C6mb6LdnXjLmbDwN1pMGkY
+2026-02-21T08:05:56.921Z [DEBUG] MCP server "claude.ai Slack": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.922Z [DEBUG] MCP server "claude.ai Slack": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.923Z [DEBUG] MCP server "claude.ai Linear": Initializing claude.ai proxy transport for server mcpsrv_01P19dQCrACCs5GybPo7Yqod
+2026-02-21T08:05:56.923Z [DEBUG] MCP server "claude.ai Linear": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01P19dQCrACCs5GybPo7Yqod
+2026-02-21T08:05:56.923Z [DEBUG] MCP server "claude.ai Linear": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.923Z [DEBUG] MCP server "claude.ai Linear": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.924Z [DEBUG] MCP server "claude.ai ClickUp": Initializing claude.ai proxy transport for server mcpsrv_01HYbCYz58D4ova2sX2RuAZz
+2026-02-21T08:05:56.924Z [DEBUG] MCP server "claude.ai ClickUp": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01HYbCYz58D4ova2sX2RuAZz
+2026-02-21T08:05:56.924Z [DEBUG] MCP server "claude.ai ClickUp": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.924Z [DEBUG] MCP server "claude.ai ClickUp": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.925Z [DEBUG] MCP server "claude.ai Windsor.ai": Initializing claude.ai proxy transport for server mcpsrv_014romFDbVBBDPzsNnC2MkyB
+2026-02-21T08:05:56.925Z [DEBUG] MCP server "claude.ai Windsor.ai": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_014romFDbVBBDPzsNnC2MkyB
+2026-02-21T08:05:56.925Z [DEBUG] MCP server "claude.ai Windsor.ai": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.925Z [DEBUG] MCP server "claude.ai Windsor.ai": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.926Z [DEBUG] MCP server "claude.ai DevRev": Initializing claude.ai proxy transport for server mcpsrv_018nCh8fGkjrEw5tqJoZuAYu
+2026-02-21T08:05:56.926Z [DEBUG] MCP server "claude.ai DevRev": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_018nCh8fGkjrEw5tqJoZuAYu
+2026-02-21T08:05:56.926Z [DEBUG] MCP server "claude.ai DevRev": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.926Z [DEBUG] MCP server "claude.ai DevRev": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.927Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Initializing claude.ai proxy transport for server mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-21T08:05:56.927Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-21T08:05:56.927Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.927Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai AWS Marketplace": Initializing claude.ai proxy transport for server mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai AWS Marketplace": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai AWS Marketplace": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai AWS Marketplace": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai Day AI": Initializing claude.ai proxy transport for server mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai Day AI": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-21T08:05:56.928Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy transport created successfully
+2026-02-21T08:05:56.929Z [DEBUG] MCP server "claude.ai Day AI": Starting connection with timeout of 30000ms
+2026-02-21T08:05:56.991Z [DEBUG] Org fast mode: enabled
+2026-02-21T08:05:57.165Z [DEBUG] MCP server "plugin:figma:figma": Found client info
+2026-02-21T08:05:57.165Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-21T08:05:57.165Z [DEBUG] MCP server "plugin:figma:figma": Generated new OAuth state
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": Saving code verifier
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": Authorization URL: https://www.figma.com/oauth/mcp?response_type=code&client_id=M67RWluGdpaQ5DtkSUolKd&code_challenge=%5BREDACTED%5D&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback&state=%5BREDACTED%5D&scope=mcp%3Aconnect&resource=https%3A%2F%2Fmcp.figma.com%2Fmcp
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": Scopes in URL: mcp:connect
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": Captured scopes from authorization URL: mcp:connect
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": Redirection handling is disabled, skipping redirect
+2026-02-21T08:05:57.166Z [DEBUG] MCP server "plugin:figma:figma": HTTP Connection failed after 337ms: Unauthorized (code: none, errno: none)
+2026-02-21T08:05:57.166Z [ERROR] MCP server "plugin:figma:figma" Error: Unauthorized
+2026-02-21T08:05:57.167Z [DEBUG] MCP server "plugin:figma:figma": Authentication required for HTTP server
+2026-02-21T08:05:57.287Z [DEBUG] MCP server "claude.ai Slack": claude.ai proxy connection failed after 366ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9V3VKsEZmpG4eXzG"}
+2026-02-21T08:05:57.287Z [ERROR] MCP server "claude.ai Slack" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9V3VKsEZmpG4eXzG"}
+2026-02-21T08:05:57.287Z [DEBUG] MCP server "claude.ai Slack": Authentication required for claude.ai proxy server
+2026-02-21T08:05:57.304Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy connection failed after 376ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9UnuRgRRd52nveY6"}
+2026-02-21T08:05:57.304Z [ERROR] MCP server "claude.ai Day AI" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9UnuRgRRd52nveY6"}
+2026-02-21T08:05:57.304Z [DEBUG] MCP server "claude.ai Day AI": Authentication required for claude.ai proxy server
+2026-02-21T08:05:57.305Z [DEBUG] MCP server "claude.ai DevRev": claude.ai proxy connection failed after 379ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9V3TkvzosDzJFaHN"}
+2026-02-21T08:05:57.305Z [ERROR] MCP server "claude.ai DevRev" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLsN9V3TkvzosDzJFaHN"}
+2026-02-21T08:05:57.305Z [DEBUG] MCP server "claude.ai DevRev": Authentication required for claude.ai proxy server
+2026-02-21T08:05:57.623Z [DEBUG] MCP server "claude.ai AWS Marketplace": Successfully connected to claudeai-proxy server in 695ms
+2026-02-21T08:05:57.623Z [DEBUG] MCP server "claude.ai AWS Marketplace": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"AWS Marketplace - Agent mode","version":"1.0.0"}}
+2026-02-21T08:05:57.623Z [DEBUG] [MCP] Server "claude.ai AWS Marketplace" connected with subscribe=false
+2026-02-21T08:05:57.723Z [DEBUG] MCP server "claude.ai ClickUp": Successfully connected to claudeai-proxy server in 799ms
+2026-02-21T08:05:57.724Z [DEBUG] MCP server "claude.ai ClickUp": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"clickup-mcp-server","version":"1.0.67"}}
+2026-02-21T08:05:57.724Z [DEBUG] [MCP] Server "claude.ai ClickUp" connected with subscribe=false
+2026-02-21T08:05:57.901Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Successfully connected to claudeai-proxy server in 974ms
+2026-02-21T08:05:57.901Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":true,"hasResourceSubscribe":false,"serverVersion":{"name":"Three.js Server","version":"1.0.0"}}
+2026-02-21T08:05:57.901Z [DEBUG] [MCP] Server "claude.ai Three.js 3D Viewer" connected with subscribe=false
+2026-02-21T08:05:58.165Z [DEBUG] MCP server "claude.ai Linear": Successfully connected to claudeai-proxy server in 1242ms
+2026-02-21T08:05:58.165Z [DEBUG] MCP server "claude.ai Linear": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"Linear MCP","title":"Linear","icons":[{"src":"https://static.linear.app/integrations/mcp/icon.svg","mimeType":"image/svg+xml"}],"version":"1.0.0","websiteUrl":"https://linear.app"}}
+2026-02-21T08:05:58.165Z [DEBUG] [MCP] Server "claude.ai Linear" connected with subscribe=false
+2026-02-21T08:05:58.236Z [ERROR] MCP server "plugin:context7:context7" Server stderr: WARNING: Using default CLIENT_IP_ENCRYPTION_KEY.
+Context7 Documentation MCP Server v2.1.1 running on stdio
+2026-02-21T08:05:58.236Z [DEBUG] MCP server "plugin:context7:context7": Successfully connected to undefined server in 1598ms
+2026-02-21T08:05:58.236Z [DEBUG] MCP server "plugin:context7:context7": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"Context7","version":"2.1.1"}}
+2026-02-21T08:05:58.236Z [DEBUG] [MCP] Server "plugin:context7:context7" connected with subscribe=false
+2026-02-21T08:05:58.355Z [DEBUG] MCP server "claude.ai Windsor.ai": Successfully connected to claudeai-proxy server in 1430ms
+2026-02-21T08:05:58.355Z [DEBUG] MCP server "claude.ai Windsor.ai": Connection established with capabilities: {"hasTools":true,"hasPrompts":true,"hasResources":true,"hasResourceSubscribe":false,"serverVersion":{"name":"Windsor.ai","version":"1.14.0"}}
+2026-02-21T08:05:58.355Z [DEBUG] [MCP] Server "claude.ai Windsor.ai" connected with subscribe=false
+2026-02-21T08:09:58.169Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": CLAUDEAI-PROXY connection dropped after 240s uptime
+2026-02-21T08:09:58.169Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection error: Streamable HTTP error: Failed to open SSE stream: Bad Gateway
+2026-02-21T08:09:58.169Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": CLAUDEAI-PROXY connection dropped after 240s uptime
+2026-02-21T08:09:58.169Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection error: Streamable HTTP error: Failed to open SSE stream: Bad Gateway
+2026-02-21T08:12:18.228Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-21T08:12:18.229Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-21T08:12:18.229Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-21T08:12:18.229Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-21T08:12:18.232Z [DEBUG] Sending 6 skills via attachment (initial, 6 total sent)
+2026-02-21T08:12:18.232Z [DEBUG] Skill prompt: showing "figma:code-connect-components" (userFacingName="code-connect-components")
+2026-02-21T08:12:18.232Z [DEBUG] Skill prompt: showing "figma:create-design-system-rules" (userFacingName="create-design-system-rules")
+2026-02-21T08:12:18.232Z [DEBUG] Skill prompt: showing "figma:implement-design" (userFacingName="implement-design")
+2026-02-21T08:12:18.232Z [DEBUG] Skill prompt: showing "claude-code-setup:claude-automation-recommender" (userFacingName="claude-automation-recommender")
+2026-02-21T08:12:18.232Z [DEBUG] Skill prompt: showing "frontend-design:frontend-design" (userFacingName="frontend-design")
+2026-02-21T08:12:18.235Z [WARN] [3P telemetry] Event dropped (no event logger initialized): user_prompt
+2026-02-21T08:12:18.241Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2026-02-21T08:12:18.241Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:12:18.241Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:12:18.242Z [DEBUG] FileHistory: Added snapshot for b3c1e8cc-c910-49e0-9482-f921ed640811, tracking 0 files
+2026-02-21T08:12:18.243Z [DEBUG] [useDeferredValue] Messages deferred by 2 (0→2)
+2026-02-21T08:12:18.259Z [DEBUG] Tool search disabled for model 'claude-haiku-4-5-20251001': model does not support tool_reference blocks. This feature is only available on Claude Sonnet 4+, Opus 4+, and newer models.
+2026-02-21T08:12:18.259Z [DEBUG] [SystemPrompt] path=simple proactive=false
+2026-02-21T08:12:18.286Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.6e6; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:12:18.288Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:12:18.288Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:12:18.290Z [DEBUG] Total plugin output styles loaded: 0
+2026-02-21T08:12:18.305Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:12:18.319Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661538319
+2026-02-21T08:12:18.319Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:18.320Z [DEBUG] Temp file written successfully, size: 14026 bytes
+2026-02-21T08:12:18.320Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:18.320Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661538319 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:18.321Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:18.323Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661538323
+2026-02-21T08:12:18.323Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:18.323Z [DEBUG] Temp file written successfully, size: 14064 bytes
+2026-02-21T08:12:18.323Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:18.323Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661538323 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:18.323Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:18.327Z [DEBUG] autocompact: tokens=620 threshold=167000 effectiveWindow=180000
+2026-02-21T08:12:18.329Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:12:18.329Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:12:18.329Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:12:18.332Z [DEBUG] [useDeferredValue] Messages deferred by 2 (0→2)
+2026-02-21T08:12:18.612Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:12:18.625Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661538625
+2026-02-21T08:12:18.625Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:18.626Z [DEBUG] Temp file written successfully, size: 14064 bytes
+2026-02-21T08:12:18.626Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:18.626Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661538625 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:18.627Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:18.628Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:12:18.628Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:12:18.629Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:12:18.629Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:12:18.630Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:12:18.867Z [DEBUG] Successfully refreshed marketplace: claude-plugins-official
+2026-02-21T08:12:19.028Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:12:19.377Z [DEBUG] Successfully refreshed marketplace: everything-claude-code
+2026-02-21T08:12:19.378Z [DEBUG] Plugin autoupdate: checking installed plugins
+2026-02-21T08:12:19.385Z [DEBUG] Caching plugin from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"} to temporary path C:\Users\ASUS\.claude\plugins\cache\temp_git_1771661539385_e8qp3g
+2026-02-21T08:12:19.390Z [DEBUG] Using manifest version for claude-code-setup@claude-plugins-official: 1.0.0
+2026-02-21T08:12:19.392Z [DEBUG] Using git SHA for frontend-design@claude-plugins-official: aa296ec81e8c
+2026-02-21T08:12:19.392Z [DEBUG] Using git SHA for context7@claude-plugins-official: aa296ec81e8c
+2026-02-21T08:12:20.056Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:12:20.456Z [DEBUG] Cloned repository from https://github.com/figma/mcp-server-guide.git to C:\Users\ASUS\.claude\plugins\cache\temp_git_1771661539385_e8qp3g
+2026-02-21T08:12:20.458Z [DEBUG] Successfully cached plugin figma to C:\Users\ASUS\.claude\plugins\cache\figma
+2026-02-21T08:12:20.458Z [DEBUG] Using manifest version for figma@claude-plugins-official: 1.1.0
+2026-02-21T08:12:21.089Z [DEBUG] [useDeferredValue] Messages deferred by 1 (2→3)
+2026-02-21T08:12:21.494Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661541494
+2026-02-21T08:12:21.494Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:21.495Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:12:21.495Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:21.495Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661541494 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:21.496Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:21.497Z [DEBUG] executePreToolHooks called for tool: Read
+2026-02-21T08:12:21.502Z [DEBUG] Getting matching hook commands for PreToolUse with query: Read
+2026-02-21T08:12:21.502Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:12:21.502Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2026-02-21T08:12:21.517Z [DEBUG] [useDeferredValue] Messages deferred by 1 (3→4)
+2026-02-21T08:12:21.536Z [DEBUG] Getting matching hook commands for PostToolUse with query: Read
+2026-02-21T08:12:21.536Z [DEBUG] Found 5 hook matchers in settings
+2026-02-21T08:12:21.536Z [DEBUG] Matched 1 unique hooks for query "Read" (1 before deduplication)
+2026-02-21T08:12:21.538Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-21T08:12:21.538Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-21T08:12:21.538Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-21T08:12:21.538Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-21T08:12:21.547Z [DEBUG] autocompact: tokens=32937 threshold=167000 effectiveWindow=180000
+2026-02-21T08:12:21.548Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:12:21.551Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661541551
+2026-02-21T08:12:21.551Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:21.551Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:12:21.551Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:21.551Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661541551 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:21.551Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:21.552Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:12:21.552Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:12:21.552Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:12:21.552Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:12:21.553Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:12:21.555Z [DEBUG] [useDeferredValue] Messages deferred by 3 (4→7)
+2026-02-21T08:12:22.730Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:12:26.142Z [DEBUG] [useDeferredValue] Messages deferred by 1 (7→8)
+2026-02-21T08:12:44.816Z [DEBUG] [useDeferredValue] Messages deferred by 1 (8→9)
+2026-02-21T08:12:44.885Z [DEBUG] High write ratio: blit=1320, write=3904 (74.7% writes), screen=153x120
+2026-02-21T08:12:44.923Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2026-02-21T08:12:44.923Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:12:44.923Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:12:44.923Z [DEBUG] autocompact: tokens=35589 threshold=167000 effectiveWindow=180000
+2026-02-21T08:12:44.925Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:12:44.928Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661564928
+2026-02-21T08:12:44.928Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:44.928Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:12:44.928Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:44.928Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661564928 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:44.929Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:44.929Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:12:44.930Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:12:44.930Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:12:44.930Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:12:44.930Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:12:44.950Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661564950
+2026-02-21T08:12:44.950Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:44.950Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:12:44.950Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:44.950Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661564950 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:44.951Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:44.955Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771661564955
+2026-02-21T08:12:44.955Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:12:44.956Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:12:44.956Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:12:44.956Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771661564955 to C:\Users\ASUS\.claude.json
+2026-02-21T08:12:44.956Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:12:46.131Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:12:46.492Z [DEBUG] Forked agent [prompt_suggestion] received message: type=assistant
+2026-02-21T08:12:46.526Z [DEBUG] Getting matching hook commands for SubagentStop with query:
+2026-02-21T08:12:46.526Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:12:46.526Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:12:46.526Z [DEBUG] Forked agent [prompt_suggestion] finished: 1 messages, types=[assistant], totalUsage: input=295 output=17 cacheRead=33966 cacheCreate=1342
+2026-02-21T08:12:46.527Z [DEBUG] [Speculation] enabled=false
+2026-02-21T08:13:44.944Z [DEBUG] Getting matching hook commands for Notification with query: idle_prompt
+2026-02-21T08:13:44.944Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:13:44.944Z [DEBUG] Matched 0 unique hooks for query "idle_prompt" (0 before deduplication)
+2026-02-21T08:18:12.275Z [DEBUG] High write ratio: blit=123, write=4287 (97.2% writes), screen=151x119
+2026-02-21T08:18:12.373Z [DEBUG] High write ratio: blit=123, write=4242 (97.2% writes), screen=153x110
+2026-02-21T08:18:12.423Z [DEBUG] High write ratio: blit=123, write=4222 (97.2% writes), screen=154x106
+2026-02-21T08:18:12.453Z [DEBUG] High write ratio: blit=123, write=4300 (97.2% writes), screen=155x102
+2026-02-21T08:18:12.499Z [DEBUG] High write ratio: blit=123, write=4276 (97.2% writes), screen=156x98
+2026-02-21T08:18:12.534Z [DEBUG] High write ratio: blit=123, write=4240 (97.2% writes), screen=156x92
+2026-02-21T08:18:12.569Z [DEBUG] High write ratio: blit=123, write=4222 (97.2% writes), screen=156x89
+2026-02-21T08:18:12.601Z [DEBUG] High write ratio: blit=123, write=4186 (97.1% writes), screen=156x83
+2026-02-21T08:18:12.634Z [DEBUG] High write ratio: blit=123, write=4237 (97.2% writes), screen=159x79
+2026-02-21T08:18:12.669Z [DEBUG] High write ratio: blit=123, write=4216 (97.2% writes), screen=160x76
+2026-02-21T08:18:12.692Z [DEBUG] High write ratio: blit=123, write=4209 (97.2% writes), screen=162x75
+2026-02-21T08:18:12.821Z [DEBUG] High write ratio: blit=123, write=4216 (97.2% writes), screen=160x76
+2026-02-21T08:18:12.885Z [DEBUG] High write ratio: blit=123, write=4223 (97.2% writes), screen=160x77
+2026-02-21T08:18:12.905Z [DEBUG] High write ratio: blit=123, write=4237 (97.2% writes), screen=159x79
+2026-02-21T08:18:12.941Z [DEBUG] High write ratio: blit=123, write=4244 (97.2% writes), screen=158x80
+2026-02-21T08:18:12.975Z [DEBUG] High write ratio: blit=123, write=4240 (97.2% writes), screen=156x92
+2026-02-21T08:18:13.005Z [DEBUG] High write ratio: blit=123, write=4306 (97.2% writes), screen=155x103
+2026-02-21T08:18:13.042Z [DEBUG] High write ratio: blit=123, write=4237 (97.2% writes), screen=153x109
+2026-02-21T08:18:13.074Z [DEBUG] High write ratio: blit=123, write=4267 (97.2% writes), screen=152x115
+2026-02-21T08:18:13.114Z [DEBUG] High write ratio: blit=123, write=4292 (97.2% writes), screen=151x120
+2026-02-21T08:18:13.141Z [DEBUG] High write ratio: blit=123, write=4312 (97.2% writes), screen=151x124
+2026-02-21T08:18:13.157Z [DEBUG] High write ratio: blit=123, write=4327 (97.2% writes), screen=150x127
+2026-02-21T08:18:13.174Z [DEBUG] High write ratio: blit=123, write=4342 (97.2% writes), screen=150x130
+2026-02-21T08:18:13.196Z [DEBUG] High write ratio: blit=123, write=4357 (97.3% writes), screen=150x133
+2026-02-21T08:18:13.216Z [DEBUG] High write ratio: blit=123, write=4362 (97.3% writes), screen=150x134
+2026-02-21T08:18:13.233Z [DEBUG] High write ratio: blit=123, write=4372 (97.3% writes), screen=150x136
+2026-02-21T08:18:13.266Z [DEBUG] High write ratio: blit=123, write=4387 (97.3% writes), screen=150x139
+2026-02-21T08:18:13.287Z [DEBUG] High write ratio: blit=123, write=4397 (97.3% writes), screen=150x141
+2026-02-21T08:18:13.302Z [DEBUG] High write ratio: blit=123, write=4402 (97.3% writes), screen=150x142
+2026-02-21T08:18:13.325Z [DEBUG] High write ratio: blit=123, write=4407 (97.3% writes), screen=150x143
+2026-02-21T08:29:08.379Z [DEBUG] High write ratio: blit=123, write=4412 (97.3% writes), screen=149x179
+2026-02-21T08:29:30.145Z [DEBUG] High write ratio: blit=123, write=4407 (97.3% writes), screen=150x143
+2026-02-21T08:29:45.576Z [DEBUG] Stored image 1 to C:\Users\ASUS\.claude\image-cache\c84b70cb-c8ff-4ee2-b1d4-8bdc0a3dad25\1.png
+2026-02-21T08:29:57.628Z [DEBUG] Stored image 1 to C:\Users\ASUS\.claude\image-cache\c84b70cb-c8ff-4ee2-b1d4-8bdc0a3dad25\1.png
+2026-02-21T08:29:57.630Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-21T08:29:57.630Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-21T08:29:57.630Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-21T08:29:57.630Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-21T08:29:57.637Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2026-02-21T08:29:57.637Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:29:57.637Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:29:57.638Z [DEBUG] FileHistory: Making snapshot for message bc5821df-8ff9-4cf7-a914-f620ed811ec4
+2026-02-21T08:29:57.638Z [DEBUG] FileHistory: Added snapshot for bc5821df-8ff9-4cf7-a914-f620ed811ec4, tracking 0 files
+2026-02-21T08:29:57.639Z [DEBUG] [useDeferredValue] Messages deferred by 2 (9→11)
+2026-02-21T08:29:57.646Z [DEBUG] High write ratio: blit=0, write=4601 (100.0% writes), screen=153x143
+2026-02-21T08:29:57.649Z [DEBUG] [SystemPrompt] path=simple proactive=false
+2026-02-21T08:29:57.665Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771662597665
+2026-02-21T08:29:57.665Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:29:57.666Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:29:57.666Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:29:57.666Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771662597665 to C:\Users\ASUS\.claude.json
+2026-02-21T08:29:57.666Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:29:57.667Z [DEBUG] autocompact: tokens=37341 threshold=167000 effectiveWindow=180000
+2026-02-21T08:29:57.669Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:29:57.674Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771662597674
+2026-02-21T08:29:57.674Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:29:57.675Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:29:57.675Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:29:57.675Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771662597674 to C:\Users\ASUS\.claude.json
+2026-02-21T08:29:57.675Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:29:57.676Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:29:57.677Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:29:57.678Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:29:57.678Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:29:57.679Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:29:57.685Z [DEBUG] [useDeferredValue] Messages deferred by 2 (9→11)
+2026-02-21T08:29:59.334Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:30:05.170Z [DEBUG] [useDeferredValue] Messages deferred by 1 (11→12)
+2026-02-21T08:30:06.285Z [DEBUG] High write ratio: blit=123, write=4554 (97.4% writes), screen=156x142
+2026-02-21T08:30:06.321Z [DEBUG] High write ratio: blit=123, write=4549 (97.4% writes), screen=156x141
+2026-02-21T08:30:06.352Z [DEBUG] High write ratio: blit=123, write=4544 (97.4% writes), screen=156x140
+2026-02-21T08:30:06.391Z [DEBUG] High write ratio: blit=123, write=4534 (97.4% writes), screen=156x138
+2026-02-21T08:30:06.409Z [DEBUG] High write ratio: blit=123, write=4529 (97.4% writes), screen=156x137
+2026-02-21T08:30:06.426Z [DEBUG] High write ratio: blit=123, write=4524 (97.4% writes), screen=156x136
+2026-02-21T08:30:06.446Z [DEBUG] High write ratio: blit=123, write=4519 (97.4% writes), screen=156x135
+2026-02-21T08:30:06.482Z [DEBUG] High write ratio: blit=123, write=4514 (97.3% writes), screen=157x134
+2026-02-21T08:30:06.509Z [DEBUG] High write ratio: blit=123, write=4509 (97.3% writes), screen=157x133
+2026-02-21T08:30:06.532Z [DEBUG] High write ratio: blit=123, write=4504 (97.3% writes), screen=157x132
+2026-02-21T08:30:06.550Z [DEBUG] High write ratio: blit=123, write=4499 (97.3% writes), screen=157x131
+2026-02-21T08:30:06.561Z [DEBUG] High write ratio: blit=123, write=4494 (97.3% writes), screen=157x130
+2026-02-21T08:30:06.578Z [DEBUG] High write ratio: blit=123, write=4489 (97.3% writes), screen=157x129
+2026-02-21T08:30:06.620Z [DEBUG] High write ratio: blit=123, write=4484 (97.3% writes), screen=157x128
+2026-02-21T08:30:06.672Z [DEBUG] High write ratio: blit=123, write=4479 (97.3% writes), screen=158x127
+2026-02-21T08:30:06.728Z [DEBUG] High write ratio: blit=123, write=4474 (97.3% writes), screen=158x126
+2026-02-21T08:30:06.777Z [DEBUG] High write ratio: blit=123, write=4469 (97.3% writes), screen=158x125
+2026-02-21T08:30:06.904Z [DEBUG] High write ratio: blit=123, write=4464 (97.3% writes), screen=158x124
+2026-02-21T08:30:06.973Z [DEBUG] High write ratio: blit=123, write=4459 (97.3% writes), screen=159x123
+2026-02-21T08:30:07.029Z [DEBUG] High write ratio: blit=123, write=4454 (97.3% writes), screen=158x122
+2026-02-21T08:30:07.188Z [DEBUG] High write ratio: blit=123, write=4449 (97.3% writes), screen=158x121
+2026-02-21T08:30:09.370Z [DEBUG] [useDeferredValue] Messages deferred by 1 (12→13)
+2026-02-21T08:30:09.398Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2026-02-21T08:30:09.398Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:30:09.398Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:30:09.398Z [DEBUG] autocompact: tokens=37610 threshold=167000 effectiveWindow=180000
+2026-02-21T08:30:09.400Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:30:09.405Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771662609405
+2026-02-21T08:30:09.405Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:30:09.405Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:30:09.405Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:30:09.405Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771662609405 to C:\Users\ASUS\.claude.json
+2026-02-21T08:30:09.406Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:30:09.406Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:30:09.406Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:30:09.407Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:30:09.407Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:30:09.407Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:30:09.430Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771662609430
+2026-02-21T08:30:09.430Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:30:09.431Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:30:09.431Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:30:09.431Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771662609430 to C:\Users\ASUS\.claude.json
+2026-02-21T08:30:09.431Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:30:09.434Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771662609434
+2026-02-21T08:30:09.434Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:30:09.435Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:30:09.435Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:30:09.435Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771662609434 to C:\Users\ASUS\.claude.json
+2026-02-21T08:30:09.435Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:30:10.304Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:30:10.603Z [DEBUG] Forked agent [prompt_suggestion] received message: type=assistant
+2026-02-21T08:30:10.645Z [DEBUG] Getting matching hook commands for SubagentStop with query:
+2026-02-21T08:30:10.645Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:30:10.645Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:30:10.645Z [DEBUG] Forked agent [prompt_suggestion] finished: 1 messages, types=[assistant], totalUsage: input=295 output=8 cacheRead=36904 cacheCreate=427
+2026-02-21T08:30:10.646Z [DEBUG] [Speculation] enabled=false
+2026-02-21T08:42:04.330Z [DEBUG] High write ratio: blit=123, write=6240 (98.1% writes), screen=172x179
+2026-02-21T08:42:36.083Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-21T08:42:36.083Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-21T08:42:36.083Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-21T08:42:36.083Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-21T08:42:36.092Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2026-02-21T08:42:36.092Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:42:36.092Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:42:36.092Z [DEBUG] FileHistory: Making snapshot for message dcd9c601-ce5f-4464-9917-8952e815bec6
+2026-02-21T08:42:36.093Z [DEBUG] FileHistory: Added snapshot for dcd9c601-ce5f-4464-9917-8952e815bec6, tracking 0 files
+2026-02-21T08:42:36.094Z [DEBUG] [useDeferredValue] Messages deferred by 1 (13→14)
+2026-02-21T08:42:36.113Z [DEBUG] Tool search disabled for model 'claude-haiku-4-5-20251001': model does not support tool_reference blocks. This feature is only available on Claude Sonnet 4+, Opus 4+, and newer models.
+2026-02-21T08:42:36.113Z [DEBUG] [SystemPrompt] path=simple proactive=false
+2026-02-21T08:42:36.114Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.fd8; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:42:36.115Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:42:36.115Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:42:36.133Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:42:36.137Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663356137
+2026-02-21T08:42:36.137Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:42:36.138Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:42:36.138Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:42:36.138Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663356137 to C:\Users\ASUS\.claude.json
+2026-02-21T08:42:36.138Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:42:36.139Z [DEBUG] autocompact: tokens=37401 threshold=167000 effectiveWindow=180000
+2026-02-21T08:42:36.141Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:42:36.144Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663356144
+2026-02-21T08:42:36.144Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:42:36.144Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:42:36.144Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:42:36.144Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663356144 to C:\Users\ASUS\.claude.json
+2026-02-21T08:42:36.145Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:42:36.145Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:42:36.146Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:42:36.147Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:42:36.147Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:42:36.147Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:42:36.151Z [DEBUG] [useDeferredValue] Messages deferred by 1 (13→14)
+2026-02-21T08:42:37.259Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:42:37.764Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:42:47.201Z [DEBUG] [useDeferredValue] Messages deferred by 1 (14→15)
+2026-02-21T08:42:48.558Z [DEBUG] [useDeferredValue] Messages deferred by 1 (15→16)
+2026-02-21T08:42:48.589Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2026-02-21T08:42:48.589Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:42:48.589Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:42:48.589Z [DEBUG] autocompact: tokens=38289 threshold=167000 effectiveWindow=180000
+2026-02-21T08:42:48.590Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:42:48.594Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663368594
+2026-02-21T08:42:48.594Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:42:48.594Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:42:48.595Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:42:48.595Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663368594 to C:\Users\ASUS\.claude.json
+2026-02-21T08:42:48.595Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:42:48.595Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:42:48.596Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:42:48.596Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:42:48.596Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:42:48.596Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:42:48.615Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663368615
+2026-02-21T08:42:48.615Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:42:48.616Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:42:48.616Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:42:48.616Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663368615 to C:\Users\ASUS\.claude.json
+2026-02-21T08:42:48.616Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:42:48.618Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663368618
+2026-02-21T08:42:48.618Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:42:48.618Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:42:48.618Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:42:48.618Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663368618 to C:\Users\ASUS\.claude.json
+2026-02-21T08:42:48.618Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:42:49.800Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:42:50.146Z [DEBUG] Forked agent [prompt_suggestion] received message: type=assistant
+2026-02-21T08:42:50.205Z [DEBUG] Getting matching hook commands for SubagentStop with query:
+2026-02-21T08:42:50.205Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:42:50.205Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:42:50.205Z [DEBUG] Forked agent [prompt_suggestion] finished: 1 messages, types=[assistant], totalUsage: input=295 output=8 cacheRead=37446 cacheCreate=561
+2026-02-21T08:42:50.206Z [DEBUG] [Speculation] enabled=false
+2026-02-21T08:43:33.996Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-21T08:43:33.996Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-21T08:43:33.996Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-21T08:43:33.996Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-21T08:43:33.999Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2026-02-21T08:43:33.999Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:43:33.999Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:43:33.999Z [DEBUG] FileHistory: Making snapshot for message d79c087c-eb79-44f6-ac98-e1a9c989f339
+2026-02-21T08:43:33.999Z [DEBUG] FileHistory: Added snapshot for d79c087c-eb79-44f6-ac98-e1a9c989f339, tracking 0 files
+2026-02-21T08:43:33.999Z [DEBUG] [useDeferredValue] Messages deferred by 1 (16→17)
+2026-02-21T08:43:34.007Z [DEBUG] Tool search disabled for model 'claude-haiku-4-5-20251001': model does not support tool_reference blocks. This feature is only available on Claude Sonnet 4+, Opus 4+, and newer models.
+2026-02-21T08:43:34.007Z [DEBUG] [SystemPrompt] path=simple proactive=false
+2026-02-21T08:43:34.007Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.37e; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:43:34.007Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:43:34.007Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:43:34.018Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:43:34.020Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663414020
+2026-02-21T08:43:34.020Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:43:34.021Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:43:34.021Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:43:34.021Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663414020 to C:\Users\ASUS\.claude.json
+2026-02-21T08:43:34.021Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:43:34.022Z [DEBUG] autocompact: tokens=38022 threshold=167000 effectiveWindow=180000
+2026-02-21T08:43:34.023Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:43:34.026Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663414026
+2026-02-21T08:43:34.026Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:43:34.026Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:43:34.026Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:43:34.026Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663414026 to C:\Users\ASUS\.claude.json
+2026-02-21T08:43:34.027Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:43:34.027Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:43:34.027Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:43:34.028Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:43:34.028Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:43:34.028Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:43:34.031Z [DEBUG] [useDeferredValue] Messages deferred by 1 (16→17)
+2026-02-21T08:43:34.801Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:43:35.139Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:43:44.429Z [DEBUG] [useDeferredValue] Messages deferred by 1 (17→18)
+2026-02-21T08:43:44.435Z [DEBUG] [useDeferredValue] Messages deferred by 1 (17→18)
+2026-02-21T08:43:48.611Z [DEBUG] [useDeferredValue] Messages deferred by 1 (18→19)
+2026-02-21T08:43:48.665Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2026-02-21T08:43:48.665Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:43:48.665Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:43:48.665Z [DEBUG] autocompact: tokens=38917 threshold=167000 effectiveWindow=180000
+2026-02-21T08:43:48.668Z [DEBUG] Auto tool search enabled: 37400 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-21T08:43:48.687Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663428687
+2026-02-21T08:43:48.688Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:43:48.689Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:43:48.689Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:43:48.689Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663428687 to C:\Users\ASUS\.claude.json
+2026-02-21T08:43:48.691Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:43:48.692Z [DEBUG] Dynamic tool loading: 0/92 deferred tools included
+2026-02-21T08:43:48.694Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.50.b97; cc_entrypoint=cli; cch=00000;
+2026-02-21T08:43:48.695Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T08:43:48.695Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T08:43:48.696Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T08:43:48.797Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.24480.1771663428797
+2026-02-21T08:43:48.797Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T08:43:48.799Z [DEBUG] Temp file written successfully, size: 14104 bytes
+2026-02-21T08:43:48.799Z [DEBUG] Applied original permissions to temp file
+2026-02-21T08:43:48.799Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.24480.1771663428797 to C:\Users\ASUS\.claude.json
+2026-02-21T08:43:48.801Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T08:43:49.642Z [DEBUG] Stream started - received first chunk
+2026-02-21T08:43:49.900Z [DEBUG] Forked agent [prompt_suggestion] received message: type=assistant
+2026-02-21T08:43:49.923Z [DEBUG] Getting matching hook commands for SubagentStop with query:
+2026-02-21T08:43:49.923Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T08:43:49.923Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-21T08:43:49.923Z [DEBUG] Forked agent [prompt_suggestion] finished: 1 messages, types=[assistant], totalUsage: input=295 output=10 cacheRead=38018 cacheCreate=615
+2026-02-21T08:43:49.924Z [DEBUG] [Speculation] enabled=false
+2026-02-21T08:46:00.305Z [DEBUG] High write ratio: blit=123, write=8147 (98.5% writes), screen=230x121
+2026-02-21T08:49:16.517Z [DEBUG] High write ratio: blit=123, write=9123 (98.7% writes), screen=225x179

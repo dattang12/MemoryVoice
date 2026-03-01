@@ -1,0 +1,124 @@
+---
+name: growthops-email-engine
+description: >
+  Fully automated email outreach engine. Use when asked to "send emails", "email founders",
+  "cold email", "email outreach", "发邮件", "auto coding email", "email sequence",
+  "follow up", or any email-related marketing task. Handles personalization, A/B testing,
+  sequences, warmup scheduling, and compliance.
+tools: Bash
+metadata: {"openclaw":{"emoji":"📧","requires":{"env":["SENDGRID_API_KEY"]}}}
+---
+
+# Email Engine Skill
+
+## What You Do
+Send personalized, compliant cold emails to founders via SendGrid API. Manage sequences, A/B tests, follow-ups, and suppression lists.
+
+## Before Every Send — MANDATORY Checks
+1. Check `workspace/email/suppression-list.md` — NEVER email anyone on this list
+2. Check `workspace/email/warmup-tracker.md` — respect daily sending limit
+3. Verify email has: unsubscribe link, physical address, honest subject line
+
+## Email Templates
+
+### Sequence A: Direct Pitch (3 emails)
+
+**Email 1 (Day 0)**
+```
+Subject A: "Quick question about {company_name}"
+Subject B: "{first_name}, 60-sec pitch video = investor intros this week?"
+
+Hi {first_name},
+
+I came across {company_name} on {source} — {specific_compliment}.
+
+We built PitchTok, where founders upload 90-second pitch videos and investors
+swipe to discover startups. {X} investors are actively browsing this week.
+
+Would you be open to uploading a quick video? Takes < 5 min.
+
+{sender_name}
+PitchTok
+
+---
+Unsubscribe: {unsubscribe_url}
+PitchTok Inc, {physical_address}
+```
+
+**Email 2 (Day 3) — Follow-up**
+```
+Subject: "Re: Quick question about {company_name}"
+
+Hey {first_name} — just bumping this. We had {X} founders get investor
+meetings last week through video pitches. Happy to show you examples.
+
+{sender_name}
+```
+
+**Email 3 (Day 7) — Breakup**
+```
+Subject: "Last try — {first_name}"
+
+Final follow-up! If PitchTok isn't the right fit, no worries at all.
+But if you're raising — video pitches are getting 3-5x more investor
+eyeballs than cold decks right now. Link: {signup_link}
+
+P.S. — If you know another founder fundraising, feel free to forward this.
+
+{sender_name}
+```
+
+## Sending via SendGrid API
+
+```bash
+curl -X POST 'https://api.sendgrid.com/v3/mail/send' \
+  -H "Authorization: Bearer $SENDGRID_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "personalizations": [{"to": [{"email": "{to_email}", "name": "{first_name}"}]}],
+    "from": {"email": "outreach@pitchtok.com", "name": "{sender_name}"},
+    "subject": "{subject}",
+    "content": [{"type": "text/plain", "value": "{body}"}],
+    "tracking_settings": {"open_tracking": {"enable": true}, "click_tracking": {"enable": true}},
+    "headers": {"List-Unsubscribe": "<{unsubscribe_url}>"}
+  }'
+```
+
+## Warmup Schedule
+Track in `workspace/email/warmup-tracker.md`:
+
+| Domain Age (weeks) | Max Emails/Day |
+|---------------------|----------------|
+| 1 | 5 |
+| 2 | 10 |
+| 3 | 20 |
+| 4 | 35 |
+| 5 | 50 |
+| 6 | 75 |
+| 7 | 100 |
+| 8+ | 150 |
+
+## A/B Testing
+- Always send variant A to 50% and variant B to 50%
+- Track opens and replies per variant in `workspace/email/ab-results.md`
+- After 100 sends per variant, declare winner
+- Stop sending loser variant
+
+## Sequence Logic
+- After Email 1: wait 3 days → send Email 2
+- After Email 2: wait 4 days → send Email 3
+- STOP if: reply received, bounce, unsubscribe, negative reply
+- Track sequence state in `workspace/email/sequences/`
+
+## Logging
+Log every sent email to `workspace/email/sent-log.md`:
+```
+| Date | To | Subject | Variant | Sequence Step | Status |
+```
+
+## Suppression List
+Maintain `workspace/email/suppression-list.md` — add anyone who:
+- Replies with "unsubscribe", "stop", "remove me"
+- Bounces
+- Replies negatively
+- Was already contacted in last 30 days

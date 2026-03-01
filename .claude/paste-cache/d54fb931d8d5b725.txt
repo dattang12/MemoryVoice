@@ -1,0 +1,34 @@
+Role: You are a Senior Creative Developer and UI/UX Designer specializing in "Awwwards-winning" web experiences.
+
+Objective: Create a high-fidelity, energetic Landing Page for a Badminton App called "RallyCoach".
+
+Visual Style: - Theme: "Dark Mode Cyber-Sport". Use a deep void black/navy background with dynamic neon glow effects (Gradient blobs of Neon Blue #3B82F6 and Rally Red #EF4444).
+
+Brand Identity: Incorporate "Yonex-style" accents (Deep Blue & Vibrant Green) for primary actions to maintain professional sporting credibility.
+
+Typography: Bold, Italicized, Sans-Serif fonts (like 'Inter' or 'Roboto') that look like they are in motion.
+
+Key Feature Implementation (The Hero Section):
+I need a specific "2.5D Layered Composition" for the Hero image to show depth. Please implement the following structure:
+
+Atmosphere: A background layer with animated, pulsing gradient blobs to create a "stadium atmosphere."
+
+Background Layer: A container displaying a "Team Lineup" image. Apply a CSS mask or gradient fade at the bottom so it blends into the page.
+
+Foreground Layer (The "Pop-Out"): A transparent PNG of a single player performing a jump smash.
+
+Constraint: Position this player absolutely on top of the Background Layer.
+
+The Trick: Use a negative top margin (e.g., -top-10) and a high z-index so the player's head and racket visually "break out" of the underlying container's bounding box.
+
+Interaction: Add a "Parallax" or "Float" animation to the Foreground player so they gently move independently of the background, enhancing the 3D effect.
+
+Animation Requirements:
+
+Create a reusable <RevealOnScroll> React component using IntersectionObserver.
+
+Behavior: Elements should start at opacity-0 and translate-y-20. When scrolled into view, they should transition smoothly (duration-700ms) to opacity-100 and translate-y-0.
+
+Apply this animation to the text, the buttons, and sequentially to the player images ("staggered" entrance).
+
+Tech Stack: React (Single File), Tailwind CSS, Lucide-React icons.

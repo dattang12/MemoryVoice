@@ -1,0 +1,52 @@
+[
+  {
+    "content": "Create project structure and configuration files",
+    "status": "completed",
+    "activeForm": "Creating project structure and configuration files"
+  },
+  {
+    "content": "Set up Supabase schema and client",
+    "status": "completed",
+    "activeForm": "Setting up Supabase schema and client"
+  },
+  {
+    "content": "Create landing page with scroll sections",
+    "status": "completed",
+    "activeForm": "Creating landing page with scroll sections"
+  },
+  {
+    "content": "Implement auth pages (login/signup)",
+    "status": "completed",
+    "activeForm": "Implementing auth pages"
+  },
+  {
+    "content": "Build dashboard with charts",
+    "status": "completed",
+    "activeForm": "Building dashboard with charts"
+  },
+  {
+    "content": "Create analytics page with video upload",
+    "status": "completed",
+    "activeForm": "Creating analytics page with video upload"
+  },
+  {
+    "content": "Build practice page with pose detection",
+    "status": "completed",
+    "activeForm": "Building practice page with pose detection"
+  },
+  {
+    "content": "Create racket recommendation page",
+    "status": "completed",
+    "activeForm": "Creating racket recommendation page"
+  },
+  {
+    "content": "Implement all API routes with Gemini integration",
+    "status": "in_progress",
+    "activeForm": "Implementing API routes with Gemini integration"
+  },
+  {
+    "content": "Add racket catalog and final polish",
+    "status": "pending",
+    "activeForm": "Adding racket catalog and final polish"
+  }
+]

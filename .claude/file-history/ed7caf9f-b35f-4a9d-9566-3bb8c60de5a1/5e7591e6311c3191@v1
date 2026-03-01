@@ -1,0 +1,213 @@
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
+import {
+  getFirestore,
+  Firestore,
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+  Unsubscribe,
+  DocumentSnapshot,
+  QuerySnapshot,
+} from 'firebase/firestore'
+import type {
+  FirestoreMemoryDoc,
+  FirestorePhotoDoc,
+  MemorySession,
+  PhotoMeta,
+} from '@/types'
+
+// ============================================================
+// Firebase Configuration
+// ============================================================
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+}
+
+// Prevent duplicate initialization during HMR
+let app: FirebaseApp
+let db: Firestore
+
+function initFirebase(): { app: FirebaseApp; db: Firestore } {
+  if (getApps().length > 0) {
+    app = getApps()[0]
+  } else {
+    app = initializeApp(firebaseConfig)
+  }
+  db = getFirestore(app)
+  return { app, db }
+}
+
+const { db: firestoreDb } = initFirebase()
+export { firestoreDb as db }
+
+// ============================================================
+// Type Guards
+// ============================================================
+
+function isFirestoreMemoryDoc(data: unknown): data is FirestoreMemoryDoc {
+  if (typeof data !== 'object' || data === null) return false
+  const d = data as Record<string, unknown>
+  return (
+    typeof d['id'] === 'string' &&
+    typeof d['personName'] === 'string' &&
+    typeof d['embeddingReady'] === 'boolean' &&
+    typeof d['status'] === 'string'
+  )
+}
+
+function isFirestorePhotoDoc(data: unknown): data is FirestorePhotoDoc {
+  if (typeof data !== 'object' || data === null) return false
+  const d = data as Record<string, unknown>
+  return (
+    typeof d['id'] === 'string' &&
+    typeof d['url'] === 'string' &&
+    typeof d['caption'] === 'string' &&
+    typeof d['era'] === 'string'
+  )
+}
+
+// ============================================================
+// Converters
+// ============================================================
+
+function toMemorySession(
+  docSnap: DocumentSnapshot,
+  photos: PhotoMeta[]
+): MemorySession | null {
+  const data = docSnap.data()
+  if (!data || !isFirestoreMemoryDoc({ id: docSnap.id, ...data })) return null
+
+  const raw = data as Omit<FirestoreMemoryDoc, 'id'>
+  return {
+    id: docSnap.id,
+    title: `${raw.personName}'s Memories`,
+    personName: raw.personName,
+    photos,
+    voiceCloneId: raw.voiceCloneId,
+    agentId: raw.agentId,
+    embeddingReady: raw.embeddingReady,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    status: raw.status,
+  }
+}
+
+function toPhotoMeta(docSnap: { id: string; data: () => unknown }): PhotoMeta | null {
+  const data = docSnap.data()
+  if (!isFirestorePhotoDoc({ id: docSnap.id, ...(data as object) })) return null
+
+  const raw = data as Omit<FirestorePhotoDoc, 'id'>
+  return {
+    id: docSnap.id,
+    url: raw.url,
+    storagePath: raw.storagePath,
+    caption: raw.caption,
+    date: raw.date,
+    era: raw.era,
+    uploadedAt: raw.uploadedAt,
+  }
+}
+
+// ============================================================
+// Firestore Helpers
+// ============================================================
+
+/**
+ * Fetch a single memory session by ID (one-time read).
+ */
+export async function getMemory(memoryId: string): Promise<MemorySession | null> {
+  try {
+    const memoryRef = doc(firestoreDb, 'memories', memoryId)
+    const memorySnap = await getDoc(memoryRef)
+
+    if (!memorySnap.exists()) return null
+
+    const photosRef = collection(firestoreDb, 'photos')
+    const photosQuery = query(
+      photosRef,
+      where('memoryId', '==', memoryId),
+      orderBy('uploadedAt', 'asc')
+    )
+
+    return new Promise((resolve) => {
+      const unsub = onSnapshot(photosQuery, (snap: QuerySnapshot) => {
+        unsub()
+        const photos: PhotoMeta[] = snap.docs
+          .map((d) => toPhotoMeta({ id: d.id, data: () => d.data() }))
+          .filter((p): p is PhotoMeta => p !== null)
+
+        resolve(toMemorySession(memorySnap, photos))
+      })
+    })
+  } catch (err) {
+    console.error('[Firebase] getMemory error:', err)
+    return null
+  }
+}
+
+/**
+ * Subscribe to real-time photo updates for a memory session.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToPhotos(
+  memoryId: string,
+  onUpdate: (photos: PhotoMeta[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  const photosRef = collection(firestoreDb, 'photos')
+  const photosQuery = query(
+    photosRef,
+    where('memoryId', '==', memoryId),
+    orderBy('uploadedAt', 'asc')
+  )
+
+  return onSnapshot(
+    photosQuery,
+    (snap: QuerySnapshot) => {
+      const photos: PhotoMeta[] = snap.docs
+        .map((d) => toPhotoMeta({ id: d.id, data: () => d.data() }))
+        .filter((p): p is PhotoMeta => p !== null)
+      onUpdate(photos)
+    },
+    (err) => {
+      console.error('[Firebase] subscribeToPhotos error:', err)
+      onError(err instanceof Error ? err : new Error(String(err)))
+    }
+  )
+}
+
+/**
+ * Subscribe to memory document status changes.
+ */
+export function subscribeToMemoryStatus(
+  memoryId: string,
+  onUpdate: (doc: FirestoreMemoryDoc) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  const memoryRef = doc(firestoreDb, 'memories', memoryId)
+
+  return onSnapshot(
+    memoryRef,
+    (snap: DocumentSnapshot) => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      if (isFirestoreMemoryDoc({ id: snap.id, ...data })) {
+        onUpdate({ id: snap.id, ...(data as Omit<FirestoreMemoryDoc, 'id'>) })
+      }
+    },
+    (err) => {
+      console.error('[Firebase] subscribeToMemoryStatus error:', err)
+      onError(err instanceof Error ? err : new Error(String(err)))
+    }
+  )
+}

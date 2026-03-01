@@ -1,0 +1,17 @@
+     1→fastapi>=0.109.0
+     2→uvicorn==0.27.0
+     3→python-multipart==0.0.6
+     4→opencv-python==4.9.0.80
+     5→mediapipe==0.10.11
+     6→numpy==1.26.3
+     7→supabase>=2.27.1
+     8→requests==2.31.0
+     9→python-dotenv==1.0.0
+    10→pydantic>=2.11.7
+    11→google-generativeai>=0.3.0
+    12→httpx>=0.26.0
+    13→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

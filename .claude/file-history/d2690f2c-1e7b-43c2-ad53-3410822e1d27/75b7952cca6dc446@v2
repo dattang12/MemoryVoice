@@ -1,0 +1,330 @@
+[
+  {
+    "id": "yonex-astrox-88d",
+    "name": "Astrox 88D Pro",
+    "brand": "Yonex",
+    "price_band": "premium",
+    "price_range": "$200-250",
+    "play_style": [
+      "power",
+      "attacking"
+    ],
+    "skill_level": [
+      "advanced",
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Heavy",
+    "flexibility": "Stiff",
+    "description": "Designed for powerful smashes and aggressive doubles play. The Rotational Generator System maximizes power transfer.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Yonex_Astrox_88_D_Pro_Silver_Black.png?v=1752538957",
+    "ebay_search_query": "Yonex Astrox 88D Pro badminton racket"
+  },
+  {
+    "id": "yonex-nanoflare-800",
+    "name": "Nanoflare 800",
+    "brand": "Yonex",
+    "price_band": "premium",
+    "price_range": "$180-220",
+    "play_style": [
+      "speed",
+      "control"
+    ],
+    "skill_level": [
+      "advanced",
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Light",
+    "flexibility": "Medium",
+    "description": "Ultra-fast racket for quick exchanges and deceptive shots. Sonic Flare System enables rapid swing speed.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Yonex_Nanoflare_800_Pro_Deep_Green.png?v=1752603799",
+    "ebay_search_query": "Yonex Nanoflare 800 badminton racket"
+  },
+  {
+    "id": "li-ning-axforce-80",
+    "name": "Axforce 80",
+    "brand": "Li-Ning",
+    "price_band": "premium",
+    "price_range": "$170-200",
+    "play_style": [
+      "power",
+      "all-round"
+    ],
+    "skill_level": [
+      "advanced",
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Heavy",
+    "flexibility": "Stiff",
+    "description": "Professional-grade racket with excellent power and stability. Used by top international players.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/AX80-4UG6M_864b676d-8152-4c97-b8fc-25951e4df752.png?v=1728685880",
+    "ebay_search_query": "Li-Ning Axforce 80 badminton racket"
+  },
+  {
+    "id": "victor-thruster-f",
+    "name": "Thruster F",
+    "brand": "Victor",
+    "price_band": "premium",
+    "price_range": "$150-180",
+    "play_style": [
+      "power",
+      "attacking"
+    ],
+    "skill_level": [
+      "advanced"
+    ],
+    "weight": "3U (85-89g)",
+    "balance": "Head Heavy",
+    "flexibility": "Stiff",
+    "description": "Maximum power generation with excellent repulsion. Aero-Sword frame cuts through air resistance.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Victor_Thruster_TK-F_Black_Enhanced_Edition_TK-F_C.png?v=1752276467",
+    "ebay_search_query": "Victor Thruster F badminton racket"
+  },
+  {
+    "id": "yonex-arcsaber-11",
+    "name": "Arcsaber 11 Pro",
+    "brand": "Yonex",
+    "price_band": "premium",
+    "price_range": "$180-220",
+    "play_style": [
+      "control",
+      "all-round"
+    ],
+    "skill_level": [
+      "advanced",
+      "intermediate"
+    ],
+    "weight": "3U (85-89g)",
+    "balance": "Even Balance",
+    "flexibility": "Medium",
+    "description": "Perfect balance of power and control. Ideal for players who value precision placement.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Yonex-Arcsaber-11-Pro-Grayish-Pearl.png?v=1752274374",
+    "ebay_search_query": "Yonex Arcsaber 11 Pro badminton racket"
+  },
+  {
+    "id": "li-ning-bladex-900",
+    "name": "BladeX 900 Moon Max",
+    "brand": "Li-Ning",
+    "price_band": "premium",
+    "price_range": "$160-190",
+    "play_style": [
+      "speed",
+      "control"
+    ],
+    "skill_level": [
+      "advanced",
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Light",
+    "flexibility": "Medium",
+    "description": "Exceptional maneuverability with precise control. Fast Frame technology for quick reactions.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Li-Ning_BladeX_900_Moon_Max_White_Silver.png?v=1728685123",
+    "ebay_search_query": "Li-Ning BladeX 900 badminton racket"
+  },
+  {
+    "id": "yonex-astrox-99",
+    "name": "Astrox 99 Pro",
+    "brand": "Yonex",
+    "price_band": "premium",
+    "price_range": "$200-250",
+    "play_style": [
+      "power",
+      "attacking"
+    ],
+    "skill_level": [
+      "advanced"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Heavy",
+    "flexibility": "Stiff",
+    "description": "Signature racket of world champions. Delivers devastating steep smashes with maximum power.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Yonex_Astrox_99_Pro_3rd_Gen_Black_Green_2025.png?v=1760124758",
+    "ebay_search_query": "Yonex Astrox 99 Pro badminton racket"
+  },
+  {
+    "id": "victor-auraspeed-90s",
+    "name": "Auraspeed 90S",
+    "brand": "Victor",
+    "price_band": "mid-range",
+    "price_range": "$120-150",
+    "play_style": [
+      "speed",
+      "all-round"
+    ],
+    "skill_level": [
+      "intermediate",
+      "advanced"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Even Balance",
+    "flexibility": "Medium",
+    "description": "Balanced performance with fast handling. Aero-Diamond frame provides stability and speed.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/Victor_Auraspeed_90S_Frame.jpg?v=1573691546",
+    "ebay_search_query": "Victor Auraspeed 90S badminton racket"
+  },
+  {
+    "id": "yonex-duora-10",
+    "name": "Duora 10",
+    "brand": "Yonex",
+    "price_band": "mid-range",
+    "price_range": "$130-160",
+    "play_style": [
+      "all-round",
+      "control"
+    ],
+    "skill_level": [
+      "intermediate"
+    ],
+    "weight": "3U (85-89g)",
+    "balance": "Even Balance",
+    "flexibility": "Medium",
+    "description": "Dual-optimized frame for different shot types on forehand and backhand. Versatile performance.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/duora10_blueorg-1.jpg?v=1573691432",
+    "ebay_search_query": "Yonex Duora 10 badminton racket"
+  },
+  {
+    "id": "li-ning-windstorm-72",
+    "name": "Windstorm 72",
+    "brand": "Li-Ning",
+    "price_band": "mid-range",
+    "price_range": "$80-100",
+    "play_style": [
+      "speed",
+      "control"
+    ],
+    "skill_level": [
+      "intermediate",
+      "beginner"
+    ],
+    "weight": "6U (72-76g)",
+    "balance": "Head Light",
+    "flexibility": "Flexible",
+    "description": "Ultra-lightweight for fast handling. Perfect for defensive players and beginners developing technique.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Li-Ning_Windstorm_72_Blue_Purple.png?v=1728686456",
+    "ebay_search_query": "Li-Ning Windstorm 72 badminton racket"
+  },
+  {
+    "id": "yonex-nanoflare-270",
+    "name": "Nanoflare 270 Speed",
+    "brand": "Yonex",
+    "price_band": "budget",
+    "price_range": "$60-80",
+    "play_style": [
+      "speed",
+      "all-round"
+    ],
+    "skill_level": [
+      "beginner",
+      "intermediate"
+    ],
+    "weight": "5U (75-79g)",
+    "balance": "Head Light",
+    "flexibility": "Flexible",
+    "description": "Entry-level racket with advanced technology. Great for developing proper technique and swing speed.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/files/nf270speed_427-1_03.webp?v=1710791553",
+    "ebay_search_query": "Yonex Nanoflare 270 Speed badminton racket"
+  },
+  {
+    "id": "victor-jetspeed-12",
+    "name": "Jetspeed 12",
+    "brand": "Victor",
+    "price_band": "mid-range",
+    "price_range": "$100-130",
+    "play_style": [
+      "speed",
+      "attacking"
+    ],
+    "skill_level": [
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Light",
+    "flexibility": "Medium",
+    "description": "Fast and agile with good power. Jet Technology provides excellent repulsion and acceleration.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/victor_jetspeed_s12_frame.jpg?v=1573691612",
+    "ebay_search_query": "Victor Jetspeed 12 badminton racket"
+  },
+  {
+    "id": "yonex-voltric-z2",
+    "name": "Voltric Z-Force II",
+    "brand": "Yonex",
+    "price_band": "mid-range",
+    "price_range": "$140-170",
+    "play_style": [
+      "power",
+      "attacking"
+    ],
+    "skill_level": [
+      "intermediate",
+      "advanced"
+    ],
+    "weight": "3U (85-89g)",
+    "balance": "Head Heavy",
+    "flexibility": "Stiff",
+    "description": "Classic power racket with Tri-Voltage System. Great for developing powerful smashes.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/voltric_zforce2_1.jpg?v=1573691698",
+    "ebay_search_query": "Yonex Voltric Z-Force II badminton racket"
+  },
+  {
+    "id": "li-ning-turbocharging-75",
+    "name": "Turbo Charging 75",
+    "brand": "Li-Ning",
+    "price_band": "mid-range",
+    "price_range": "$90-120",
+    "play_style": [
+      "power",
+      "all-round"
+    ],
+    "skill_level": [
+      "intermediate"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Head Heavy",
+    "flexibility": "Medium",
+    "description": "Solid power performance at a reasonable price. Good for players developing offensive skills.",
+    "image_url": "https://joybadminton.com/cdn/shop/files/Li-Ning_Turbo_Charging_75_Black_Red.png?v=1728686789",
+    "ebay_search_query": "Li-Ning Turbo Charging 75 badminton racket"
+  },
+  {
+    "id": "carlton-powerblade-9100",
+    "name": "Powerblade 9100",
+    "brand": "Carlton",
+    "price_band": "budget",
+    "price_range": "$40-60",
+    "play_style": [
+      "all-round",
+      "control"
+    ],
+    "skill_level": [
+      "beginner"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Even Balance",
+    "flexibility": "Flexible",
+    "description": "Excellent beginner racket with forgiving sweet spot. Durable construction for learning players.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/carlton_powerblade_superlite.jpg?v=1573691234",
+    "ebay_search_query": "Carlton Powerblade 9100 badminton racket"
+  },
+  {
+    "id": "yonex-gr-020g",
+    "name": "GR-020G",
+    "brand": "Yonex",
+    "price_band": "budget",
+    "price_range": "$25-35",
+    "play_style": [
+      "all-round"
+    ],
+    "skill_level": [
+      "beginner"
+    ],
+    "weight": "4U (80-84g)",
+    "balance": "Even Balance",
+    "flexibility": "Flexible",
+    "description": "Most affordable Yonex racket. Steel shaft provides durability for recreational play.",
+    "image_url": "https://www.badmintonwarehouse.com/cdn/shop/products/gr020g_1.jpg?v=1573691345",
+    "ebay_search_query": "Yonex GR-020G badminton racket"
+  }
+]

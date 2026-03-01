@@ -1,0 +1,149 @@
+---
+name: growthops-account-manager
+description: >
+  Manage PitchTok social media accounts across platforms. Use when asked to "set up accounts",
+  "创建账号", "manage accounts", "account warmup", "account health", or any account management
+  task. Handles account creation (with approval), warmup schedules, and credibility building.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"🔑"}}
+---
+
+# Account Manager Skill
+
+## What You Do
+Create, warm up, and manage PitchTok social media accounts across all platforms. Build credibility gradually. Maintain account health and avoid bans/restrictions.
+
+## REQUIRES HUMAN APPROVAL
+- Creating any new account
+- Linking Gmail to any service
+- Changing any account settings
+- Verifying accounts (phone, email)
+
+## Account Setup Plan
+
+### Accounts to Create (using provided Gmail)
+
+| Platform | Account Type | Username Format | Priority |
+|----------|-------------|-----------------|----------|
+| LinkedIn | Company Page + Personal | PitchTok / {name} | HIGH |
+| Twitter/X | Brand Account | @PitchTokHQ | HIGH |
+| 小红书 | Creator Account | PitchTok创始人 | HIGH |
+| Reddit | Personal (team member) | u/pitchtok_{name} | MEDIUM |
+| Product Hunt | Maker Account | PitchTok | MEDIUM |
+| Indie Hackers | Product Profile | PitchTok | MEDIUM |
+| Discord | Bot/Team Account | PitchTok Team | MEDIUM |
+| GitHub | Org Account | PitchTok | LOW |
+
+### Account Creation Checklist (per platform)
+
+```markdown
+## {Platform} Account Setup
+
+### Registration
+- [ ] Create account using provided Gmail
+- [ ] Set username: {username}
+- [ ] Verify email
+- [ ] Set profile photo (PitchTok logo or team photo)
+- [ ] Write bio (platform-specific)
+- [ ] Add website link
+- [ ] Complete all profile fields
+- [ ] HUMAN APPROVED: ✅/❌
+
+### Bio Templates
+LinkedIn: "Helping early-stage founders get in front of investors through 90-second pitch videos. Think TikTok meets deal flow. | PitchTok"
+Twitter: "TikTok for startup pitches. Founders record 90-sec videos, investors discover them. Free for founders. 🚀"
+XHS: "帮助早期创始人用90秒视频pitch获得投资人关注 | PitchTok | 美国创业 | VC"
+Reddit: "Building PitchTok — short video pitches for investors. Here to help founders with fundraising questions."
+```
+
+## Account Warmup Schedule
+
+### CRITICAL: Do NOT start outreach on Day 1. Build credibility first.
+
+#### Week 1: Foundation (NO outreach)
+- Complete all profile information
+- Follow relevant accounts (founders, VCs, startup media)
+- Like and engage with others' content (no self-promotion)
+- Join relevant groups/communities
+- Post 1-2 valuable, non-promotional posts
+
+#### Week 2: Credibility Building (NO cold outreach)
+- Post 3-4 valuable content pieces (fundraising tips, market insights)
+- Engage in 10+ conversations daily (comments, replies)
+- Follow 20-30 accounts per day
+- Share others' content with thoughtful commentary
+- Build follower base organically
+
+#### Week 3: Soft Introduction (light outreach)
+- Begin sharing PitchTok-related content (case studies, founder stories)
+- Start answering fundraising questions in communities
+- Engage with potential founders' content directly
+- Queue first batch of DMs for approval (5/day max)
+
+#### Week 4+: Full Operations
+- Regular content publishing (per content calendar)
+- Active comment monitoring and replies
+- DM outreach at full daily limits
+- Community participation
+
+## Platform-Specific Warmup
+
+### LinkedIn
+- Week 1: 10 connections/day (people you actually know or relevant industry)
+- Week 2: 15 connections/day + 3 comments on others' posts
+- Week 3: 20 connections/day + 1 original post + 5 comments
+- Week 4+: Full cadence (5 connection requests to cold leads, 3 posts/week)
+
+### Twitter/X
+- Week 1: Follow 30 accounts, like 20 tweets/day, reply to 5
+- Week 2: 3 original tweets/day, reply to 10 tweets
+- Week 3: 5 tweets/day, 1 thread/week, start DMs
+- Week 4+: Full cadence
+
+### 小红书
+- Week 1: Follow 50 creators, save/like 30 posts/day
+- Week 2: 2 posts (non-promotional, valuable content)
+- Week 3: 3 posts/week, start engaging in comments
+- Week 4+: Full cadence (3 content packs/week)
+
+### Reddit
+- Week 1: Subscribe to subreddits, upvote, read
+- Week 2: Comment helpfully on 5 threads/day (NO self-promotion)
+- Week 3: Post 1 valuable discussion, continue commenting
+- Week 4+: Regular participation + occasional PitchTok mentions when relevant
+- NEVER spam — Reddit users will destroy your reputation
+
+## Account Health Monitoring
+
+Check daily:
+```markdown
+# Account Health — {Date}
+
+| Platform | Followers | Following | Posts | Engagement Rate | Restrictions | Status |
+|----------|-----------|-----------|-------|-----------------|-------------|--------|
+| LinkedIn | | | | | None | 🟢 |
+| Twitter | | | | | None | 🟢 |
+| XHS | | | | | None | 🟢 |
+| Reddit | | | | | None | 🟢 |
+
+## Alerts
+- 🔴 Account restricted: {platform} — {reason}
+- 🟡 Engagement dropping: {platform} — {recommended action}
+- 🟢 All accounts healthy
+```
+
+## Account Health Rules
+- If engagement drops 30%+ week over week: reduce posting frequency
+- If any warning/restriction received: STOP all activity on that platform, alert human
+- If follower growth stalls: analyze content quality, adjust strategy
+- Never buy followers, likes, or engagement
+- Never use third-party automation tools that violate platform ToS
+
+## Credential Management
+- Store credentials ONLY in the secure OpenClaw credential store
+- NEVER log credentials in workspace files
+- NEVER share credentials in DMs, comments, or emails
+- Rotate passwords every 90 days
+- Enable 2FA on all accounts
+
+Save account status to `workspace/accounts/status.md`

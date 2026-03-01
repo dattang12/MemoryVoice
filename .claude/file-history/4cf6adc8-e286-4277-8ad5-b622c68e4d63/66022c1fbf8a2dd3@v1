@@ -1,0 +1,114 @@
+# RallyCoach - AI-Powered Badminton Training
+
+A modern web application that provides AI-powered badminton coaching using pose estimation and Google's Gemini AI models.
+
+## Features
+
+- **Landing Page**: Beautiful hero section with scroll-to navigation
+- **Authentication**: Supabase-powered login/signup
+- **Dashboard**: Track your progress with interactive charts
+- **Analytics**: Upload videos for AI analysis and personalized training plans
+- **Practice Mode**: Real-time pose detection with live coaching cues
+- **Racket Recommendations**: AI-powered equipment suggestions
+
+## Tech Stack
+
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Charts**: Recharts
+- **Pose Detection**: MediaPipe Pose (browser-based)
+- **Backend**: Next.js Route Handlers
+- **Database/Auth/Storage**: Supabase
+- **AI**: Google Gemini 3 (Flash for live coaching, Pro for analytics, Pro Image for drill visuals)
+
+## Setup Instructions
+
+### 1. Clone and Install
+
+```bash
+cd rallycoach
+npm install
+```
+
+### 2. Configure Supabase
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Run the SQL schema in `supabase/schema.sql` in the Supabase SQL Editor
+3. Create a storage bucket named `videos` (public)
+4. Copy your project URL and anon key
+
+### 3. Configure Gemini API
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Ensure you have access to Gemini 3 Flash and Pro models (preview)
+
+### 4. Environment Variables
+
+Create a `.env.local` file:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in your credentials:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+### 5. Run the Development Server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+## Database Schema
+
+The app uses 3 main tables:
+
+- `sessions`: Practice session records with scores
+- `analysis_results`: Video analysis results from Gemini Pro
+- `racket_favorites`: User's favorited racket recommendations
+
+See `supabase/schema.sql` for the complete schema.
+
+## API Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/analysis/start` | POST | Start video analysis |
+| `/api/analysis/[id]` | GET | Get analysis results |
+| `/api/practice/tick` | POST | Get live coaching cue |
+| `/api/racket/recommend` | POST | Get racket recommendations |
+
+## Gemini Models Used
+
+- **gemini-3-flash-preview**: Ultra-fast model for real-time practice coaching with live commentary, reasoning hints, and sub-second latency
+- **gemini-3-pro-preview**: Advanced reasoning model for detailed video analysis, training plan generation, and structured coaching feedback
+- **gemini-3-pro-image-preview**: Multimodal image generation for drill visualization
+
+## Why Gemini 3
+
+RallyCoach leverages Gemini 3's unique capabilities to deliver a "wow" coaching experience:
+
+1. **Live Commentary with Structured Reasoning** - Gemini 3 Flash provides real-time multimodal commentary during practice sessions. Each coaching cue includes a reasoning hint explaining *why* that specific correction was chosen, making feedback transparent and educational.
+
+2. **Low-Latency Live Coaching** - Gemini 3 Flash delivers coaching cues in under 500ms, enabling truly real-time feedback during active movement. Latency is measured and displayed per-cue so players can see the AI responding in real time.
+
+3. **Real Data, No Mocks** - All analysis flows use actual pose data from MediaPipe or stored session data. Gemini 3 Pro analyzes real player metrics to generate personalized training plans, issue detection, and drill recommendations.
+
+4. **Enhanced Multimodal Understanding** - Gemini 3 Pro's advanced reasoning produces more accurate form analysis, better drill suggestions, and more nuanced coaching feedback compared to previous generations.
+
+## Notes
+
+- Pose detection runs entirely in the browser using MediaPipe
+- If pose detection fails, demo mode is available but clearly labeled
+- Video analysis uses real pose data from sessions (no mock metrics in production)
+- Racket recommendations use a local catalog with AI-powered ranking
+
+## License
+
+MIT

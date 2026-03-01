@@ -1,0 +1,492 @@
+/**
+ * Banded Scoring Rules Configuration
+ *
+ * This module provides configurable scoring rules with:
+ * - Skill level-based tolerance bands (beginner/intermediate/advanced)
+ * - Three-tier scoring: Green (good), Yellow (minor deviation), Red (major deviation)
+ * - Confidence gating: Low confidence poses are marked as "unknown" instead of red
+ * - Phase-aware checks: Different rules for ready vs lunge vs recovery phases
+ *
+ * Version: v1
+ */
+
+import type {
+  ScoringRulesConfig,
+  ScoreBand,
+  BandedScore,
+  PoseLandmark,
+  PoseMetrics
+} from './types';
+import { calculateAngle, calculateDistance, POSE_LANDMARKS } from './pose-utils';
+
+// ============================================
+// Rules Configuration (versioned)
+// ============================================
+
+export const SCORING_RULES_CONFIG: ScoringRulesConfig = {
+  version: 'v1',
+
+  // How much wider the acceptable bands are for each skill level
+  skill_bands: {
+    beginner: {
+      green_tolerance: 0.40, // 40% wider green band
+      yellow_tolerance: 0.60, // 60% wider than ideal for yellow
+    },
+    intermediate: {
+      green_tolerance: 0.25, // 25% wider green band
+      yellow_tolerance: 0.40, // 40% wider for yellow
+    },
+    advanced: {
+      green_tolerance: 0.10, // 10% wider green band (strict)
+      yellow_tolerance: 0.20, // 20% wider for yellow
+    },
+  },
+
+  // Minimum confidence threshold - below this, mark as "unknown"
+  confidence_threshold: 0.5,
+
+  // Phase-specific rules
+  phase_rules: {
+    ready: {
+      name: 'Ready Position',
+      applicable_metrics: ['knee_angle', 'stance_width'],
+      thresholds: {
+        knee_angle: { min: 130, max: 160 },
+        stance_width: { min: 0.8, max: 1.3 },
+      },
+    },
+    lunge: {
+      name: 'Lunge/Reach',
+      applicable_metrics: ['knee_angle', 'stance_width', 'elbow_angle'],
+      thresholds: {
+        knee_angle: { min: 90, max: 140 },
+        stance_width: { min: 1.0, max: 2.0 },
+        elbow_angle: { min: 100, max: 160 },
+      },
+    },
+    overhead: {
+      name: 'Overhead Shot',
+      applicable_metrics: ['elbow_angle', 'body_rotation'],
+      thresholds: {
+        elbow_angle: { min: 150, max: 180 },
+        body_rotation: { min: 15, max: 50 },
+      },
+    },
+    recovery: {
+      name: 'Recovery',
+      applicable_metrics: ['knee_angle', 'stance_width'],
+      thresholds: {
+        knee_angle: { min: 120, max: 155 },
+        stance_width: { min: 0.7, max: 1.4 },
+      },
+    },
+  },
+};
+
+// ============================================
+// Metric Definitions with Ideal Ranges
+// ============================================
+
+export interface MetricDefinition {
+  code: string;
+  name: string;
+  unit: string;
+  ideal: { min: number; max: number };
+  description: string;
+  feedback: {
+    green: string;
+    yellow_low: string;
+    yellow_high: string;
+    red_low: string;
+    red_high: string;
+  };
+}
+
+export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
+  elbow_angle: {
+    code: 'elbow_angle',
+    name: 'Elbow Angle',
+    unit: 'degrees',
+    ideal: { min: 90, max: 130 }, // General ideal for most shots
+    description: 'Angle at the elbow joint during stroke',
+    feedback: {
+      green: 'Good elbow position!',
+      yellow_low: 'Try extending your elbow a bit more',
+      yellow_high: 'Slight over-extension, maintain control',
+      red_low: 'Elbow too bent - extend more for power',
+      red_high: 'Elbow locked - keep slight flex for control',
+    },
+  },
+  knee_angle: {
+    code: 'knee_angle',
+    name: 'Knee Bend',
+    unit: 'degrees',
+    ideal: { min: 120, max: 155 },
+    description: 'Angle at the knee for athletic stance',
+    feedback: {
+      green: 'Great knee position!',
+      yellow_low: 'Knees slightly too bent',
+      yellow_high: 'Could bend knees more',
+      red_low: 'Too deep - may slow recovery',
+      red_high: 'Legs too straight - bend for explosiveness',
+    },
+  },
+  stance_width: {
+    code: 'stance_width',
+    name: 'Stance Width',
+    unit: 'ratio',
+    ideal: { min: 0.8, max: 1.4 }, // Ratio of ankle width to shoulder width
+    description: 'Foot separation relative to shoulder width',
+    feedback: {
+      green: 'Good stance width!',
+      yellow_low: 'Stance slightly narrow',
+      yellow_high: 'Stance slightly wide',
+      red_low: 'Feet too close - widen for stability',
+      red_high: 'Overly wide stance - may limit mobility',
+    },
+  },
+  body_rotation: {
+    code: 'body_rotation',
+    name: 'Body Rotation',
+    unit: 'degrees',
+    ideal: { min: 10, max: 40 },
+    description: 'Hip-shoulder separation for power generation',
+    feedback: {
+      green: 'Excellent rotation!',
+      yellow_low: 'Could rotate more for power',
+      yellow_high: 'Slight over-rotation',
+      red_low: 'Not enough rotation - use your hips',
+      red_high: 'Too much rotation - control your swing',
+    },
+  },
+};
+
+// ============================================
+// Banded Scoring Functions
+// ============================================
+
+/**
+ * Calculate the score band for a given metric value
+ */
+export function calculateBand(
+  value: number,
+  ideal: { min: number; max: number },
+  skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+  confidence: number = 1.0
+): BandedScore {
+  const config = SCORING_RULES_CONFIG;
+  const skillConfig = config.skill_bands[skillLevel];
+
+  // Confidence gating - if too low, return unknown
+  if (confidence < config.confidence_threshold) {
+    return {
+      band: 'unknown',
+      value,
+      confidence,
+      feedback: 'Pose confidence too low to evaluate',
+    };
+  }
+
+  const idealRange = ideal.max - ideal.min;
+  const idealMid = (ideal.min + ideal.max) / 2;
+
+  // Calculate tolerance ranges
+  const greenTolerance = idealRange * skillConfig.green_tolerance;
+  const yellowTolerance = idealRange * skillConfig.yellow_tolerance;
+
+  const greenMin = ideal.min - greenTolerance / 2;
+  const greenMax = ideal.max + greenTolerance / 2;
+  const yellowMin = ideal.min - yellowTolerance / 2;
+  const yellowMax = ideal.max + yellowTolerance / 2;
+
+  // Determine band
+  if (value >= greenMin && value <= greenMax) {
+    return {
+      band: 'green',
+      value,
+      confidence,
+    };
+  } else if (value >= yellowMin && value <= yellowMax) {
+    return {
+      band: 'yellow',
+      value,
+      confidence,
+    };
+  } else {
+    return {
+      band: 'red',
+      value,
+      confidence,
+    };
+  }
+}
+
+/**
+ * Get feedback message for a banded score
+ */
+export function getBandedFeedback(
+  metricCode: string,
+  score: BandedScore
+): string {
+  const metric = METRIC_DEFINITIONS[metricCode];
+  if (!metric) return '';
+
+  const { band, value } = score;
+  const { ideal, feedback } = metric;
+  const mid = (ideal.min + ideal.max) / 2;
+
+  switch (band) {
+    case 'green':
+      return feedback.green;
+    case 'yellow':
+      return value < mid ? feedback.yellow_low : feedback.yellow_high;
+    case 'red':
+      return value < ideal.min ? feedback.red_low : feedback.red_high;
+    case 'unknown':
+    default:
+      return 'Unable to evaluate - check camera position';
+  }
+}
+
+// ============================================
+// Phase Detection
+// ============================================
+
+export type MovementPhase = 'ready' | 'lunge' | 'overhead' | 'recovery' | 'general';
+
+/**
+ * Detect the current movement phase from pose landmarks
+ */
+export function detectPhase(landmarks: PoseLandmark[]): MovementPhase {
+  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+  const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+
+  // Check if arm is raised (overhead shot)
+  if (rightWrist.y < rightShoulder.y - 0.1) {
+    return 'overhead';
+  }
+
+  // Check knee angle for lunge detection
+  const kneeAngle = calculateAngle(rightHip, rightKnee, landmarks[POSE_LANDMARKS.RIGHT_ANKLE]);
+  if (kneeAngle < 120) {
+    return 'lunge';
+  }
+
+  // Check if in ready position (knees slightly bent, centered)
+  if (kneeAngle >= 130 && kneeAngle <= 160) {
+    return 'ready';
+  }
+
+  // Default to general
+  return 'general';
+}
+
+// ============================================
+// Comprehensive Banded Evaluation
+// ============================================
+
+export interface BandedEvaluationResult {
+  phase: MovementPhase;
+  overall_band: ScoreBand;
+  overall_score: number; // 0-100
+  metrics: Record<string, BandedScore>;
+  feedback: string[];
+  highlight_joints: number[];
+}
+
+/**
+ * Evaluate pose with banded scoring
+ */
+export function evaluateWithBands(
+  landmarks: PoseLandmark[],
+  skillLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+  forcePhase?: MovementPhase
+): BandedEvaluationResult {
+  // Calculate average confidence
+  const avgConfidence = landmarks.reduce((sum, l) => sum + (l.visibility || 0), 0) / landmarks.length;
+
+  // Detect phase
+  const phase = forcePhase || detectPhase(landmarks);
+  const phaseRule = SCORING_RULES_CONFIG.phase_rules[phase];
+
+  // Calculate metrics
+  const metrics: Record<string, BandedScore> = {};
+  const feedback: string[] = [];
+  const highlightJoints: number[] = [];
+  let totalScore = 0;
+  let metricCount = 0;
+
+  // Elbow angle
+  const shoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const elbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+  const wrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+  const elbowAngle = calculateAngle(shoulder, elbow, wrist);
+  const elbowConfidence = Math.min(shoulder.visibility, elbow.visibility, wrist.visibility);
+
+  const elbowIdeal = phaseRule?.thresholds?.elbow_angle || METRIC_DEFINITIONS.elbow_angle.ideal;
+  metrics.elbow_angle = calculateBand(elbowAngle, elbowIdeal, skillLevel, elbowConfidence);
+  metrics.elbow_angle.feedback = getBandedFeedback('elbow_angle', metrics.elbow_angle);
+
+  if (metrics.elbow_angle.band !== 'green' && metrics.elbow_angle.band !== 'unknown') {
+    feedback.push(metrics.elbow_angle.feedback!);
+    highlightJoints.push(POSE_LANDMARKS.RIGHT_ELBOW, POSE_LANDMARKS.RIGHT_WRIST);
+  }
+
+  // Knee angle
+  const hip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const knee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+  const ankle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+  const kneeAngle = calculateAngle(hip, knee, ankle);
+  const kneeConfidence = Math.min(hip.visibility, knee.visibility, ankle.visibility);
+
+  const kneeIdeal = phaseRule?.thresholds?.knee_angle || METRIC_DEFINITIONS.knee_angle.ideal;
+  metrics.knee_angle = calculateBand(kneeAngle, kneeIdeal, skillLevel, kneeConfidence);
+  metrics.knee_angle.feedback = getBandedFeedback('knee_angle', metrics.knee_angle);
+
+  if (metrics.knee_angle.band !== 'green' && metrics.knee_angle.band !== 'unknown') {
+    feedback.push(metrics.knee_angle.feedback!);
+    highlightJoints.push(POSE_LANDMARKS.RIGHT_KNEE, POSE_LANDMARKS.LEFT_KNEE);
+  }
+
+  // Stance width
+  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+  const ankleWidth = calculateDistance(leftAnkle, rightAnkle);
+  const stanceWidth = shoulderWidth > 0 ? ankleWidth / shoulderWidth : 0;
+  const stanceConfidence = Math.min(leftAnkle.visibility, rightAnkle.visibility);
+
+  const stanceIdeal = phaseRule?.thresholds?.stance_width || METRIC_DEFINITIONS.stance_width.ideal;
+  metrics.stance_width = calculateBand(stanceWidth, stanceIdeal, skillLevel, stanceConfidence);
+  metrics.stance_width.feedback = getBandedFeedback('stance_width', metrics.stance_width);
+
+  if (metrics.stance_width.band !== 'green' && metrics.stance_width.band !== 'unknown') {
+    feedback.push(metrics.stance_width.feedback!);
+    highlightJoints.push(POSE_LANDMARKS.LEFT_ANKLE, POSE_LANDMARKS.RIGHT_ANKLE);
+  }
+
+  // Body rotation (for overhead phase)
+  if (phase === 'overhead' || !phaseRule) {
+    const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+    const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+    const shoulderAngle = Math.atan2(
+      rightShoulder.y - leftShoulder.y,
+      rightShoulder.x - leftShoulder.x
+    );
+    const hipAngle = Math.atan2(rightHip.y - leftHip.y, rightHip.x - leftHip.x);
+    const rotation = Math.abs(shoulderAngle - hipAngle) * (180 / Math.PI);
+    const rotationConfidence = Math.min(
+      leftShoulder.visibility, rightShoulder.visibility,
+      leftHip.visibility, rightHip.visibility
+    );
+
+    const rotationIdeal = phaseRule?.thresholds?.body_rotation || METRIC_DEFINITIONS.body_rotation.ideal;
+    metrics.body_rotation = calculateBand(rotation, rotationIdeal, skillLevel, rotationConfidence);
+    metrics.body_rotation.feedback = getBandedFeedback('body_rotation', metrics.body_rotation);
+
+    if (metrics.body_rotation.band !== 'green' && metrics.body_rotation.band !== 'unknown') {
+      feedback.push(metrics.body_rotation.feedback!);
+    }
+  }
+
+  // Calculate overall score
+  const bandScores: Record<ScoreBand, number> = {
+    green: 100,
+    yellow: 70,
+    red: 30,
+    unknown: 50, // Neutral
+  };
+
+  Object.values(metrics).forEach(m => {
+    if (m.band !== 'unknown') {
+      totalScore += bandScores[m.band];
+      metricCount++;
+    }
+  });
+
+  const overallScore = metricCount > 0 ? totalScore / metricCount : 50;
+
+  // Determine overall band
+  let overallBand: ScoreBand;
+  const greenCount = Object.values(metrics).filter(m => m.band === 'green').length;
+  const redCount = Object.values(metrics).filter(m => m.band === 'red').length;
+  const validCount = Object.values(metrics).filter(m => m.band !== 'unknown').length;
+
+  if (validCount === 0) {
+    overallBand = 'unknown';
+  } else if (redCount > 0) {
+    overallBand = redCount > 1 ? 'red' : 'yellow';
+  } else if (greenCount === validCount) {
+    overallBand = 'green';
+  } else {
+    overallBand = 'yellow';
+  }
+
+  // Add encouraging feedback if all green
+  if (overallBand === 'green' && feedback.length === 0) {
+    feedback.push('Excellent form! Keep it up!');
+  }
+
+  return {
+    phase,
+    overall_band: overallBand,
+    overall_score: overallScore,
+    metrics,
+    feedback,
+    highlight_joints: highlightJoints,
+  };
+}
+
+// ============================================
+// Legend/Documentation for UI
+// ============================================
+
+export const SCORING_LEGEND = {
+  green: {
+    label: 'Good',
+    description: 'Within coach-approved range for your skill level',
+    color: '#22c55e',
+    bgColor: '#dcfce7',
+  },
+  yellow: {
+    label: 'Minor Deviation',
+    description: 'Slightly outside ideal range - minor adjustment needed',
+    color: '#eab308',
+    bgColor: '#fef9c3',
+  },
+  red: {
+    label: 'Major Deviation',
+    description: 'Significantly outside ideal range - focus on this area',
+    color: '#ef4444',
+    bgColor: '#fee2e2',
+  },
+  unknown: {
+    label: 'Unknown',
+    description: 'Pose confidence too low to evaluate accurately',
+    color: '#9ca3af',
+    bgColor: '#f3f4f6',
+  },
+};
+
+export const SKILL_LEVEL_DESCRIPTIONS = {
+  beginner: {
+    label: 'Beginner',
+    description: 'Wider tolerance bands - focus on basic form',
+    recommendation: 'Good for learning fundamentals without frustration',
+  },
+  intermediate: {
+    label: 'Intermediate',
+    description: 'Standard tolerance bands - balanced feedback',
+    recommendation: 'Ideal for most club-level players',
+  },
+  advanced: {
+    label: 'Advanced',
+    description: 'Strict tolerance bands - precision feedback',
+    recommendation: 'For competitive players seeking fine-tuning',
+  },
+};

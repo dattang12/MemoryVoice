@@ -1,0 +1,22 @@
+[
+  {
+    "content": "Investigate which image URLs are failing in browser",
+    "status": "completed",
+    "activeForm": "Investigating failed image URLs"
+  },
+  {
+    "content": "Clear Next.js cache to force reload of rackets.json",
+    "status": "completed",
+    "activeForm": "Clearing Next.js cache"
+  },
+  {
+    "content": "Update ALL rackets to use joybadminton.com CDN URLs only",
+    "status": "completed",
+    "activeForm": "Updating all rackets to use joybadminton CDN"
+  },
+  {
+    "content": "Restart Next.js dev server and test",
+    "status": "in_progress",
+    "activeForm": "Restarting dev server"
+  }
+]

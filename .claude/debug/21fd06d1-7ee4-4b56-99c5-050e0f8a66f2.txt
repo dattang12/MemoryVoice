@@ -1,0 +1,175 @@
+2026-02-08T08:03:39.101Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-08T08:03:39.101Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-08T08:03:39.101Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-08T08:03:39.101Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-08T08:03:39.120Z [DEBUG] Using bash path: "C:\Program Files\Git\bin\bash.exe"
+2026-02-08T08:03:39.131Z [DEBUG] Applying permission update: Adding 1 allow rule(s) to destination 'userSettings': ["Bash(dir:*)"]
+2026-02-08T08:03:39.131Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-08T08:03:39.148Z [DEBUG] Loading plugin figma from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"}
+2026-02-08T08:03:39.148Z [DEBUG] No version found for figma@claude-plugins-official, using 'unknown'
+2026-02-08T08:03:39.148Z [DEBUG] [ToolSearch:optimistic] mode=tst-auto, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-02-08T08:03:39.149Z [DEBUG] [STARTUP] Running setup()...
+2026-02-08T08:03:39.149Z [DEBUG] Caching plugin from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"} to temporary path C:\Users\ASUS\.claude\plugins\cache\temp_git_1770537819149_r98808
+2026-02-08T08:03:39.231Z [DEBUG] Loading skills from: managed=C:\ProgramData\ClaudeCode\.claude\skills, user=C:\Users\ASUS\.claude\skills, project=[]
+2026-02-08T08:03:39.232Z [DEBUG] Error log sink initialized
+2026-02-08T08:03:39.248Z [DEBUG] [STARTUP] setup() completed in 99ms
+2026-02-08T08:03:39.248Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-02-08T08:03:39.258Z [DEBUG] Loaded 0 unique skills (managed: 0, user: 0, project: 0, additional: 0, legacy commands: 0)
+2026-02-08T08:03:39.259Z [DEBUG] [Claude in Chrome] Found chrome profiles: Default
+2026-02-08T08:03:39.260Z [DEBUG] [Claude in Chrome] Extension fcoeoabgfenejglbffodgkkbkcdhcgfn found in chrome Default
+2026-02-08T08:03:40.768Z [DEBUG] Cloned repository from https://github.com/figma/mcp-server-guide.git to C:\Users\ASUS\.claude\plugins\cache\temp_git_1770537819149_r98808
+2026-02-08T08:03:40.769Z [DEBUG] Successfully cached plugin figma to C:\Users\ASUS\.claude\plugins\cache\figma
+2026-02-08T08:03:40.769Z [DEBUG] Using manifest version for figma@claude-plugins-official: 1.0.0
+2026-02-08T08:03:40.770Z [DEBUG] Plugin figma@claude-plugins-official version 1.0.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.0.0
+2026-02-08T08:03:40.776Z [DEBUG] Loading plugin claude-code-setup from source: "./plugins/claude-code-setup"
+2026-02-08T08:03:40.776Z [DEBUG] Using manifest version for claude-code-setup@claude-plugins-official: 1.0.0
+2026-02-08T08:03:40.777Z [DEBUG] Plugin claude-code-setup@claude-plugins-official version 1.0.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-08T08:03:40.777Z [DEBUG] Copied local plugin claude-code-setup to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-08T08:03:40.777Z [DEBUG] Found 2 plugins (2 enabled, 0 disabled)
+2026-02-08T08:03:40.778Z [DEBUG] getPluginSkills: Processing 2 enabled plugins
+2026-02-08T08:03:40.778Z [DEBUG] Checking plugin figma: skillsPath=exists, skillsPaths=0 paths
+2026-02-08T08:03:40.778Z [DEBUG] Attempting to load skills from plugin figma default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.0.0\skills
+2026-02-08T08:03:40.784Z [DEBUG] Total plugin commands loaded: 0
+2026-02-08T08:03:40.784Z [DEBUG] Registered 0 hooks from 2 plugins
+2026-02-08T08:03:40.784Z [DEBUG] Total plugin agents loaded: 0
+2026-02-08T08:03:40.785Z [DEBUG] Loaded 3 skills from plugin figma default directory
+2026-02-08T08:03:40.785Z [DEBUG] Checking plugin claude-code-setup: skillsPath=exists, skillsPaths=0 paths
+2026-02-08T08:03:40.785Z [DEBUG] Attempting to load skills from plugin claude-code-setup default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0\skills
+2026-02-08T08:03:40.786Z [DEBUG] Loaded 1 skills from plugin claude-code-setup default directory
+2026-02-08T08:03:40.786Z [DEBUG] Total plugin skills loaded: 4
+2026-02-08T08:03:40.786Z [DEBUG] getSkills returning: 0 skill dir commands, 4 plugin skills, 2 bundled skills
+2026-02-08T08:03:40.787Z [DEBUG] [STARTUP] Commands and agents loaded in 1539ms
+2026-02-08T08:03:40.787Z [DEBUG] [STARTUP] Running showSetupScreens()...
+2026-02-08T08:03:40.788Z [DEBUG] [render] initLayout starting
+2026-02-08T08:03:40.788Z [DEBUG] Layout engine: yoga
+2026-02-08T08:03:40.794Z [DEBUG] [render] initLayout complete
+2026-02-08T08:03:40.799Z [DEBUG] [keybindings] KeybindingSetup initialized with 100 bindings, 0 warnings
+2026-02-08T08:03:40.805Z [DEBUG] [render] first ink render: 2256ms since process start
+2026-02-08T08:03:40.830Z [DEBUG] Grove: Using fresh cached config
+2026-02-08T08:03:40.842Z [DEBUG] [render] initLayout starting
+2026-02-08T08:03:40.843Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-02-08T08:03:40.845Z [DEBUG] [render] initLayout complete
+2026-02-08T08:03:40.846Z [DEBUG] [keybindings] KeybindingSetup initialized with 100 bindings, 0 warnings
+2026-02-08T08:03:40.853Z [DEBUG] [render] first ink render: 2304ms since process start
+2026-02-08T08:03:40.860Z [DEBUG] [keybindings] Watching for changes to C:\Users\ASUS\.claude\keybindings.json
+2026-02-08T08:03:40.862Z [DEBUG] [keybindings] Watching for changes to C:\Users\ASUS\.claude\keybindings.json
+2026-02-08T08:03:40.864Z [DEBUG] Git remote URL: null
+2026-02-08T08:03:40.864Z [DEBUG] No git remote URL found
+2026-02-08T08:03:40.864Z [DEBUG] Not in a GitHub repository, skipping path mapping update
+2026-02-08T08:03:41.041Z [DEBUG] [STARTUP] showSetupScreens() completed in 254ms
+2026-02-08T08:03:41.042Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-02-08T08:03:41.042Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-02-08T08:03:41.042Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-02-08T08:03:41.042Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-08T08:03:41.042Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-08T08:03:41.044Z [DEBUG] [STARTUP] MCP configs loaded in 1913ms
+2026-02-08T08:03:41.045Z [DEBUG] MCP server "plugin:figma:figma": Initializing HTTP transport to https://mcp.figma.com/mcp
+2026-02-08T08:03:41.045Z [DEBUG] MCP server "plugin:figma:figma": Node version: v24.11.0, Platform: win32
+2026-02-08T08:03:41.045Z [DEBUG] MCP server "plugin:figma:figma": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-08T08:03:41.046Z [DEBUG] MCP server "plugin:figma:figma-desktop": Initializing HTTP transport to http://127.0.0.1:3845/mcp
+2026-02-08T08:03:41.046Z [DEBUG] MCP server "plugin:figma:figma-desktop": Node version: v24.11.0, Platform: win32
+2026-02-08T08:03:41.046Z [DEBUG] MCP server "plugin:figma:figma-desktop": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-08T08:03:41.055Z [DEBUG] All plugins already exist, skipping migration
+2026-02-08T08:03:41.057Z [DEBUG] [Reconnection] computeInitialTeamContext: No teammate context set (not a teammate)
+2026-02-08T08:03:41.060Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.21916.1770537821060
+2026-02-08T08:03:41.060Z [DEBUG] Preserving file permissions: 100666
+2026-02-08T08:03:41.061Z [DEBUG] Temp file written successfully, size: 12424 bytes
+2026-02-08T08:03:41.061Z [DEBUG] Applied original permissions to temp file
+2026-02-08T08:03:41.061Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.21916.1770537821060 to C:\Users\ASUS\.claude.json
+2026-02-08T08:03:41.061Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-08T08:03:41.063Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2026-02-08T08:03:41.063Z [DEBUG] Found 0 hook matchers in settings
+2026-02-08T08:03:41.063Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2026-02-08T08:03:41.063Z [DEBUG] Loaded 3 installed plugins from C:\Users\ASUS\.claude\plugins\installed_plugins.json
+2026-02-08T08:03:41.063Z [DEBUG] Initialized versioned plugins system with 3 plugins
+2026-02-08T08:03:41.064Z [DEBUG] MCP server "plugin:figma:figma": Proxy options: default
+2026-02-08T08:03:41.064Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport options: {"url":"https://mcp.figma.com/mcp","headers":{"User-Agent":"claude-code/2.1.37"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-08T08:03:41.064Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport created successfully
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma": Client created, setting up request handler
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma": Starting connection with timeout of 30000ms
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma": Testing basic HTTP connectivity to https://mcp.figma.com/mcp
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma": Parsed URL: host=mcp.figma.com, port=default, protocol=https:
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma-desktop": Proxy options: default
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport options: {"url":"http://127.0.0.1:3845/mcp","headers":{"User-Agent":"claude-code/2.1.37"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-08T08:03:41.066Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport created successfully
+2026-02-08T08:03:41.067Z [DEBUG] MCP server "plugin:figma:figma-desktop": Client created, setting up request handler
+2026-02-08T08:03:41.067Z [DEBUG] MCP server "plugin:figma:figma-desktop": Starting connection with timeout of 30000ms
+2026-02-08T08:03:41.067Z [DEBUG] MCP server "plugin:figma:figma-desktop": Testing basic HTTP connectivity to http://127.0.0.1:3845/mcp
+2026-02-08T08:03:41.067Z [DEBUG] MCP server "plugin:figma:figma-desktop": Parsed URL: host=127.0.0.1, port=3845, protocol=http:
+2026-02-08T08:03:41.067Z [DEBUG] MCP server "plugin:figma:figma-desktop": Using loopback address: 127.0.0.1
+2026-02-08T08:03:41.074Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-08T08:03:41.076Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-08T08:03:41.076Z [DEBUG] MCP server "plugin:figma:figma-desktop": No token data found
+2026-02-08T08:03:41.076Z [DEBUG] [render] initLayout starting
+2026-02-08T08:03:41.078Z [DEBUG] [render] initLayout complete
+2026-02-08T08:03:41.085Z [DEBUG] [keybindings] KeybindingSetup initialized with 100 bindings, 0 warnings
+2026-02-08T08:03:41.119Z [DEBUG] [REPL:mount] REPL mounted, disabled=false
+2026-02-08T08:03:41.121Z [DEBUG] Official marketplace auto-install skipped: already_attempted
+2026-02-08T08:03:41.122Z [DEBUG] performStartupChecks called
+2026-02-08T08:03:41.122Z [DEBUG] Starting background plugin installations
+2026-02-08T08:03:41.122Z [DEBUG] performBackgroundPluginInstallations called
+2026-02-08T08:03:41.125Z [DEBUG] [render] first ink render: 2575ms since process start
+2026-02-08T08:03:41.126Z [DEBUG] AutoUpdaterWrapper: Installation type: npm-global
+2026-02-08T08:03:41.136Z [DEBUG] Watching for changes in setting files C:\Users\ASUS\.claude\settings.json...
+2026-02-08T08:03:41.258Z [DEBUG] Found 2 enabled plugins
+2026-02-08T08:03:41.258Z [DEBUG] All plugins already exist, skipping migration
+2026-02-08T08:03:41.258Z [DEBUG] Found 3 installed plugins (V2 format)
+2026-02-08T08:03:41.259Z [DEBUG] Loaded plugins - Enabled: 2, Disabled: 0, Commands: 0, Agents: 0, Errors: 0
+2026-02-08T08:03:41.259Z [DEBUG] Found 0 missing plugins (not installed):
+2026-02-08T08:03:41.259Z [DEBUG] Setting installation status: 0 marketplaces, 0 installable plugins, 0 uninstallable plugins
+2026-02-08T08:03:41.273Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-08T08:03:41.273Z [DEBUG] [claudeai-mcp] Gate returned: true
+2026-02-08T08:03:41.273Z [DEBUG] [claudeai-mcp] Fetching from https://api.anthropic.com/v1/mcp_servers?limit=1000
+2026-02-08T08:03:41.298Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP Connection failed after 252ms: fetch failed (code: none, errno: none)
+2026-02-08T08:03:41.298Z [ERROR] MCP server "plugin:figma:figma-desktop" TypeError: fetch failed
+2026-02-08T08:03:41.309Z [DEBUG] MCP server "plugin:figma:figma-desktop": Connection failed after 262ms: fetch failed
+2026-02-08T08:03:41.309Z [ERROR] MCP server "plugin:figma:figma-desktop" Connection failed: fetch failed
+2026-02-08T08:03:41.310Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=C:\Users\ASUS\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\vendor\ripgrep\x64-win32\rg.exe)
+2026-02-08T08:03:41.315Z [DEBUG] High write ratio: blit=0, write=1012 (100.0% writes), screen=18x120
+2026-02-08T08:03:41.320Z [DEBUG] Total LSP servers loaded: 0
+2026-02-08T08:03:41.320Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-02-08T08:03:41.320Z [DEBUG] LSP manager initialized with 0 servers
+2026-02-08T08:03:41.320Z [DEBUG] LSP server manager initialized successfully
+2026-02-08T08:03:41.320Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-02-08T08:03:41.324Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.21916.1770537821324
+2026-02-08T08:03:41.324Z [DEBUG] Preserving file permissions: 100666
+2026-02-08T08:03:41.325Z [DEBUG] Temp file written successfully, size: 12424 bytes
+2026-02-08T08:03:41.325Z [DEBUG] Applied original permissions to temp file
+2026-02-08T08:03:41.325Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.21916.1770537821324 to C:\Users\ASUS\.claude.json
+2026-02-08T08:03:41.325Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-08T08:03:41.325Z [DEBUG] Watching for changes in skill/command directories: C:\Users\ASUS\.claude\skills...
+2026-02-08T08:03:41.448Z [DEBUG] [claudeai-mcp] Fetched 3 servers
+2026-02-08T08:03:41.449Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Initializing claude.ai proxy transport for server mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-08T08:03:41.449Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-08T08:03:41.449Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": claude.ai proxy transport created successfully
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Starting connection with timeout of 30000ms
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai AWS Marketplace": Initializing claude.ai proxy transport for server mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai AWS Marketplace": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai AWS Marketplace": claude.ai proxy transport created successfully
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai AWS Marketplace": Starting connection with timeout of 30000ms
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai Day AI": Initializing claude.ai proxy transport for server mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai Day AI": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-08T08:03:41.450Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy transport created successfully
+2026-02-08T08:03:41.451Z [DEBUG] MCP server "claude.ai Day AI": Starting connection with timeout of 30000ms
+2026-02-08T08:03:41.453Z [DEBUG] Org penguin mode: enabled
+2026-02-08T08:03:41.509Z [DEBUG] MCP server "plugin:figma:figma": Found client info
+2026-02-08T08:03:41.509Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-08T08:03:41.509Z [DEBUG] MCP server "plugin:figma:figma": Generated new OAuth state
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Saving code verifier
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Authorization URL: https://www.figma.com/oauth/mcp?response_type=code&client_id=891cwELxWYhFZxItV9o7RC&code_challenge=%5BREDACTED%5D&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback&state=%5BREDACTED%5D&scope=mcp%3Aconnect&resource=https%3A%2F%2Fmcp.figma.com%2Fmcp
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Scopes in URL: mcp:connect
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Captured scopes from authorization URL: mcp:connect
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Redirection handling is disabled, skipping redirect
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": HTTP Connection failed after 465ms: Unauthorized (code: none, errno: none)
+2026-02-08T08:03:41.510Z [ERROR] MCP server "plugin:figma:figma" Error: Unauthorized
+2026-02-08T08:03:41.510Z [DEBUG] MCP server "plugin:figma:figma": Authentication required for HTTP server
+2026-02-08T08:03:41.517Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-08T08:03:41.517Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-08T08:03:41.517Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-08T08:03:41.753Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy connection failed after 303ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CXvFgHQG86wVZBeB69oTs"}
+2026-02-08T08:03:41.753Z [ERROR] MCP server "claude.ai Day AI" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CXvFgHQG86wVZBeB69oTs"}
+2026-02-08T08:03:41.753Z [DEBUG] MCP server "claude.ai Day AI": Authentication required for claude.ai proxy server
+2026-02-08T08:03:42.039Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Successfully connected to claudeai-proxy server in 590ms
+2026-02-08T08:03:42.039Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":true,"serverVersion":{"name":"Three.js Server","version":"1.0.0"}}
+2026-02-08T08:03:42.159Z [DEBUG] MCP server "claude.ai AWS Marketplace": Successfully connected to claudeai-proxy server in 709ms
+2026-02-08T08:03:42.160Z [DEBUG] MCP server "claude.ai AWS Marketplace": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"AWS Marketplace - Agent mode","version":"1.0.0"}}

@@ -1,0 +1,651 @@
+/**
+ * Mistake Detection Module
+ *
+ * Detects specific mistake types from pose data:
+ * 1. Overhead contact too low
+ * 2. Late/missing split-step
+ * 3. Poor lunge recovery
+ * 4. Insufficient body rotation
+ * 5. Stance too narrow/wide
+ *
+ * Each mistake includes:
+ * - Time range (startTimeSec, endTimeSec)
+ * - Severity (0-1)
+ * - Confidence (derived from visibility)
+ * - Affected joints
+ */
+
+import type {
+  PoseLandmark,
+  PoseMetrics,
+  MistakeEvent,
+  FixKeyframe,
+  TimelineSegment
+} from './types';
+import { POSE_LANDMARKS, calculateAngle, calculateDistance } from './pose-utils';
+
+// Minimum frames to persist an issue before reporting
+const MIN_PERSISTENCE_FRAMES = 3;
+// Minimum confidence to report a mistake
+const MIN_CONFIDENCE_THRESHOLD = 0.4;
+
+/**
+ * Mistake type definitions with thresholds and feedback
+ */
+const MISTAKE_TYPES = {
+  OVERHEAD_CONTACT_LOW: {
+    code: 'OVERHEAD_CONTACT_LOW',
+    title: 'Contact Point Too Low',
+    description: 'Raise your contact point for better power and angle',
+    severity: 0.8,
+    joints: [
+      POSE_LANDMARKS.RIGHT_WRIST,
+      POSE_LANDMARKS.RIGHT_ELBOW,
+      POSE_LANDMARKS.RIGHT_SHOULDER,
+    ],
+  },
+  LATE_SPLIT_STEP: {
+    code: 'LATE_SPLIT_STEP',
+    title: 'Late or Missing Split-Step',
+    description: 'Time your split-step with opponent\'s contact',
+    severity: 0.6,
+    joints: [
+      POSE_LANDMARKS.LEFT_ANKLE,
+      POSE_LANDMARKS.RIGHT_ANKLE,
+      POSE_LANDMARKS.LEFT_KNEE,
+      POSE_LANDMARKS.RIGHT_KNEE,
+    ],
+  },
+  POOR_LUNGE_RECOVERY: {
+    code: 'POOR_LUNGE_RECOVERY',
+    title: 'Slow Lunge Recovery',
+    description: 'Push off your front foot faster to recover',
+    severity: 0.7,
+    joints: [
+      POSE_LANDMARKS.RIGHT_KNEE,
+      POSE_LANDMARKS.RIGHT_ANKLE,
+      POSE_LANDMARKS.LEFT_HIP,
+      POSE_LANDMARKS.RIGHT_HIP,
+    ],
+  },
+  INSUFFICIENT_ROTATION: {
+    code: 'INSUFFICIENT_ROTATION',
+    title: 'Insufficient Body Rotation',
+    description: 'Rotate hips before shoulders for more power',
+    severity: 0.5,
+    joints: [
+      POSE_LANDMARKS.LEFT_SHOULDER,
+      POSE_LANDMARKS.RIGHT_SHOULDER,
+      POSE_LANDMARKS.LEFT_HIP,
+      POSE_LANDMARKS.RIGHT_HIP,
+    ],
+  },
+  STANCE_TOO_NARROW: {
+    code: 'STANCE_TOO_NARROW',
+    title: 'Stance Too Narrow',
+    description: 'Widen your stance for better stability',
+    severity: 0.4,
+    joints: [
+      POSE_LANDMARKS.LEFT_ANKLE,
+      POSE_LANDMARKS.RIGHT_ANKLE,
+    ],
+  },
+  STANCE_TOO_WIDE: {
+    code: 'STANCE_TOO_WIDE',
+    title: 'Stance Too Wide',
+    description: 'Narrow your stance for quicker movement',
+    severity: 0.4,
+    joints: [
+      POSE_LANDMARKS.LEFT_ANKLE,
+      POSE_LANDMARKS.RIGHT_ANKLE,
+    ],
+  },
+  ELBOW_TOO_BENT: {
+    code: 'ELBOW_TOO_BENT',
+    title: 'Elbow Too Bent at Contact',
+    description: 'Extend your elbow more at contact point',
+    severity: 0.7,
+    joints: [
+      POSE_LANDMARKS.RIGHT_ELBOW,
+      POSE_LANDMARKS.RIGHT_WRIST,
+      POSE_LANDMARKS.RIGHT_SHOULDER,
+    ],
+  },
+};
+
+/**
+ * Calculate confidence for a mistake based on joint visibility
+ */
+function calculateMistakeConfidence(
+  landmarks: PoseLandmark[],
+  jointIndices: number[]
+): number {
+  if (!landmarks || jointIndices.length === 0) return 0;
+
+  let totalVisibility = 0;
+  let count = 0;
+
+  for (const idx of jointIndices) {
+    const landmark = landmarks[idx];
+    if (landmark) {
+      totalVisibility += landmark.visibility ?? 0;
+      count++;
+    }
+  }
+
+  return count > 0 ? totalVisibility / count : 0;
+}
+
+/**
+ * Detect overhead contact too low
+ */
+function detectOverheadContactLow(
+  landmarks: PoseLandmark[]
+): { detected: boolean; confidence: number } {
+  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const head = landmarks[POSE_LANDMARKS.NOSE];
+
+  if (!rightWrist || !rightShoulder || !head) {
+    return { detected: false, confidence: 0 };
+  }
+
+  const confidence = calculateMistakeConfidence(landmarks, MISTAKE_TYPES.OVERHEAD_CONTACT_LOW.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { detected: false, confidence };
+  }
+
+  // Check if wrist is raised (overhead position) but not high enough
+  const isOverheadPosition = rightWrist.y < rightShoulder.y;
+  const isTooLow = isOverheadPosition && rightWrist.y > head.y - 0.05;
+
+  return { detected: isOverheadPosition && isTooLow, confidence };
+}
+
+/**
+ * Detect late or missing split-step
+ * Checks for stance width changes that indicate split-step
+ */
+function detectLateSplitStep(
+  currentLandmarks: PoseLandmark[],
+  prevLandmarks: PoseLandmark[] | null,
+  prev2Landmarks: PoseLandmark[] | null
+): { detected: boolean; confidence: number } {
+  if (!prevLandmarks || !prev2Landmarks) {
+    return { detected: false, confidence: 0 };
+  }
+
+  const confidence = calculateMistakeConfidence(currentLandmarks, MISTAKE_TYPES.LATE_SPLIT_STEP.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { detected: false, confidence };
+  }
+
+  // Calculate stance widths
+  const currentStance = calculateStanceWidth(currentLandmarks);
+  const prevStance = calculateStanceWidth(prevLandmarks);
+  const prev2Stance = calculateStanceWidth(prev2Landmarks);
+
+  if (currentStance === 0 || prevStance === 0 || prev2Stance === 0) {
+    return { detected: false, confidence };
+  }
+
+  // Detect if there's a significant movement without split-step
+  // Split-step: quick widening then return
+  const stanceChange = Math.abs(currentStance - prevStance);
+  const prevChange = Math.abs(prevStance - prev2Stance);
+
+  // If there's big movement but no stance change, split-step might be missing
+  const movementWithoutSplitStep = stanceChange < 0.1 && prevChange < 0.1;
+
+  // Check if body is moving (hip position change)
+  const currentHip = currentLandmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const prevHip = prevLandmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const prev2Hip = prev2Landmarks[POSE_LANDMARKS.RIGHT_HIP];
+
+  if (!currentHip || !prevHip || !prev2Hip) {
+    return { detected: false, confidence };
+  }
+
+  const hipMovement = Math.sqrt(
+    Math.pow(currentHip.x - prev2Hip.x, 2) + Math.pow(currentHip.y - prev2Hip.y, 2)
+  );
+
+  // Significant movement without split-step
+  const detected = hipMovement > 0.05 && movementWithoutSplitStep;
+
+  return { detected, confidence };
+}
+
+/**
+ * Detect poor lunge recovery
+ */
+function detectPoorLungeRecovery(
+  currentLandmarks: PoseLandmark[],
+  prevLandmarks: PoseLandmark[] | null,
+  isInLunge: boolean,
+  lungeStartFrame: number,
+  currentFrame: number,
+  fps: number
+): { detected: boolean; confidence: number; isInLunge: boolean; lungeStartFrame: number } {
+  const confidence = calculateMistakeConfidence(currentLandmarks, MISTAKE_TYPES.POOR_LUNGE_RECOVERY.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { detected: false, confidence, isInLunge, lungeStartFrame };
+  }
+
+  const rightHip = currentLandmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const rightKnee = currentLandmarks[POSE_LANDMARKS.RIGHT_KNEE];
+  const rightAnkle = currentLandmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+
+  if (!rightHip || !rightKnee || !rightAnkle) {
+    return { detected: false, confidence, isInLunge, lungeStartFrame };
+  }
+
+  const kneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+
+  // Detect lunge entry (knee angle < 110)
+  if (!isInLunge && kneeAngle < 110) {
+    return { detected: false, confidence, isInLunge: true, lungeStartFrame: currentFrame };
+  }
+
+  // Check recovery (knee angle back > 145)
+  if (isInLunge && kneeAngle > 145) {
+    const recoveryFrames = currentFrame - lungeStartFrame;
+    const recoveryTime = recoveryFrames / fps;
+
+    // Poor recovery if > 0.8 seconds
+    const isPoorRecovery = recoveryTime > 0.8;
+
+    return { detected: isPoorRecovery, confidence, isInLunge: false, lungeStartFrame: 0 };
+  }
+
+  // Still in lunge
+  if (isInLunge) {
+    const lungeTime = (currentFrame - lungeStartFrame) / fps;
+    // Very poor if in lunge > 1.5 seconds
+    return { detected: lungeTime > 1.5, confidence, isInLunge: true, lungeStartFrame };
+  }
+
+  return { detected: false, confidence, isInLunge, lungeStartFrame };
+}
+
+/**
+ * Detect insufficient body rotation
+ */
+function detectInsufficientRotation(
+  landmarks: PoseLandmark[]
+): { detected: boolean; confidence: number } {
+  const confidence = calculateMistakeConfidence(landmarks, MISTAKE_TYPES.INSUFFICIENT_ROTATION.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { detected: false, confidence };
+  }
+
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+
+  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip || !rightWrist) {
+    return { detected: false, confidence };
+  }
+
+  // Only check rotation during overhead shots
+  if (rightWrist.y > rightShoulder.y) {
+    return { detected: false, confidence };
+  }
+
+  // Calculate rotation angle
+  const shoulderAngle = Math.atan2(
+    rightShoulder.y - leftShoulder.y,
+    rightShoulder.x - leftShoulder.x
+  );
+  const hipAngle = Math.atan2(
+    rightHip.y - leftHip.y,
+    rightHip.x - leftHip.x
+  );
+  const rotationDeg = Math.abs(shoulderAngle - hipAngle) * (180 / Math.PI);
+
+  // Insufficient rotation if < 10 degrees during overhead
+  return { detected: rotationDeg < 10, confidence };
+}
+
+/**
+ * Detect stance issues
+ */
+function detectStanceIssues(
+  landmarks: PoseLandmark[]
+): { tooNarrow: boolean; tooWide: boolean; confidence: number } {
+  const confidence = calculateMistakeConfidence(landmarks, MISTAKE_TYPES.STANCE_TOO_NARROW.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { tooNarrow: false, tooWide: false, confidence };
+  }
+
+  const stanceWidth = calculateStanceWidth(landmarks);
+  if (stanceWidth === 0) {
+    return { tooNarrow: false, tooWide: false, confidence };
+  }
+
+  return {
+    tooNarrow: stanceWidth < 0.5,
+    tooWide: stanceWidth > 2.0,
+    confidence,
+  };
+}
+
+/**
+ * Detect elbow too bent at contact
+ */
+function detectElbowTooBent(
+  landmarks: PoseLandmark[]
+): { detected: boolean; confidence: number } {
+  const confidence = calculateMistakeConfidence(landmarks, MISTAKE_TYPES.ELBOW_TOO_BENT.joints);
+  if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+    return { detected: false, confidence };
+  }
+
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+  const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+
+  if (!rightShoulder || !rightElbow || !rightWrist) {
+    return { detected: false, confidence };
+  }
+
+  // Only check during overhead
+  if (rightWrist.y > rightShoulder.y) {
+    return { detected: false, confidence };
+  }
+
+  const elbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+
+  // Elbow too bent if < 130 degrees during overhead contact
+  return { detected: elbowAngle < 130, confidence };
+}
+
+/**
+ * Main function: Detect all mistakes from pose data
+ */
+export function detectMistakes(
+  poseData: (PoseLandmark[] | null)[],
+  fps: number = 10
+): MistakeEvent[] {
+  const mistakes: MistakeEvent[] = [];
+  const activeIssues: Map<string, { startFrame: number; frames: number; confidence: number }> = new Map();
+
+  // State for lunge tracking
+  let isInLunge = false;
+  let lungeStartFrame = 0;
+
+  for (let i = 0; i < poseData.length; i++) {
+    const landmarks = poseData[i];
+    if (!landmarks) continue;
+
+    const prevLandmarks = i > 0 ? poseData[i - 1] : null;
+    const prev2Landmarks = i > 1 ? poseData[i - 2] : null;
+
+    // Check each mistake type
+    const detections: { code: string; detected: boolean; confidence: number }[] = [];
+
+    // Overhead contact too low
+    const overhead = detectOverheadContactLow(landmarks);
+    detections.push({ code: 'OVERHEAD_CONTACT_LOW', ...overhead });
+
+    // Late split-step
+    const splitStep = detectLateSplitStep(landmarks, prevLandmarks, prev2Landmarks);
+    detections.push({ code: 'LATE_SPLIT_STEP', ...splitStep });
+
+    // Poor lunge recovery
+    const lungeResult = detectPoorLungeRecovery(
+      landmarks, prevLandmarks, isInLunge, lungeStartFrame, i, fps
+    );
+    isInLunge = lungeResult.isInLunge;
+    lungeStartFrame = lungeResult.lungeStartFrame;
+    detections.push({ code: 'POOR_LUNGE_RECOVERY', detected: lungeResult.detected, confidence: lungeResult.confidence });
+
+    // Insufficient rotation
+    const rotation = detectInsufficientRotation(landmarks);
+    detections.push({ code: 'INSUFFICIENT_ROTATION', ...rotation });
+
+    // Stance issues
+    const stance = detectStanceIssues(landmarks);
+    if (stance.tooNarrow) {
+      detections.push({ code: 'STANCE_TOO_NARROW', detected: true, confidence: stance.confidence });
+    }
+    if (stance.tooWide) {
+      detections.push({ code: 'STANCE_TOO_WIDE', detected: true, confidence: stance.confidence });
+    }
+
+    // Elbow too bent
+    const elbow = detectElbowTooBent(landmarks);
+    detections.push({ code: 'ELBOW_TOO_BENT', ...elbow });
+
+    // Process detections
+    for (const { code, detected, confidence } of detections) {
+      const issue = activeIssues.get(code);
+
+      if (detected) {
+        if (issue) {
+          // Continue existing issue
+          issue.frames++;
+          issue.confidence = Math.max(issue.confidence, confidence);
+        } else {
+          // Start new issue
+          activeIssues.set(code, { startFrame: i, frames: 1, confidence });
+        }
+      } else if (issue) {
+        // Issue ended - check if it persisted long enough
+        if (issue.frames >= MIN_PERSISTENCE_FRAMES) {
+          const mistakeType = MISTAKE_TYPES[code as keyof typeof MISTAKE_TYPES];
+          if (mistakeType) {
+            mistakes.push({
+              id: `${code}-${issue.startFrame}`,
+              type: code,
+              startTimeSec: issue.startFrame / fps,
+              endTimeSec: i / fps,
+              severity: mistakeType.severity,
+              confidence: issue.confidence,
+              joints: mistakeType.joints,
+              summaryTitle: mistakeType.title,
+              description: mistakeType.description,
+            });
+          }
+        }
+        activeIssues.delete(code);
+      }
+    }
+  }
+
+  // Close any remaining active issues
+  for (const [code, issue] of activeIssues) {
+    if (issue.frames >= MIN_PERSISTENCE_FRAMES) {
+      const mistakeType = MISTAKE_TYPES[code as keyof typeof MISTAKE_TYPES];
+      if (mistakeType) {
+        mistakes.push({
+          id: `${code}-${issue.startFrame}`,
+          type: code,
+          startTimeSec: issue.startFrame / fps,
+          endTimeSec: poseData.length / fps,
+          severity: mistakeType.severity,
+          confidence: issue.confidence,
+          joints: mistakeType.joints,
+          summaryTitle: mistakeType.title,
+          description: mistakeType.description,
+        });
+      }
+    }
+  }
+
+  // Sort by time and merge overlapping segments of same type
+  return mergeMistakes(mistakes);
+}
+
+/**
+ * Merge overlapping or adjacent mistakes of the same type
+ */
+function mergeMistakes(mistakes: MistakeEvent[]): MistakeEvent[] {
+  if (mistakes.length === 0) return [];
+
+  // Sort by type then by start time
+  mistakes.sort((a, b) => {
+    if (a.type !== b.type) return a.type.localeCompare(b.type);
+    return a.startTimeSec - b.startTimeSec;
+  });
+
+  const merged: MistakeEvent[] = [];
+  let current = { ...mistakes[0] };
+
+  for (let i = 1; i < mistakes.length; i++) {
+    const next = mistakes[i];
+
+    if (next.type === current.type && next.startTimeSec <= current.endTimeSec + 0.5) {
+      // Merge
+      current.endTimeSec = Math.max(current.endTimeSec, next.endTimeSec);
+      current.confidence = Math.max(current.confidence, next.confidence);
+    } else {
+      merged.push(current);
+      current = { ...next };
+    }
+  }
+
+  merged.push(current);
+
+  // Sort final result by start time
+  merged.sort((a, b) => a.startTimeSec - b.startTimeSec);
+
+  return merged;
+}
+
+/**
+ * Convert mistakes to timeline segments for rendering
+ */
+export function mistakesToTimelineSegments(
+  mistakes: MistakeEvent[],
+  totalDuration: number
+): TimelineSegment[] {
+  if (totalDuration <= 0) return [];
+
+  return mistakes.map(event => ({
+    id: event.id,
+    startPercent: (event.startTimeSec / totalDuration) * 100,
+    widthPercent: ((event.endTimeSec - event.startTimeSec) / totalDuration) * 100,
+    color: getSeverityColor(event.severity),
+    event,
+  }));
+}
+
+/**
+ * Get color based on severity
+ */
+function getSeverityColor(severity: number): string {
+  if (severity >= 0.7) return '#ef4444'; // Red
+  if (severity >= 0.4) return '#f97316'; // Orange
+  return '#eab308'; // Yellow
+}
+
+/**
+ * Generate fix keyframes for a mistake
+ */
+export function generateFixKeyframes(
+  mistake: MistakeEvent,
+  poseData: (PoseLandmark[] | null)[],
+  fps: number = 10
+): FixKeyframe[] {
+  const startFrame = Math.floor(mistake.startTimeSec * fps);
+  const endFrame = Math.floor(mistake.endTimeSec * fps);
+
+  const keyframes: FixKeyframe[] = [];
+
+  // Setup phase - frame before mistake
+  const setupFrame = Math.max(0, startFrame - Math.floor(fps * 0.3));
+  if (poseData[setupFrame]) {
+    keyframes.push({
+      phase: 'setup',
+      landmarks: poseData[setupFrame]!,
+      label: 'Setup',
+      correction: getSetupCorrection(mistake.type),
+    });
+  }
+
+  // Contact phase - middle of mistake
+  const contactFrame = Math.floor((startFrame + endFrame) / 2);
+  if (poseData[contactFrame]) {
+    keyframes.push({
+      phase: 'contact',
+      landmarks: poseData[contactFrame]!,
+      label: 'Contact',
+      correction: getContactCorrection(mistake.type),
+    });
+  }
+
+  // Recovery phase - frame after mistake
+  const recoveryFrame = Math.min(poseData.length - 1, endFrame + Math.floor(fps * 0.3));
+  if (poseData[recoveryFrame]) {
+    keyframes.push({
+      phase: 'recover',
+      landmarks: poseData[recoveryFrame]!,
+      label: 'Recovery',
+      correction: getRecoveryCorrection(mistake.type),
+    });
+  }
+
+  return keyframes;
+}
+
+function getSetupCorrection(mistakeType: string): string {
+  switch (mistakeType) {
+    case 'OVERHEAD_CONTACT_LOW':
+      return 'Position yourself under the shuttle early';
+    case 'LATE_SPLIT_STEP':
+      return 'Watch opponent\'s racket for timing';
+    case 'POOR_LUNGE_RECOVERY':
+      return 'Prepare to push off front foot';
+    case 'INSUFFICIENT_ROTATION':
+      return 'Turn sideways to the net';
+    default:
+      return 'Ready position';
+  }
+}
+
+function getContactCorrection(mistakeType: string): string {
+  switch (mistakeType) {
+    case 'OVERHEAD_CONTACT_LOW':
+      return 'Hit at the highest point above your head';
+    case 'LATE_SPLIT_STEP':
+      return 'Land with both feet as opponent hits';
+    case 'POOR_LUNGE_RECOVERY':
+      return 'Push through heel immediately';
+    case 'INSUFFICIENT_ROTATION':
+      return 'Rotate hips then shoulders';
+    case 'ELBOW_TOO_BENT':
+      return 'Extend elbow fully at contact';
+    default:
+      return 'Contact point';
+  }
+}
+
+function getRecoveryCorrection(mistakeType: string): string {
+  switch (mistakeType) {
+    case 'POOR_LUNGE_RECOVERY':
+      return 'Return to center quickly';
+    case 'LATE_SPLIT_STEP':
+      return 'Move explosively after landing';
+    default:
+      return 'Return to ready position';
+  }
+}
+
+// Helper function
+function calculateStanceWidth(landmarks: PoseLandmark[]): number {
+  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+
+  if (!leftAnkle || !rightAnkle || !leftShoulder || !rightShoulder) return 0;
+  if ((leftAnkle.visibility ?? 0) < 0.5 || (rightAnkle.visibility ?? 0) < 0.5) return 0;
+
+  const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+  const ankleWidth = calculateDistance(leftAnkle, rightAnkle);
+
+  return shoulderWidth > 0 ? ankleWidth / shoulderWidth : 0;
+}

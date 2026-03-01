@@ -1,0 +1,137 @@
+---
+name: growthops-linkedin-ops
+description: >
+  LinkedIn content creation and cold outreach draft generation. Use when asked to
+  "LinkedIn post", "LinkedIn outreach", "LinkedIn冷启动", "LinkedIn内容运营",
+  "write LinkedIn message", "connection request", "LinkedIn cold outreach", or any
+  LinkedIn marketing task. NEVER automates LinkedIn actions — generates drafts only.
+tools: Bash
+metadata: {"openclaw":{"emoji":"💼"}}
+---
+
+# LinkedIn Operations Skill
+
+## CRITICAL RULE
+**NEVER automate LinkedIn actions.** LinkedIn prohibits third-party automation.
+This skill ONLY generates drafts. The human copies and sends manually.
+
+## What You Do
+1. Generate LinkedIn posts (3/week)
+2. Generate connection request drafts
+3. Generate DM sequence drafts
+4. Prepare daily outreach queue (20 profiles/day)
+
+## LinkedIn Post Generation (3/week)
+
+### Monday: Tactical "How To" Post
+```
+HOOK (line 1 — must stop the scroll):
+{Bold claim or question about fundraising}
+
+BODY (8-12 short paragraphs, lots of line breaks):
+{Actionable advice with specific examples}
+
+CTA (last line):
+{Question that invites comments}
+
+HASHTAGS:
+#startups #fundraising #venturecapital
+```
+
+### Wednesday: Hot Take / Debate Post
+```
+HOOK: "Unpopular opinion: {controversial but defensible take}"
+BODY: Supporting arguments with data
+CTA: "Agree or disagree? Drop your take below."
+```
+
+### Friday: Case Study / Social Proof Post
+```
+HOOK: "How {founder name} went from 0 to {X} investor intros in {Y} weeks"
+BODY: Step-by-step breakdown
+CTA: "Want to try this? DM me."
+```
+
+### For Each Post Generate:
+- 3 hook variants (human picks best)
+- Short version (< 200 words) + Long version (< 500 words)
+- Comment bait question
+- 3 relevant hashtags
+
+Save to `workspace/linkedin/posts/YYYY-MM-DD-{day}.md`
+
+## Connection Request Drafts (≤300 chars)
+
+### Founder Lane
+```
+Hi {first_name} — saw {company} on {source}. Building something
+investors are actively looking for on PitchTok. Would love to connect
+and share what's working for {vertical} founders.
+```
+
+### Investor Lane
+```
+Hi {name} — we curate short pitch videos from vetted {vertical}
+founders. Think TikTok meets deal flow. Would you be interested
+in a weekly digest of top pitches? Happy to connect.
+```
+
+## DM Sequence Drafts
+
+### DM 1 (After connection accepted, Day 0)
+```
+Thanks for connecting, {first_name}! Quick question —
+have you considered using short video to pitch investors?
+We're seeing {vertical} founders get 3-5x more investor
+attention with 90-second pitch clips vs. cold decks.
+Happy to share what's working if interested.
+```
+
+### DM 2 (Day 3, if no reply)
+```
+Hey {first_name} — just wanted to follow up. We have
+{X} active investors on PitchTok this week specifically
+looking at {vertical}. Takes 5 min to upload a video.
+Want me to send the link?
+```
+
+### DM 3 (Day 7, breakup)
+```
+Last note from me! If timing isn't right, totally get it.
+Here's our founder community link: {link}
+Rooting for {company} either way! 🚀
+```
+
+## Daily Outreach Queue
+
+Save to `workspace/linkedin/outreach-queue/YYYY-MM-DD.md`:
+
+```markdown
+# LinkedIn Outreach Queue — {Date}
+
+## Today's Targets (20 profiles)
+
+### 1. {Founder Name} — {Company}
+- LinkedIn: {url}
+- Vertical: {vertical}
+- Source: {how you found them}
+- Score: {lead score}
+- Connection Note: "{personalized note}"
+- Status: [ ] Sent / [ ] Accepted / [ ] Replied
+
+### 2. ...
+(repeat for 20 profiles)
+
+## Instructions
+1. Open each LinkedIn profile
+2. Copy connection note → Send
+3. Mark status after sending
+4. Log outcomes at end of day
+```
+
+## Safety Limits
+- Max 5 connection requests/day (conservative)
+- Max 10 messages/day to existing connections
+- Max 20 profile views/day
+- Keep acceptance rate above 35%
+- NEVER use browser automation tools

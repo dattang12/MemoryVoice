@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Polish + Verification",
+  "description": "Final polish and verification:\n1. Add loading animation during analysis\n2. Ensure skeleton overlay stays synced during seek\n3. Update README with new features\n4. Create test checklist\n5. Verify no mocked confidence numbers",
+  "activeForm": "Polishing and verifying implementation",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

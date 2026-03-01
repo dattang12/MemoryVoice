@@ -1,0 +1,279 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   BASE LAYER — Editorial / Newspaper theme
+   ============================================================ */
+@layer base {
+  :root {
+    --memory-bg: #faf6f1;
+    --memory-accent: #c0392b;
+    --memory-navy: #1a3a5c;
+    --memory-text: #1c1c1c;
+    --memory-text-muted: #666666;
+  }
+
+  html {
+    font-family: system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--memory-bg);
+    color: var(--memory-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.04); }
+  ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(192, 57, 43, 0.5); }
+
+  :focus-visible {
+    outline: 2px solid var(--memory-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: rgba(192, 57, 43, 0.15);
+    color: var(--memory-text);
+  }
+}
+
+/* ============================================================
+   COMPONENT LAYER
+   ============================================================ */
+@layer components {
+  /* Paper card — clean white with drop shadow, no blur */
+  .glass-card {
+    @apply bg-white border border-[rgba(0,0,0,0.1)] shadow-paper;
+    border-radius: 2px;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5;
+  }
+
+  /* Crimson primary button */
+  .btn-gold {
+    @apply bg-memory-accent text-white font-semibold px-6 py-3
+           transition-all duration-200 hover:bg-memory-accent-dim active:scale-95
+           focus-visible:ring-2 focus-visible:ring-memory-accent focus-visible:ring-offset-2
+           focus-visible:ring-offset-memory-bg disabled:opacity-40 disabled:cursor-not-allowed;
+    border-radius: 2px;
+    font-family: system-ui, -apple-system, sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  /* Outline secondary button */
+  .btn-ghost {
+    @apply border border-[rgba(0,0,0,0.2)] text-memory-text-muted px-6 py-3
+           transition-all duration-200 hover:border-memory-accent hover:text-memory-accent
+           active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+    border-radius: 2px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  /* Era badge */
+  .era-badge {
+    @apply text-xs font-bold uppercase tracking-widest px-2 py-0.5
+           border border-[rgba(0,0,0,0.15)];
+    border-radius: 2px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  /* Skeleton loader — light mode */
+  .skeleton {
+    background-color: rgba(0, 0, 0, 0.07);
+    border-radius: 2px;
+    background-image: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.04) 25%,
+      rgba(0, 0, 0, 0.09) 50%,
+      rgba(0, 0, 0, 0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Section heading with red rule */
+  .section-title {
+    @apply text-2xl font-bold text-memory-text relative inline-block;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .section-title::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-0.5 bg-memory-accent rounded-full;
+  }
+
+  /* Newspaper-style double top rule */
+  .newspaper-rule {
+    border-top: 3px solid #1c1c1c;
+    border-bottom: 1px solid #888;
+    padding-bottom: 2px;
+  }
+
+  /* Waveform bars */
+  .waveform-bar {
+    @apply w-1 rounded-full bg-memory-accent;
+    transform-origin: bottom center;
+  }
+
+  /* Status dots */
+  .status-dot { @apply w-2.5 h-2.5 rounded-full inline-block; }
+  .status-dot-active { @apply status-dot bg-emerald-500 animate-pulse; }
+  .status-dot-idle { @apply status-dot bg-gray-400; }
+  .status-dot-error { @apply status-dot bg-red-500; }
+}
+
+/* ============================================================
+   UTILITY LAYER
+   ============================================================ */
+@layer utilities {
+  .animate-float { animation: float 6s ease-in-out infinite; }
+  .animate-float-delayed { animation: float 6s ease-in-out 2s infinite; }
+  .animate-float-slow { animation: float 8s ease-in-out 1s infinite; }
+
+  .animate-memory-entrance {
+    animation: memoryEntrance 0.5s ease-out forwards;
+    opacity: 0;
+  }
+
+  .animate-page-enter {
+    animation: page-fade-in 0.25s ease-out forwards;
+  }
+
+  .animate-pulse-glow-purple {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+
+  .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+
+  /* Red editorial text gradient */
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #c0392b 0%, #e74c3c 60%, #922b21 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #1a3a5c 0%, #2e6da4 50%, #1a3a5c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-radial-purple {
+    background: radial-gradient(ellipse at 50% 0%, rgba(26, 58, 92, 0.05) 0%, transparent 70%);
+  }
+
+  .bg-radial-gold {
+    background: radial-gradient(ellipse at 50% 100%, rgba(192, 57, 43, 0.05) 0%, transparent 60%);
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ============================================================
+   KEYFRAME DEFINITIONS
+   ============================================================ */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes memory-entrance {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes memoryEntrance {
+  0%   { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(26, 58, 92, 0.2); }
+  50%       { box-shadow: 0 0 20px rgba(26, 58, 92, 0.5); }
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes waveform {
+  0%   { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes orb-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50%       { transform: scale(1.05); opacity: 1; }
+}
+
+/* ============================================================
+   ELEVENLABS WIDGET OVERRIDES
+   ============================================================ */
+elevenlabs-convai {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+}

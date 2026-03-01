@@ -1,0 +1,445 @@
+/**
+ * Rally State Machine
+ *
+ * Computes the tactical state (phase, initiative, pressure, open zones)
+ * at each decision point in a rally based on shot sequence and positions.
+ */
+
+import type { ShotSegment, RallyState, RallyPhase, Initiative } from './types';
+import {
+  DEBUG_FLAG,
+  PRESSURE_THRESHOLDS,
+  DEFENSIVE_SHOT_TYPES,
+  ATTACKING_SHOT_TYPES,
+  ZONE_ADJACENCY,
+  ZONE_DEPTH_BOUNDARIES,
+  ZONE_WIDTH_BOUNDARIES,
+} from './constants';
+
+/**
+ * Debug logger
+ */
+function logDebug(message: string, data?: unknown): void {
+  if (DEBUG_FLAG) {
+    console.log(`[RallyStateMachine] ${message}`, data ?? '');
+  }
+}
+
+/**
+ * Convert normalized position (0-1) to zone ID (0-8)
+ *
+ * Zone layout (on opponent's half, y > 0.5):
+ * ```
+ *   6 | 7 | 8  (back)
+ *   3 | 4 | 5  (mid)
+ *   0 | 1 | 2  (front)
+ * ---- NET ----
+ * ```
+ */
+export function positionToZone(x: number, y: number): number {
+  // Determine width zone
+  let widthIdx: number;
+  if (x < ZONE_WIDTH_BOUNDARIES.left.max) {
+    widthIdx = 0; // left
+  } else if (x < ZONE_WIDTH_BOUNDARIES.center.max) {
+    widthIdx = 1; // center
+  } else {
+    widthIdx = 2; // right
+  }
+
+  // Determine depth zone (relative to far half-court)
+  // For opponent's side (y > 0.5):
+  // - front: 0.5 - 0.667
+  // - mid: 0.667 - 0.833
+  // - back: 0.833 - 1.0
+  let depthIdx: number;
+  if (y > 0.5) {
+    // Opponent's side
+    if (y < ZONE_DEPTH_BOUNDARIES.far.front.max) {
+      depthIdx = 0; // front
+    } else if (y < ZONE_DEPTH_BOUNDARIES.far.mid.max) {
+      depthIdx = 1; // mid
+    } else {
+      depthIdx = 2; // back
+    }
+  } else {
+    // Our side - mirror the zones
+    if (y > ZONE_DEPTH_BOUNDARIES.near.front.min) {
+      depthIdx = 0; // front (near net)
+    } else if (y > ZONE_DEPTH_BOUNDARIES.near.mid.min) {
+      depthIdx = 1; // mid
+    } else {
+      depthIdx = 2; // back (near our baseline)
+    }
+  }
+
+  return depthIdx * 3 + widthIdx;
+}
+
+/**
+ * Convert zone ID to center position (normalized coordinates)
+ */
+export function zoneToPosition(zoneId: number): { x: number; y: number } {
+  const widthIdx = zoneId % 3;
+  const depthIdx = Math.floor(zoneId / 3);
+
+  // Width centers
+  const xCenters = [0.167, 0.5, 0.833]; // left, center, right
+
+  // Depth centers (for opponent's half)
+  const yCenters = [0.583, 0.75, 0.917]; // front, mid, back
+
+  return {
+    x: xCenters[widthIdx],
+    y: yCenters[depthIdx],
+  };
+}
+
+/**
+ * Check if two zones are adjacent
+ */
+export function isAdjacentZone(zone1: number, zone2: number): boolean {
+  if (zone1 === zone2) return true;
+  return ZONE_ADJACENCY[zone1]?.includes(zone2) ?? false;
+}
+
+/**
+ * Find all open court zones given opponent's position
+ * Returns zones that are NOT adjacent to opponent's current zone
+ */
+export function findOpenCourtZones(
+  opponentPosition?: { x: number; y: number }
+): number[] {
+  // If no opponent position, assume corners are most likely open
+  if (!opponentPosition) {
+    return [0, 2, 6, 8]; // All four corners
+  }
+
+  const opponentZone = positionToZone(opponentPosition.x, opponentPosition.y);
+  const openZones: number[] = [];
+
+  for (let zone = 0; zone < 9; zone++) {
+    if (!isAdjacentZone(zone, opponentZone)) {
+      openZones.push(zone);
+    }
+  }
+
+  // If all zones are covered (opponent in center), at least return far corners
+  if (openZones.length === 0) {
+    return [6, 8]; // Back corners are hardest to cover from center
+  }
+
+  return openZones;
+}
+
+/**
+ * Determine rally phase based on recent shots and current shot
+ */
+function determinePhase(
+  currentShot: ShotSegment,
+  recentShots: ShotSegment[]
+): RallyPhase {
+  // If current shot is defensive, we're likely in defense
+  if (DEFENSIVE_SHOT_TYPES.includes(currentShot.type)) {
+    return 'defense';
+  }
+
+  // If current shot is attacking and from a good position, we're attacking
+  if (ATTACKING_SHOT_TYPES.includes(currentShot.type)) {
+    const startY = currentShot.trajectorySlice[0]?.y ?? 0.5;
+    // If starting from front court (our side), we have initiative
+    if (startY < 0.5) {
+      return 'attack';
+    }
+  }
+
+  // Check momentum from recent shots (last 3)
+  const recentAttacks = recentShots.filter(s =>
+    ATTACKING_SHOT_TYPES.includes(s.type)
+  ).length;
+  const recentDefense = recentShots.filter(s =>
+    DEFENSIVE_SHOT_TYPES.includes(s.type)
+  ).length;
+
+  if (recentAttacks > recentDefense) {
+    return 'attack';
+  }
+  if (recentDefense > recentAttacks) {
+    return 'defense';
+  }
+
+  return 'neutral';
+}
+
+/**
+ * Determine who has initiative in the rally
+ */
+function determineInitiative(
+  recentShots: ShotSegment[],
+  currentShotIndex: number
+): Initiative {
+  if (recentShots.length === 0) {
+    return 'unknown';
+  }
+
+  // Check if recent shots show one side pressing
+  const nearSideShots = recentShots.filter(s => s.player === 'near');
+  const farSideShots = recentShots.filter(s => s.player === 'far');
+
+  // More attacking shots from near side = we have initiative
+  const nearAttacks = nearSideShots.filter(s =>
+    ATTACKING_SHOT_TYPES.includes(s.type)
+  ).length;
+  const farAttacks = farSideShots.filter(s =>
+    ATTACKING_SHOT_TYPES.includes(s.type)
+  ).length;
+
+  if (nearAttacks > farAttacks + 1) {
+    return 'us';
+  }
+  if (farAttacks > nearAttacks + 1) {
+    return 'them';
+  }
+
+  // Check shot positions - if we're playing from front court, we likely have initiative
+  const lastShot = recentShots[recentShots.length - 1];
+  if (lastShot?.player === 'near') {
+    const startY = lastShot.trajectorySlice[0]?.y ?? 0.5;
+    if (startY > 0.3 && startY < 0.5) {
+      return 'us'; // Playing from mid-front court
+    }
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Calculate pressure level (0-1) based on various factors
+ */
+function calculatePressure(
+  currentShot: ShotSegment,
+  recentShots: ShotSegment[],
+  opponentPosition?: { x: number; y: number }
+): number {
+  let pressure = 0.5; // Base pressure
+
+  // Factor 1: Time pressure - fast exchanges increase pressure
+  if (recentShots.length >= 2) {
+    const totalDuration = recentShots.reduce(
+      (sum, s) => sum + (s.endTime - s.startTime),
+      0
+    );
+    const avgShotDuration = totalDuration / recentShots.length;
+
+    // Faster exchanges (< 500ms per shot) = more pressure
+    if (avgShotDuration < 500) {
+      pressure += 0.2;
+    } else if (avgShotDuration < 1000) {
+      pressure += 0.1;
+    }
+  }
+
+  // Factor 2: Position pressure - opponent close to net increases our pressure
+  if (opponentPosition) {
+    if (opponentPosition.y < 0.4) {
+      // Opponent in front court (attacking position)
+      pressure += 0.25;
+    } else if (opponentPosition.y < 0.6) {
+      // Opponent in mid court
+      pressure += 0.1;
+    }
+  }
+
+  // Factor 3: Shot type pressure - receiving smash = high pressure
+  if (recentShots.length > 0) {
+    const lastOpponentShot = recentShots
+      .filter(s => s.player === 'far')
+      .slice(-1)[0];
+
+    if (lastOpponentShot?.type === 'smash') {
+      pressure += 0.3;
+    } else if (lastOpponentShot?.type === 'drop') {
+      pressure += 0.15;
+    }
+  }
+
+  // Factor 4: Current shot position - playing from deep = more pressure
+  const startY = currentShot.trajectorySlice[0]?.y ?? 0.5;
+  if (startY < 0.2) {
+    // Playing from near our baseline
+    pressure += 0.15;
+  }
+
+  // Factor 5: Defensive shots indicate high pressure situation
+  if (DEFENSIVE_SHOT_TYPES.includes(currentShot.type)) {
+    pressure += 0.1;
+  }
+
+  // Clamp to valid range
+  return Math.min(1, Math.max(0, pressure));
+}
+
+/**
+ * Main function: Compute rally state at a specific shot
+ *
+ * @param shots All shots in the rally
+ * @param currentShotIndex Index of the shot to compute state for
+ * @param opponentPosition Optional opponent position for better zone detection
+ * @returns RallyState object
+ */
+export function computeRallyState(
+  shots: ShotSegment[],
+  currentShotIndex: number,
+  opponentPosition?: { x: number; y: number }
+): RallyState {
+  // Validate input
+  if (!shots || shots.length === 0 || currentShotIndex < 0) {
+    logDebug('Invalid input, returning default state');
+    return {
+      phase: 'neutral',
+      initiative: 'unknown',
+      pressure: 0.5,
+      openCourtZones: [0, 2, 6, 8],
+      timestamp: 0,
+    };
+  }
+
+  const currentShot = shots[Math.min(currentShotIndex, shots.length - 1)];
+
+  // Get recent shots (up to 3 previous shots for context)
+  const recentShots = shots.slice(
+    Math.max(0, currentShotIndex - 3),
+    currentShotIndex + 1
+  );
+
+  // Compute each component
+  const phase = determinePhase(currentShot, recentShots);
+  const initiative = determineInitiative(recentShots, currentShotIndex);
+  const pressure = calculatePressure(currentShot, recentShots, opponentPosition);
+  const openCourtZones = findOpenCourtZones(opponentPosition);
+
+  const state: RallyState = {
+    phase,
+    initiative,
+    pressure,
+    openCourtZones,
+    timestamp: currentShot.startTime,
+  };
+
+  logDebug(`Computed rally state for shot ${currentShotIndex}`, {
+    phase,
+    initiative,
+    pressure: pressure.toFixed(2),
+    openZones: openCourtZones,
+  });
+
+  return state;
+}
+
+/**
+ * Compute rally states for all shots in a rally
+ * Returns an array of states, one per shot
+ */
+export function computeAllRallyStates(
+  shots: ShotSegment[],
+  opponentPositions?: Array<{ x: number; y: number; timestamp: number }>
+): RallyState[] {
+  return shots.map((shot, index) => {
+    // Find opponent position closest to shot time
+    let opponentPos: { x: number; y: number } | undefined;
+    if (opponentPositions && opponentPositions.length > 0) {
+      const closest = opponentPositions.reduce((prev, curr) =>
+        Math.abs(curr.timestamp - shot.startTime) < Math.abs(prev.timestamp - shot.startTime)
+          ? curr
+          : prev
+      );
+      opponentPos = { x: closest.x, y: closest.y };
+    }
+
+    return computeRallyState(shots, index, opponentPos);
+  });
+}
+
+/**
+ * Get a human-readable description of the rally state
+ */
+export function describeRallyState(state: RallyState): string {
+  const phaseDescriptions: Record<RallyPhase, string> = {
+    attack: 'Attacking position',
+    neutral: 'Neutral exchange',
+    defense: 'Defensive situation',
+  };
+
+  const pressureLevel =
+    state.pressure > PRESSURE_THRESHOLDS.defense
+      ? 'high'
+      : state.pressure > PRESSURE_THRESHOLDS.attack
+      ? 'moderate'
+      : 'low';
+
+  const nextAction =
+    state.phase === 'defense'
+      ? 'Reset'
+      : state.phase === 'attack'
+      ? 'Finish'
+      : 'Build';
+
+  return `${phaseDescriptions[state.phase]} (${pressureLevel} pressure) → ${nextAction}`;
+}
+
+/**
+ * Determine the dominant phase across multiple rally states
+ */
+export function getDominantPhase(states: RallyState[]): RallyPhase {
+  if (states.length === 0) return 'neutral';
+
+  const phaseCounts: Record<RallyPhase, number> = {
+    attack: 0,
+    neutral: 0,
+    defense: 0,
+  };
+
+  for (const state of states) {
+    phaseCounts[state.phase]++;
+  }
+
+  // Find phase with highest count
+  let maxCount = 0;
+  let dominant: RallyPhase = 'neutral';
+  for (const phase of ['attack', 'neutral', 'defense'] as RallyPhase[]) {
+    if (phaseCounts[phase] > maxCount) {
+      maxCount = phaseCounts[phase];
+      dominant = phase;
+    }
+  }
+
+  return dominant;
+}
+
+/**
+ * Calculate average pressure across multiple rally states
+ */
+export function getAveragePressure(states: RallyState[]): number {
+  if (states.length === 0) return 0.5;
+
+  const total = states.reduce((sum, state) => sum + state.pressure, 0);
+  return total / states.length;
+}
+
+/**
+ * Find key moments (high pressure decision points) in a rally
+ */
+export function findKeyMoments(
+  states: RallyState[],
+  pressureThreshold: number = 0.7
+): number[] {
+  const keyMoments: number[] = [];
+
+  for (let i = 0; i < states.length; i++) {
+    if (states[i].pressure >= pressureThreshold) {
+      keyMoments.push(i);
+    }
+  }
+
+  return keyMoments;
+}

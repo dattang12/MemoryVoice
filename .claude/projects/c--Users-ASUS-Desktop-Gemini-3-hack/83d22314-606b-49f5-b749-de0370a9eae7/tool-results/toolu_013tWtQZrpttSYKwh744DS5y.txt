@@ -1,0 +1,365 @@
+     1→'use client';
+     2→
+     3→import { useRef, useState, useMemo } from 'react';
+     4→import { Canvas, useFrame } from '@react-three/fiber';
+     5→import { OrbitControls, Text, Line } from '@react-three/drei';
+     6→import * as THREE from 'three';
+     7→import type { TrajectoryPoint } from '@/lib/types';
+     8→
+     9→// ============================================
+    10→// PHASE 4: 3D Court Visualization
+    11→// ============================================
+    12→
+    13→interface CourtTrajectory3DProps {
+    14→  originalTrajectory: TrajectoryPoint[];
+    15→  refinedTrajectory: TrajectoryPoint[];
+    16→  showOriginal: boolean;
+    17→  showRefined: boolean;
+    18→  animationProgress: number;
+    19→  isPlaying: boolean;
+    20→}
+    21→
+    22→// Court dimensions (scaled to meters)
+    23→const COURT_LENGTH = 13.4; // meters
+    24→const COURT_WIDTH = 6.1;   // meters (doubles)
+    25→const SINGLES_WIDTH = 5.18;
+    26→const NET_HEIGHT = 1.55;   // meters at center
+    27→const SERVICE_LINE = 1.98; // meters from net
+    28→
+    29→// Pseudo-3D height curve based on shot type heuristic
+    30→function calculateHeight(
+    31→  startY: number,
+    32→  endY: number,
+    33→  t: number,
+    34→  shotIndex: number
+    35→): number {
+    36→  // Determine shot type based on court position change
+    37→  const deltaY = Math.abs(endY - startY);
+    38→
+    39→  // Higher arc for clears (long shots), lower for drives and drops
+    40→  let maxHeight = 1.5; // Default medium height
+    41→  if (deltaY > 0.5) {
+    42→    // Long shot - clear
+    43→    maxHeight = 3.5;
+    44→  } else if (deltaY < 0.2) {
+    45→    // Short shot - drop or net
+    46→    maxHeight = 1.0;
+    47→  }
+    48→
+    49→  // Parabolic arc with some variation
+    50→  const arc = Math.sin(t * Math.PI);
+    51→  return arc * maxHeight + 0.3; // Minimum height above net
+    52→}
+    53→
+    54→// Ball component that follows trajectory
+    55→function Ball({
+    56→  trajectory,
+    57→  progress,
+    58→  color,
+    59→  show,
+    60→}: {
+    61→  trajectory: TrajectoryPoint[];
+    62→  progress: number;
+    63→  color: string;
+    64→  show: boolean;
+    65→}) {
+    66→  const meshRef = useRef<THREE.Mesh>(null);
+    67→
+    68→  useFrame(() => {
+    69→    if (!meshRef.current || !show || trajectory.length < 2) return;
+    70→
+    71→    // Calculate current position along trajectory
+    72→    const totalPoints = trajectory.length;
+    73→    const currentIndex = Math.min(
+    74→      Math.floor(progress * totalPoints),
+    75→      totalPoints - 1
+    76→    );
+    77→    const nextIndex = Math.min(currentIndex + 1, totalPoints - 1);
+    78→    const localT = (progress * totalPoints) % 1;
+    79→
+    80→    const p1 = trajectory[currentIndex];
+    81→    const p2 = trajectory[nextIndex];
+    82→
+    83→    // Convert court coordinates to 3D
+    84→    const x1 = (p1.x - 0.5) * COURT_WIDTH;
+    85→    const z1 = (p1.y - 0.5) * COURT_LENGTH;
+    86→    const x2 = (p2.x - 0.5) * COURT_WIDTH;
+    87→    const z2 = (p2.y - 0.5) * COURT_LENGTH;
+    88→
+    89→    // Interpolate position
+    90→    const x = THREE.MathUtils.lerp(x1, x2, localT);
+    91→    const z = THREE.MathUtils.lerp(z1, z2, localT);
+    92→    const y = calculateHeight(p1.y, p2.y, localT, currentIndex);
+    93→
+    94→    meshRef.current.position.set(x, y, z);
+    95→  });
+    96→
+    97→  if (!show) return null;
+    98→
+    99→  return (
+   100→    <mesh ref={meshRef}>
+   101→      <sphereGeometry args={[0.1, 16, 16]} />
+   102→      <meshStandardMaterial color={color} />
+   103→    </mesh>
+   104→  );
+   105→}
+   106→
+   107→// Trajectory path visualization
+   108→function TrajectoryPath({
+   109→  trajectory,
+   110→  progress,
+   111→  color,
+   112→  show,
+   113→}: {
+   114→  trajectory: TrajectoryPoint[];
+   115→  progress: number;
+   116→  color: string;
+   117→  show: boolean;
+   118→}) {
+   119→  const points = useMemo(() => {
+   120→    if (!show || trajectory.length < 2) return [];
+   121→
+   122→    const result: THREE.Vector3[] = [];
+   123→    const visiblePoints = Math.ceil(progress * trajectory.length);
+   124→
+   125→    for (let i = 0; i < Math.min(visiblePoints, trajectory.length); i++) {
+   126→      const p = trajectory[i];
+   127→      const nextP = trajectory[Math.min(i + 1, trajectory.length - 1)];
+   128→
+   129→      // Add multiple points along each segment for smooth curve
+   130→      for (let t = 0; t < 1; t += 0.1) {
+   131→        const x = THREE.MathUtils.lerp(
+   132→          (p.x - 0.5) * COURT_WIDTH,
+   133→          (nextP.x - 0.5) * COURT_WIDTH,
+   134→          t
+   135→        );
+   136→        const z = THREE.MathUtils.lerp(
+   137→          (p.y - 0.5) * COURT_LENGTH,
+   138→          (nextP.y - 0.5) * COURT_LENGTH,
+   139→          t
+   140→        );
+   141→        const y = calculateHeight(p.y, nextP.y, t, i);
+   142→        result.push(new THREE.Vector3(x, y, z));
+   143→      }
+   144→    }
+   145→
+   146→    return result;
+   147→  }, [trajectory, progress, show]);
+   148→
+   149→  if (!show || points.length < 2) return null;
+   150→
+   151→  return (
+   152→    <Line
+   153→      points={points}
+   154→      color={color}
+   155→      lineWidth={3}
+   156→      dashed
+   157→      dashSize={0.3}
+   158→      gapSize={0.1}
+   159→    />
+   160→  );
+   161→}
+   162→
+   163→// Court plane with lines
+   164→function Court() {
+   165→  return (
+   166→    <group>
+   167→      {/* Court surface */}
+   168→      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+   169→        <planeGeometry args={[COURT_WIDTH, COURT_LENGTH]} />
+   170→        <meshStandardMaterial color="#15803d" side={THREE.DoubleSide} />
+   171→      </mesh>
+   172→
+   173→      {/* Court lines */}
+   174→      <group position={[0, 0.01, 0]}>
+   175→        {/* Outer boundary */}
+   176→        <Line
+   177→          points={[
+   178→            [-COURT_WIDTH / 2, 0, -COURT_LENGTH / 2],
+   179→            [COURT_WIDTH / 2, 0, -COURT_LENGTH / 2],
+   180→            [COURT_WIDTH / 2, 0, COURT_LENGTH / 2],
+   181→            [-COURT_WIDTH / 2, 0, COURT_LENGTH / 2],
+   182→            [-COURT_WIDTH / 2, 0, -COURT_LENGTH / 2],
+   183→          ]}
+   184→          color="white"
+   185→          lineWidth={2}
+   186→        />
+   187→
+   188→        {/* Singles boundary */}
+   189→        <Line
+   190→          points={[
+   191→            [-SINGLES_WIDTH / 2, 0, -COURT_LENGTH / 2],
+   192→            [-SINGLES_WIDTH / 2, 0, COURT_LENGTH / 2],
+   193→          ]}
+   194→          color="white"
+   195→          lineWidth={1}
+   196→        />
+   197→        <Line
+   198→          points={[
+   199→            [SINGLES_WIDTH / 2, 0, -COURT_LENGTH / 2],
+   200→            [SINGLES_WIDTH / 2, 0, COURT_LENGTH / 2],
+   201→          ]}
+   202→          color="white"
+   203→          lineWidth={1}
+   204→        />
+   205→
+   206→        {/* Center line */}
+   207→        <Line
+   208→          points={[
+   209→            [-COURT_WIDTH / 2, 0, 0],
+   210→            [COURT_WIDTH / 2, 0, 0],
+   211→          ]}
+   212→          color="white"
+   213→          lineWidth={2}
+   214→        />
+   215→
+   216→        {/* Service lines */}
+   217→        <Line
+   218→          points={[
+   219→            [-COURT_WIDTH / 2, 0, -SERVICE_LINE],
+   220→            [COURT_WIDTH / 2, 0, -SERVICE_LINE],
+   221→          ]}
+   222→          color="white"
+   223→          lineWidth={1}
+   224→        />
+   225→        <Line
+   226→          points={[
+   227→            [-COURT_WIDTH / 2, 0, SERVICE_LINE],
+   228→            [COURT_WIDTH / 2, 0, SERVICE_LINE],
+   229→          ]}
+   230→          color="white"
+   231→          lineWidth={1}
+   232→        />
+   233→
+   234→        {/* Center service line */}
+   235→        <Line
+   236→          points={[
+   237→            [0, 0, -SERVICE_LINE],
+   238→            [0, 0, SERVICE_LINE],
+   239→          ]}
+   240→          color="white"
+   241→          lineWidth={1}
+   242→        />
+   243→      </group>
+   244→    </group>
+   245→  );
+   246→}
+   247→
+   248→// Net
+   249→function Net() {
+   250→  return (
+   251→    <group position={[0, NET_HEIGHT / 2, 0]}>
+   252→      {/* Net posts */}
+   253→      <mesh position={[-COURT_WIDTH / 2 - 0.2, 0, 0]}>
+   254→        <cylinderGeometry args={[0.05, 0.05, NET_HEIGHT, 8]} />
+   255→        <meshStandardMaterial color="#333" />
+   256→      </mesh>
+   257→      <mesh position={[COURT_WIDTH / 2 + 0.2, 0, 0]}>
+   258→        <cylinderGeometry args={[0.05, 0.05, NET_HEIGHT, 8]} />
+   259→        <meshStandardMaterial color="#333" />
+   260→      </mesh>
+   261→
+   262→      {/* Net mesh (simplified) */}
+   263→      <mesh>
+   264→        <planeGeometry args={[COURT_WIDTH + 0.4, NET_HEIGHT]} />
+   265→        <meshStandardMaterial
+   266→          color="#ffffff"
+   267→          transparent
+   268→          opacity={0.3}
+   269→          side={THREE.DoubleSide}
+   270→        />
+   271→      </mesh>
+   272→
+   273→      {/* Top rope */}
+   274→      <mesh position={[0, NET_HEIGHT / 2, 0]}>
+   275→        <boxGeometry args={[COURT_WIDTH + 0.4, 0.02, 0.02]} />
+   276→        <meshStandardMaterial color="#333" />
+   277→      </mesh>
+   278→    </group>
+   279→  );
+   280→}
+   281→
+   282→// Main 3D Scene
+   283→function Scene({
+   284→  originalTrajectory,
+   285→  refinedTrajectory,
+   286→  showOriginal,
+   287→  showRefined,
+   288→  animationProgress,
+   289→}: CourtTrajectory3DProps) {
+   290→  return (
+   291→    <>
+   292→      {/* Lighting */}
+   293→      <ambientLight intensity={0.6} />
+   294→      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+   295→      <directionalLight position={[-10, 10, -5]} intensity={0.4} />
+   296→
+   297→      {/* Court */}
+   298→      <Court />
+   299→
+   300→      {/* Net */}
+   301→      <Net />
+   302→
+   303→      {/* Trajectories */}
+   304→      <TrajectoryPath
+   305→        trajectory={originalTrajectory}
+   306→        progress={animationProgress}
+   307→        color="#ef4444"
+   308→        show={showOriginal}
+   309→      />
+   310→      <TrajectoryPath
+   311→        trajectory={refinedTrajectory}
+   312→        progress={animationProgress}
+   313→        color="#22c55e"
+   314→        show={showRefined}
+   315→      />
+   316→
+   317→      {/* Balls */}
+   318→      <Ball
+   319→        trajectory={originalTrajectory}
+   320→        progress={animationProgress}
+   321→        color="#ef4444"
+   322→        show={showOriginal}
+   323→      />
+   324→      <Ball
+   325→        trajectory={refinedTrajectory}
+   326→        progress={animationProgress}
+   327→        color="#22c55e"
+   328→        show={showRefined}
+   329→      />
+   330→
+   331→      {/* Camera controls */}
+   332→      <OrbitControls
+   333→        enablePan={true}
+   334→        enableZoom={true}
+   335→        enableRotate={true}
+   336→        minDistance={5}
+   337→        maxDistance={25}
+   338→        target={[0, 1, 0]}
+   339→      />
+   340→    </>
+   341→  );
+   342→}
+   343→
+   344→// Export the main component
+   345→export default function CourtTrajectory3D(props: CourtTrajectory3DProps) {
+   346→  return (
+   347→    <div className="w-full h-[500px] bg-gray-900 rounded-lg overflow-hidden">
+   348→      <Canvas
+   349→        camera={{
+   350→          position: [0, 10, 12],
+   351→          fov: 50,
+   352→          near: 0.1,
+   353→          far: 100,
+   354→        }}
+   355→      >
+   356→        <Scene {...props} />
+   357→      </Canvas>
+   358→    </div>
+   359→  );
+   360→}
+   361→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

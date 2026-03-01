@@ -1,0 +1,210 @@
+You are Claude running inside VS Code. You will VIBE CODE as a multi-agent team:
+- PLANNER (architecture + file map)
+- BUILDER (implement end-to-end)
+- REFINER (polish UX + performance)
+- SUPERVISOR (verify “real not mock”, run checks, produce test checklist)
+
+You MUST use ALL available MCP tools (filesystem read/search, terminal, git, supabase, etc.) to inspect and modify the real codebase. No stubs, no placeholders, no random outputs. If anything is missing, implement it properly.
+
+PROJECT CONTEXT (READ THIS CAREFULLY)
+This repo is RallyCoach with this structure:
+- backend/ (FastAPI, MediaPipe, OpenCV, Gemini, Supabase)
+  - main.py, analysis.py, pose_estimation.py, gemini_client.py, video_annotator.py, video_processing.py
+- rallycoach/ (Next.js 14 App Router frontend)
+  - src/app/analytics, practice, strategy, etc.
+  - src/lib/pose-utils.ts, rules-engine.ts, scoring-rules.ts, strategy_engine, courtSpec.ts
+There are existing APIs:
+- backend: /api/analyze etc.
+- frontend routes: /api/analysis/start, /api/analysis/auto-level, etc.
+(Confirm by reading README + code.)
+
+MISSION
+Implement these 3 features FOR REAL in the Video Analytics experience (and reuse in Practice mode where feasible):
+
+1) Ghost Rival Overlay (visual wow)
+2) Mistake Timeline -> click-to-jump + Animation Cards (product polish)
+3) Auto Skill Estimation + Confidence Meters (ML credibility)
+
+NON-NEGOTIABLE REQUIREMENTS
+- START by reading the repo. Do not code until you map the current data flow:
+  (Upload -> backend analyze -> DB save -> frontend fetch -> video render + overlay)
+- Must work with real uploaded videos and real pose output.
+- Must not rely on user selecting Beginner/Intermediate/Advanced. Remove that UI if it exists.
+- Must show loading animation while analysis is running.
+- Must store results in Supabase (sessions/issues or new fields) so history works.
+
+KEY TECH CONSTRAINTS
+- “Confidence” must come from actual pose detection signals:
+  - In MediaPipe Pose outputs, landmarks include `visibility` in [0,1] (likelihood landmark is visible/not occluded). Use that as a main confidence signal.
+  - In Tasks-Vision PoseLandmarker config, there are minPoseDetectionConfidence / minPosePresenceConfidence / minTrackingConfidence; use them and any available scores to derive confidence.
+  Do NOT invent confidence numbers. Derive from visibility, detection success rate, and dropout frequency.
+
+- Timeline seeking must be implemented by setting HTMLMediaElement.currentTime and syncing UI via timeupdate events.
+  (Implement proper seek on click; keep overlay synced.)
+
+PHASE 1 — PLANNER (repo read + plan)
+1) Use MCP filesystem search to locate:
+   - Frontend video player component(s) on analytics page
+   - Overlay rendering (canvas / Three.js overlay / annotated video display)
+   - Where pose frames + issues are shown
+   - Current “level selection” UI and why it always says “perfect”
+   - Backend analysis pipeline outputs and how they’re stored (Supabase schema usage)
+2) Output a short map:
+   - file paths + what they do
+   - current JSON shapes for analysis output
+3) Propose an implementation plan with minimal changes but clean architecture:
+   - EXACT files to edit
+   - EXACT new files/modules to add (if needed)
+   - DB schema changes ONLY if necessary (provide SQL migration if you add columns)
+4) Define acceptance criteria for each feature (below). Then implement.
+
+PHASE 2 — BUILDER (implement end-to-end)
+
+========================
+FEATURE 1: GHOST RIVAL OVERLAY
+========================
+Goal: Show a translucent “ghost” skeleton over the user’s video, time-synced, with a toggle.
+This MUST be real.
+
+Ghost Source (must support at least one real source):
+A) “My Best Rep” (required): ghost is taken from the SAME uploaded video by selecting the highest-quality segment based on your scoring rules.
+   - Find top-N shot events (you already do shot detection).
+   - For each shot window (e.g., t-0.8s to t+0.6s), compute a “form quality score” using existing rules-engine/scoring-rules.
+   - Choose best segment => store as ghostPoseSequence (pose frames + normalized time 0..1 or absolute timestamps).
+   - This is always available and fully real.
+
+B) “Pro Template” (optional but nice): if the repo already contains a reference clip or reference landmark JSON, support it.
+   - If not present, do NOT fake it. Just implement “My Best Rep” first.
+
+Sync strategy:
+- Default alignment: absolute time if ghost is from same clip.
+- If ghost uses normalized time (0..1), map userTime within chosen shot window to ghostTime via linear normalization.
+- Overlay must stay synced during play/pause/seek.
+
+Rendering:
+- Frontend overlay should render 2 skeletons:
+  - user skeleton (existing colors)
+  - ghost skeleton (distinct color + low opacity)
+- Provide a toggle “Ghost Rival” and a selector “Ghost: My Best Rep / Pro Template (if available)”
+- Ensure overlay continues to render even when the user switches modes/levels (remove reliance on user-selected level).
+
+Backend changes (likely):
+- In backend/analysis.py or associated pipeline: compute best-rep window + store ghost frames (compressed) OR store the window boundaries and rely on frontend to extract frames from stored pose frames.
+- If pose frames are huge, store ghost as a downsampled sequence (e.g., 15 FPS) for rendering.
+
+========================
+FEATURE 2: MISTAKE TIMELINE + CLICK-TO-JUMP + ANIMATION CARDS
+========================
+2.1 Mistake Timeline
+Goal: a horizontal timeline under the video:
+- entire duration
+- colored mistake segments by severity (red/orange)
+- playhead that tracks currentTime
+- clicking a segment seeks video to that time
+
+Implementation:
+- Use HTMLVideoElement.currentTime to seek on click.
+- Subscribe to timeupdate to update playhead + selected mistake.
+- When user clicks anywhere on timeline, seek to the corresponding time (not only segment start).
+- Mistake segments must come from real computed events in analysis output:
+  Each mistake event:
+  {
+    id, type, startTimeSec, endTimeSec,
+    severity (0..1),
+    confidence (0..1) derived from pose visibility/detection stability,
+    joints: [..] (which landmarks matter),
+    summaryTitle (short)
+  }
+
+Mistake detection rules (use what you can reliably compute now from landmarks):
+Implement at least 3 mistake types that are feasible with pose landmarks:
+- Overhead contact too low: wrist/hand y relative to shoulder/head at “contact moment”
+- No split-step (or late split-step proxy): detect lack of small hop/stance widening before large movement onset
+- Poor lunge recovery: time from deepest knee flexion back to neutral stance; trunk lean too large
+(Choose based on what your current rules engine already supports. Do not make up events.)
+
+2.2 Animation Cards (must be animated, not text-only)
+Goal: When a mistake is selected, show a “Fix-it” card with a 2–5 sec loop animation:
+- Stick-figure animation rendered in Canvas or SVG (your choice)
+- 3 key phases (setup / contact / recover), with interpolation
+- Minimal text: title + at most 1 sentence
+
+Data source for animation:
+- If ghost (best rep) exists for that mistake’s shot window, use ghost keyframes as “correct motion”.
+- Otherwise create a corrected keyframe set using your rules-engine target pose (e.g., adjust elbow lead, raise contact point, correct stance width).
+But must be derived from actual pose frames + computed corrections, not stock animations.
+
+Where to implement:
+- Frontend: new component e.g. rallycoach/src/components/Analytics/MistakeTimeline.tsx + FixItCard.tsx
+- Shared math: rallycoach/src/lib/pose-utils.ts additions or new lib modules.
+
+========================
+FEATURE 3: AUTO SKILL ESTIMATION + CONFIDENCE METERS
+========================
+Goal:
+- Remove manual level selection UI on analytics page (and anywhere else).
+- Replace with auto computed:
+  - skillScore (0–100)
+  - levelLabel (Beginner/Intermediate/Advanced)
+  - confidencePercent (0–100) + reasons if low
+
+Implementation constraints:
+- SkillScore must be computed from real metrics (not Gemini alone):
+  Use features you can compute from pose frames and your scoring rules:
+  - consistency of key joint angles over shots
+  - recovery speed after lunges
+  - stance stability + split-step presence
+  - overhead sequence quality (shoulder/hip separation proxy)
+- LevelLabel is derived from thresholds (tune using observed distribution):
+  Example: <40 Beginner, 40–70 Intermediate, >70 Advanced (adjust).
+- Confidence must be derived from pose visibility / tracking stability:
+  - mean landmark visibility across key joints
+  - % frames above a visibility threshold
+  - dropout rate (frames with missing/low visibility)
+Optionally incorporate Tasks-Vision confidence settings where available.
+
+Gemini integration:
+- Keep Gemini for “coaching narrative” and natural-language feedback.
+- But the numeric score/label must come from your computed metrics.
+- Update backend/gemini_client.py prompts so Gemini references the computed score + key metrics instead of inventing levels.
+
+Store results:
+- Save skillScore, levelLabel, confidence, and mistake events in Supabase with the session.
+- Ensure history page can load them.
+
+PHASE 3 — REFINER (polish + performance)
+- Add loading animation overlay in analytics during analysis (skeleton shimmer or spinner).
+- Optimize rendering:
+  - Overlay uses requestAnimationFrame, not heavy React re-renders.
+  - Downsample ghost sequence for drawing.
+- Clean UI:
+  - Ghost toggle + source selector
+  - Skill badge + confidence meter
+  - Timeline + fix-it card below video
+- Ensure skeleton overlay still shows in analytics (this fixes your previous “skeleton overlay not showing” class of bug if related).
+
+PHASE 4 — SUPERVISOR (verify)
+- Run backend + frontend locally
+- Provide a “How to test” checklist:
+  1) Upload a video
+  2) See loading
+  3) See skill score + confidence
+  4) See mistake timeline segments
+  5) Click timeline -> video seeks correctly, overlay stays synced
+  6) Turn on Ghost Rival -> ghost appears and follows correctly
+  7) Select mistake -> animated fix-it card plays
+- Confirm no mocked numbers: show where confidence is computed from visibility/tracking outputs.
+
+DELIVERABLES
+- Actual code changes committed (if git is available) with meaningful commit messages.
+- If DB schema change is needed, write a migration SQL file and update README.
+- Update README “Features” section to include:
+  - Ghost Rival Overlay
+  - Mistake Timeline + click-to-jump
+  - Auto skill score + confidence meters
+
+NOW START:
+1) PLANNER: read files and produce a file-level plan
+2) BUILDER: implement
+3) REFINER: polish
+4) SUPERVISOR: verify + checklist

@@ -1,0 +1,307 @@
+2026-02-21T07:06:09.605Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-21T07:06:09.606Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-21T07:06:09.606Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-21T07:06:09.606Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-21T07:06:09.650Z [DEBUG] Using bash path: "C:\Program Files\Git\bin\bash.exe"
+2026-02-21T07:06:09.662Z [DEBUG] Applying permission update: Adding 2 allow rule(s) to destination 'userSettings': ["Bash(dir:*)","mcp__pencil"]
+2026-02-21T07:06:09.662Z [DEBUG] Applying permission update: Adding 2 allow rule(s) to destination 'projectSettings': ["Bash(dir:*)","mcp__pencil"]
+2026-02-21T07:06:09.662Z [DEBUG] Applying permission update: Adding 29 allow rule(s) to destination 'localSettings': ["WebSearch","WebFetch(domain:github.com)","Bash(powershell:*)","WebFetch(domain:www.digitalocean.com)","WebFetch(domain:marketingagent.blog)","Bash(where:*)","Bash(openclaw --version:*)","WebFetch(domain:docs.openclaw.ai)","WebFetch(domain:openclaw-ai.online)","Bash(openclaw --help:*)","Bash(npx openclaw --help:*)","Bash(openclaw models:*)","Bash(openclaw config:*)","Bash(openclaw dashboard:*)","Bash(openclaw logs:*)","Bash(openclaw tui:*)","Bash(openclaw status:*)","Bash(openclaw health:*)","Bash(openclaw sessions:*)","Bash(openclaw doctor:*)","Bash(openclaw agents --help:*)","Bash(openclaw agents list:*)","WebFetch(domain:platform.moonshot.ai)","Bash(netstat:*)","WebFetch(domain:webspatial.dev)","WebFetch(domain:tpac2025.webspatial.dev)","WebFetch(domain:www.w3.org)","Bash(echo:*)","Bash(powershell.exe -Command \"Get-ChildItem -Path ''$env:USERPROFILE\\\\.claude'' -Recurse -File | Select-Object FullName\")"]
+2026-02-21T07:06:09.664Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-21T07:06:09.670Z [DEBUG] [ToolSearch:optimistic] mode=tst-auto, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-02-21T07:06:09.670Z [DEBUG] [STARTUP] Running setup()...
+2026-02-21T07:06:09.686Z [DEBUG] Loading skills from: managed=C:\ProgramData\ClaudeCode\.claude\skills, user=C:\Users\ASUS\.claude\skills, project=[]
+2026-02-21T07:06:09.687Z [DEBUG] Error log sink initialized
+2026-02-21T07:06:09.915Z [DEBUG] [Claude in Chrome] Found chrome profiles: Default
+2026-02-21T07:06:09.928Z [DEBUG] [Claude in Chrome] Extension fcoeoabgfenejglbffodgkkbkcdhcgfn found in chrome Default
+2026-02-21T07:06:09.936Z [DEBUG] Loaded 0 unique skills (0 unconditional, 0 conditional, managed: 0, user: 0, project: 0, additional: 0, legacy commands: 0)
+2026-02-21T07:06:09.952Z [DEBUG] Git remote URL: null
+2026-02-21T07:06:09.952Z [DEBUG] No git remote URL found
+2026-02-21T07:06:09.963Z [DEBUG] Loading plugin figma from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"}
+2026-02-21T07:06:09.963Z [DEBUG] No version found for figma@claude-plugins-official, using 'unknown'
+2026-02-21T07:06:09.964Z [DEBUG] Loading plugin claude-code-setup from source: "./plugins/claude-code-setup"
+2026-02-21T07:06:09.964Z [DEBUG] Loading plugin context7 from source: "./external_plugins/context7"
+2026-02-21T07:06:09.965Z [DEBUG] Loading plugin frontend-design from source: "./plugins/frontend-design"
+2026-02-21T07:06:09.984Z [DEBUG] Caching plugin from source: {"source":"url","url":"https://github.com/figma/mcp-server-guide.git"} to temporary path C:\Users\ASUS\.claude\plugins\cache\temp_git_1771657569984_slrf57
+2026-02-21T07:06:10.075Z [DEBUG] Using manifest version for claude-code-setup@claude-plugins-official: 1.0.0
+2026-02-21T07:06:10.078Z [DEBUG] Plugin claude-code-setup@claude-plugins-official version 1.0.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-21T07:06:10.078Z [DEBUG] Resolved local plugin claude-code-setup to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0
+2026-02-21T07:06:10.084Z [DEBUG] Using git SHA for context7@claude-plugins-official: aa296ec81e8c
+2026-02-21T07:06:10.085Z [DEBUG] Using git SHA for frontend-design@claude-plugins-official: aa296ec81e8c
+2026-02-21T07:06:10.085Z [DEBUG] Plugin context7@claude-plugins-official version aa296ec81e8c already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\context7\aa296ec81e8c
+2026-02-21T07:06:10.085Z [DEBUG] Resolved local plugin context7 to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\context7\aa296ec81e8c
+2026-02-21T07:06:10.085Z [DEBUG] Plugin frontend-design@claude-plugins-official version aa296ec81e8c already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c
+2026-02-21T07:06:10.085Z [DEBUG] Resolved local plugin frontend-design to versioned cache: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c
+2026-02-21T07:06:10.089Z [DEBUG] [STARTUP] setup() completed in 419ms
+2026-02-21T07:06:10.089Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-02-21T07:06:10.357Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657570357
+2026-02-21T07:06:10.357Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:10.357Z [DEBUG] Temp file written successfully, size: 13921 bytes
+2026-02-21T07:06:10.358Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:10.358Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657570357 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:10.358Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:10.361Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=C:\Users\ASUS\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\vendor\ripgrep\x64-win32\rg.exe)
+2026-02-21T07:06:11.324Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657571324
+2026-02-21T07:06:11.324Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:11.325Z [DEBUG] Temp file written successfully, size: 13921 bytes
+2026-02-21T07:06:11.325Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:11.325Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657571324 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:11.326Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.359Z [DEBUG] Cloned repository from https://github.com/figma/mcp-server-guide.git to C:\Users\ASUS\.claude\plugins\cache\temp_git_1771657569984_slrf57
+2026-02-21T07:06:12.362Z [DEBUG] Successfully cached plugin figma to C:\Users\ASUS\.claude\plugins\cache\figma
+2026-02-21T07:06:12.362Z [DEBUG] Using manifest version for figma@claude-plugins-official: 1.1.0
+2026-02-21T07:06:12.362Z [DEBUG] Plugin figma@claude-plugins-official version 1.1.0 already cached at C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.1.0
+2026-02-21T07:06:12.370Z [DEBUG] Found 4 plugins (4 enabled, 0 disabled)
+2026-02-21T07:06:12.371Z [DEBUG] getPluginSkills: Processing 4 enabled plugins
+2026-02-21T07:06:12.371Z [DEBUG] Checking plugin figma: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T07:06:12.371Z [DEBUG] Attempting to load skills from plugin figma default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\figma\1.1.0\skills
+2026-02-21T07:06:12.377Z [DEBUG] Total plugin commands loaded: 0
+2026-02-21T07:06:12.377Z [DEBUG] Registered 0 hooks from 4 plugins
+2026-02-21T07:06:12.377Z [DEBUG] Total plugin agents loaded: 0
+2026-02-21T07:06:12.377Z [DEBUG] Loaded 3 skills from plugin figma default directory
+2026-02-21T07:06:12.377Z [DEBUG] Checking plugin claude-code-setup: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T07:06:12.377Z [DEBUG] Attempting to load skills from plugin claude-code-setup default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\claude-code-setup\1.0.0\skills
+2026-02-21T07:06:12.382Z [DEBUG] Loaded 1 skills from plugin claude-code-setup default directory
+2026-02-21T07:06:12.382Z [DEBUG] Checking plugin frontend-design: skillsPath=exists, skillsPaths=0 paths
+2026-02-21T07:06:12.382Z [DEBUG] Attempting to load skills from plugin frontend-design default skillsPath: C:\Users\ASUS\.claude\plugins\cache\claude-plugins-official\frontend-design\aa296ec81e8c\skills
+2026-02-21T07:06:12.383Z [DEBUG] Loaded 1 skills from plugin frontend-design default directory
+2026-02-21T07:06:12.383Z [DEBUG] Checking plugin context7: skillsPath=none, skillsPaths=0 paths
+2026-02-21T07:06:12.383Z [DEBUG] Total plugin skills loaded: 5
+2026-02-21T07:06:12.384Z [DEBUG] getSkills returning: 0 skill dir commands, 5 plugin skills, 3 bundled skills
+2026-02-21T07:06:12.385Z [DEBUG] [STARTUP] Commands and agents loaded in 2296ms
+2026-02-21T07:06:12.389Z [DEBUG] [STARTUP] Running showSetupScreens()...
+2026-02-21T07:06:12.419Z [DEBUG] Grove: Using fresh cached config
+2026-02-21T07:06:12.419Z [DEBUG] Not in a GitHub repository, skipping path mapping update
+2026-02-21T07:06:12.434Z [DEBUG] [keybindings] KeybindingSetup initialized with 103 bindings, 0 warnings
+2026-02-21T07:06:12.443Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-02-21T07:06:12.443Z [DEBUG] [3P telemetry] isTelemetryEnabled=false (CLAUDE_CODE_ENABLE_TELEMETRY=undefined)
+2026-02-21T07:06:12.457Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572457
+2026-02-21T07:06:12.457Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.457Z [DEBUG] Temp file written successfully, size: 13920 bytes
+2026-02-21T07:06:12.458Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.458Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572457 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.458Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.460Z [DEBUG] [keybindings] Watching for changes to C:\Users\ASUS\.claude\keybindings.json
+2026-02-21T07:06:12.684Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572684
+2026-02-21T07:06:12.684Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.685Z [DEBUG] Temp file written successfully, size: 13920 bytes
+2026-02-21T07:06:12.685Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.685Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572684 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.685Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.800Z [DEBUG] [STARTUP] showSetupScreens() completed in 411ms
+2026-02-21T07:06:12.800Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-02-21T07:06:12.800Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-02-21T07:06:12.800Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-02-21T07:06:12.801Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-21T07:06:12.801Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-21T07:06:12.804Z [DEBUG] [STARTUP] MCP configs loaded in 3140ms
+2026-02-21T07:06:12.814Z [DEBUG] MCP server "plugin:context7:context7": Starting connection with timeout of 30000ms
+2026-02-21T07:06:12.831Z [DEBUG] MCP server "pencil": Starting connection with timeout of 30000ms
+2026-02-21T07:06:12.867Z [DEBUG] All plugins already exist, skipping migration
+2026-02-21T07:06:12.867Z [DEBUG] [Reconnection] computeInitialTeamContext: No teammate context set (not a teammate)
+2026-02-21T07:06:12.869Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572869
+2026-02-21T07:06:12.869Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.869Z [DEBUG] Temp file written successfully, size: 13920 bytes
+2026-02-21T07:06:12.869Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.869Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572869 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.869Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.872Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2026-02-21T07:06:12.872Z [DEBUG] Found 0 hook matchers in settings
+2026-02-21T07:06:12.872Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2026-02-21T07:06:12.872Z [DEBUG] Loaded 5 installed plugins from C:\Users\ASUS\.claude\plugins\installed_plugins.json
+2026-02-21T07:06:12.872Z [DEBUG] Initialized versioned plugins system with 5 plugins
+2026-02-21T07:06:12.884Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572884
+2026-02-21T07:06:12.884Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.884Z [DEBUG] Temp file written successfully, size: 13953 bytes
+2026-02-21T07:06:12.884Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.884Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572884 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.885Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.898Z [DEBUG] [keybindings] KeybindingSetup initialized with 103 bindings, 0 warnings
+2026-02-21T07:06:12.928Z [DEBUG] High write ratio: blit=0, write=1211 (100.0% writes), screen=22x120
+2026-02-21T07:06:12.934Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572934
+2026-02-21T07:06:12.934Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.935Z [DEBUG] Temp file written successfully, size: 13953 bytes
+2026-02-21T07:06:12.935Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.935Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572934 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.935Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.937Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657572937
+2026-02-21T07:06:12.937Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:12.937Z [DEBUG] Temp file written successfully, size: 13953 bytes
+2026-02-21T07:06:12.937Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:12.937Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657572937 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:12.937Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:12.940Z [DEBUG] [REPL:mount] REPL mounted, disabled=false
+2026-02-21T07:06:12.942Z [DEBUG] Official marketplace auto-install skipped: already_attempted
+2026-02-21T07:06:12.942Z [DEBUG] performStartupChecks called
+2026-02-21T07:06:12.944Z [DEBUG] Starting background plugin installations
+2026-02-21T07:06:12.944Z [DEBUG] performBackgroundPluginInstallations called
+2026-02-21T07:06:12.946Z [DEBUG] Loaded 9 CLAUDE.md/rules files:
+  [User] C:\Users\ASUS\.claude\rules\agents.md (1540 chars)
+  [User] C:\Users\ASUS\.claude\rules\coding-style.md (704 chars)
+  [User] C:\Users\ASUS\.claude\rules\git-workflow.md (1114 chars)
+  [User] C:\Users\ASUS\.claude\rules\hooks.md (394 chars)
+  [User] C:\Users\ASUS\.claude\rules\patterns.md (813 chars)
+  [User] C:\Users\ASUS\.claude\rules\performance.md (1654 chars)
+  [User] C:\Users\ASUS\.claude\rules\security.md (505 chars)
+  [User] C:\Users\ASUS\.claude\rules\testing.md (570 chars)
+  [AutoMem] C:\Users\ASUS\.claude\projects\C--Users-ASUS\memory\MEMORY.md (381 chars)
+2026-02-21T07:06:12.949Z [DEBUG] Watching for changes in setting files C:\Users\ASUS\.claude\settings.json, C:\Users\ASUS\.claude\settings.local.json...
+2026-02-21T07:06:12.950Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-21T07:06:12.950Z [DEBUG] AutoUpdaterWrapper: Installation type: npm-global
+2026-02-21T07:06:12.953Z [DEBUG] [FileIndex] getProjectFiles called, respectGitignore=true
+2026-02-21T07:06:12.953Z [DEBUG] [FileIndex] getFilesUsingGit called
+2026-02-21T07:06:12.980Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-21T07:06:12.980Z [DEBUG] [claudeai-mcp] Gate returned: true
+2026-02-21T07:06:12.980Z [DEBUG] [claudeai-mcp] Fetching from https://api.anthropic.com/v1/mcp_servers?limit=1000
+2026-02-21T07:06:13.013Z [DEBUG] MCP server "plugin:figma:figma": Initializing HTTP transport to https://mcp.figma.com/mcp
+2026-02-21T07:06:13.013Z [DEBUG] MCP server "plugin:figma:figma": Node version: v24.11.0, Platform: win32
+2026-02-21T07:06:13.013Z [DEBUG] MCP server "plugin:figma:figma": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-21T07:06:13.013Z [DEBUG] MCP server "plugin:figma:figma": Proxy options: default
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport options: {"url":"https://mcp.figma.com/mcp","headers":{"User-Agent":"claude-code/2.1.49 (cli)"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": HTTP transport created successfully
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": Client created, setting up request handler
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": Testing basic HTTP connectivity to https://mcp.figma.com/mcp
+2026-02-21T07:06:13.014Z [DEBUG] MCP server "plugin:figma:figma": Parsed URL: host=mcp.figma.com, port=default, protocol=https:
+2026-02-21T07:06:13.015Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": Initializing HTTP transport to http://127.0.0.1:3845/mcp
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": Node version: v24.11.0, Platform: win32
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": Proxy options: default
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport options: {"url":"http://127.0.0.1:3845/mcp","headers":{"User-Agent":"claude-code/2.1.49 (cli)"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-02-21T07:06:13.016Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP transport created successfully
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": Client created, setting up request handler
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": Testing basic HTTP connectivity to http://127.0.0.1:3845/mcp
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": Parsed URL: host=127.0.0.1, port=3845, protocol=http:
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": Using loopback address: 127.0.0.1
+2026-02-21T07:06:13.017Z [DEBUG] MCP server "plugin:figma:figma-desktop": No token data found
+2026-02-21T07:06:13.019Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657573019
+2026-02-21T07:06:13.019Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:13.020Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T07:06:13.020Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:13.020Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657573019 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:13.020Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:13.024Z [ERROR] MCP server "pencil" Server stderr: 2026/02/20 23:06:12 [MCP] Starting server in stdio mode
+2026/02/20 23:06:12 [WebSocketClient] server connected to WebSocket server
+2026/02/20 23:06:12 [WebSocketClient] received client ID: fdca38de-5acf-4a80-8a11-75bebb10c231
+2026-02-21T07:06:13.024Z [DEBUG] MCP server "pencil": Successfully connected to stdio server in 194ms
+2026-02-21T07:06:13.024Z [DEBUG] MCP server "pencil": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"pencil","version":"1.0.0"}}
+2026-02-21T07:06:13.024Z [DEBUG] [FileIndex] git ls-files (tracked) took 71ms
+2026-02-21T07:06:13.025Z [DEBUG] [FileIndex] git ls-files: 0 tracked files in 72ms
+2026-02-21T07:06:13.028Z [DEBUG] [FileIndex] using git ls-files result (0 files)
+2026-02-21T07:06:13.034Z [DEBUG] MCP server "plugin:figma:figma-desktop": HTTP Connection failed after 18ms: fetch failed (code: none, errno: none)
+2026-02-21T07:06:13.034Z [ERROR] MCP server "plugin:figma:figma-desktop" TypeError: fetch failed
+2026-02-21T07:06:13.046Z [DEBUG] MCP server "plugin:figma:figma-desktop": Connection failed after 30ms: fetch failed
+2026-02-21T07:06:13.046Z [ERROR] MCP server "plugin:figma:figma-desktop" Connection failed: fetch failed
+2026-02-21T07:06:13.064Z [DEBUG] Total LSP servers loaded: 0
+2026-02-21T07:06:13.064Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-02-21T07:06:13.064Z [DEBUG] LSP manager initialized with 0 servers
+2026-02-21T07:06:13.064Z [DEBUG] LSP server manager initialized successfully
+2026-02-21T07:06:13.064Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-02-21T07:06:13.065Z [DEBUG] Found 4 enabled plugins
+2026-02-21T07:06:13.065Z [DEBUG] All plugins already exist, skipping migration
+2026-02-21T07:06:13.065Z [DEBUG] Found 5 installed plugins (V2 format)
+2026-02-21T07:06:13.065Z [DEBUG] Found 0 missing plugins (not installed):
+2026-02-21T07:06:13.065Z [DEBUG] Setting installation status: 0 marketplaces, 0 installable plugins, 0 uninstallable plugins
+2026-02-21T07:06:13.065Z [DEBUG] Watching for changes in skill/command directories: C:\Users\ASUS\.claude\skills, C:\Users\ASUS\.claude\skills...
+2026-02-21T07:06:13.075Z [DEBUG] Fetching plugin security messages from https://raw.githubusercontent.com/anthropics/claude-plugins-official/refs/heads/security/security.json
+2026-02-21T07:06:13.081Z [DEBUG] [FileIndex] Not in bundled mode, using Fuse.js fallback
+2026-02-21T07:06:13.081Z [DEBUG] [FileIndex] cache refresh completed in 128ms (24 files)
+2026-02-21T07:06:13.083Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657573083
+2026-02-21T07:06:13.083Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:13.083Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T07:06:13.083Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:13.083Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657573083 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:13.084Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:13.094Z [DEBUG] [claudeai-mcp] Fetched 8 servers
+2026-02-21T07:06:13.101Z [DEBUG] MCP server "claude.ai Slack": Initializing claude.ai proxy transport for server mcpsrv_01C6mb6LdnXjLmbDwN1pMGkY
+2026-02-21T07:06:13.101Z [DEBUG] MCP server "claude.ai Slack": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01C6mb6LdnXjLmbDwN1pMGkY
+2026-02-21T07:06:13.101Z [DEBUG] MCP server "claude.ai Slack": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.101Z [DEBUG] MCP server "claude.ai Slack": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.102Z [DEBUG] MCP server "claude.ai Linear": Initializing claude.ai proxy transport for server mcpsrv_01P19dQCrACCs5GybPo7Yqod
+2026-02-21T07:06:13.103Z [DEBUG] MCP server "claude.ai Linear": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01P19dQCrACCs5GybPo7Yqod
+2026-02-21T07:06:13.103Z [DEBUG] MCP server "claude.ai Linear": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.103Z [DEBUG] MCP server "claude.ai Linear": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.104Z [DEBUG] MCP server "claude.ai ClickUp": Initializing claude.ai proxy transport for server mcpsrv_01HYbCYz58D4ova2sX2RuAZz
+2026-02-21T07:06:13.104Z [DEBUG] MCP server "claude.ai ClickUp": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01HYbCYz58D4ova2sX2RuAZz
+2026-02-21T07:06:13.104Z [DEBUG] MCP server "claude.ai ClickUp": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.104Z [DEBUG] MCP server "claude.ai ClickUp": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai Windsor.ai": Initializing claude.ai proxy transport for server mcpsrv_014romFDbVBBDPzsNnC2MkyB
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai Windsor.ai": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_014romFDbVBBDPzsNnC2MkyB
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai Windsor.ai": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai Windsor.ai": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai DevRev": Initializing claude.ai proxy transport for server mcpsrv_018nCh8fGkjrEw5tqJoZuAYu
+2026-02-21T07:06:13.105Z [DEBUG] MCP server "claude.ai DevRev": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_018nCh8fGkjrEw5tqJoZuAYu
+2026-02-21T07:06:13.106Z [DEBUG] MCP server "claude.ai DevRev": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.106Z [DEBUG] MCP server "claude.ai DevRev": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.106Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Initializing claude.ai proxy transport for server mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-21T07:06:13.106Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01SEz7FiW7NCkG2kff6xB2ew
+2026-02-21T07:06:13.106Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.107Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.107Z [DEBUG] MCP server "claude.ai AWS Marketplace": Initializing claude.ai proxy transport for server mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-21T07:06:13.107Z [DEBUG] MCP server "claude.ai AWS Marketplace": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01Vdd8Q5wEwhr95KWDBX4qMA
+2026-02-21T07:06:13.107Z [DEBUG] MCP server "claude.ai AWS Marketplace": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.108Z [DEBUG] MCP server "claude.ai AWS Marketplace": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.108Z [DEBUG] MCP server "claude.ai Day AI": Initializing claude.ai proxy transport for server mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-21T07:06:13.108Z [DEBUG] MCP server "claude.ai Day AI": Using claude.ai proxy at https://mcp-proxy.anthropic.com/v1/mcp/mcpsrv_01EbhxzuXzc76v3vbGp4Henb
+2026-02-21T07:06:13.108Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy transport created successfully
+2026-02-21T07:06:13.108Z [DEBUG] MCP server "claude.ai Day AI": Starting connection with timeout of 30000ms
+2026-02-21T07:06:13.177Z [DEBUG] Security messages saved successfully
+2026-02-21T07:06:13.183Z [DEBUG] Loaded plugins - Enabled: 4, Disabled: 0, Commands: 0, Agents: 0, Errors: 0
+2026-02-21T07:06:13.214Z [DEBUG] Org fast mode: enabled
+2026-02-21T07:06:13.249Z [DEBUG] MCP server "plugin:figma:figma": Found client info
+2026-02-21T07:06:13.249Z [DEBUG] MCP server "plugin:figma:figma": Token expired without refresh token
+2026-02-21T07:06:13.249Z [DEBUG] MCP server "plugin:figma:figma": Generated new OAuth state
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Saving code verifier
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Authorization URL: https://www.figma.com/oauth/mcp?response_type=code&client_id=M67RWluGdpaQ5DtkSUolKd&code_challenge=%5BREDACTED%5D&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback&state=%5BREDACTED%5D&scope=mcp%3Aconnect&resource=https%3A%2F%2Fmcp.figma.com%2Fmcp
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Scopes in URL: mcp:connect
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Captured scopes from authorization URL: mcp:connect
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Redirection handling is disabled, skipping redirect
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": HTTP Connection failed after 238ms: Unauthorized (code: none, errno: none)
+2026-02-21T07:06:13.251Z [ERROR] MCP server "plugin:figma:figma" Error: Unauthorized
+2026-02-21T07:06:13.251Z [DEBUG] MCP server "plugin:figma:figma": Authentication required for HTTP server
+2026-02-21T07:06:13.377Z [DEBUG] MCP server "claude.ai DevRev": claude.ai proxy connection failed after 272ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoykJ4Pyy4rW9ktdx6"}
+2026-02-21T07:06:13.377Z [ERROR] MCP server "claude.ai DevRev" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoykJ4Pyy4rW9ktdx6"}
+2026-02-21T07:06:13.377Z [DEBUG] MCP server "claude.ai DevRev": Authentication required for claude.ai proxy server
+2026-02-21T07:06:13.393Z [DEBUG] MCP server "claude.ai Day AI": claude.ai proxy connection failed after 285ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoymnDpVuHAinyfaT9"}
+2026-02-21T07:06:13.393Z [ERROR] MCP server "claude.ai Day AI" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoymnDpVuHAinyfaT9"}
+2026-02-21T07:06:13.393Z [DEBUG] MCP server "claude.ai Day AI": Authentication required for claude.ai proxy server
+2026-02-21T07:06:13.727Z [DEBUG] MCP server "claude.ai Slack": claude.ai proxy connection failed after 626ms: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoymHqEeZn1fUivnjV"}
+2026-02-21T07:06:13.727Z [ERROR] MCP server "claude.ai Slack" Error: Streamable HTTP error: Error POSTing to endpoint: {"type":"error","error":{"type":"authentication_error","message":"MCP server requires authentication but no OAuth token is configured."},"request_id":"req_011CYLnoymHqEeZn1fUivnjV"}
+2026-02-21T07:06:13.727Z [DEBUG] MCP server "claude.ai Slack": Authentication required for claude.ai proxy server
+2026-02-21T07:06:13.741Z [DEBUG] AutoUpdater: Detected installation type: npm-global
+2026-02-21T07:06:13.741Z [DEBUG] AutoUpdater: Using global update method
+2026-02-21T07:06:13.759Z [DEBUG] MCP server "claude.ai AWS Marketplace": Successfully connected to claudeai-proxy server in 652ms
+2026-02-21T07:06:13.759Z [DEBUG] MCP server "claude.ai AWS Marketplace": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"AWS Marketplace - Agent mode","version":"1.0.0"}}
+2026-02-21T07:06:13.991Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Successfully connected to claudeai-proxy server in 885ms
+2026-02-21T07:06:13.991Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":true,"serverVersion":{"name":"Three.js Server","version":"1.0.0"}}
+2026-02-21T07:06:14.022Z [DEBUG] MCP server "claude.ai ClickUp": Successfully connected to claudeai-proxy server in 918ms
+2026-02-21T07:06:14.022Z [DEBUG] MCP server "claude.ai ClickUp": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"clickup-mcp-server","version":"1.0.67"}}
+2026-02-21T07:06:14.493Z [DEBUG] MCP server "claude.ai Windsor.ai": Successfully connected to claudeai-proxy server in 1388ms
+2026-02-21T07:06:14.493Z [DEBUG] MCP server "claude.ai Windsor.ai": Connection established with capabilities: {"hasTools":true,"hasPrompts":true,"hasResources":true,"serverVersion":{"name":"Windsor.ai","version":"1.14.0"}}
+2026-02-21T07:06:14.495Z [DEBUG] MCP server "claude.ai Linear": Successfully connected to claudeai-proxy server in 1393ms
+2026-02-21T07:06:14.495Z [DEBUG] MCP server "claude.ai Linear": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"Linear MCP","title":"Linear","icons":[{"src":"https://static.linear.app/integrations/mcp/icon.svg","mimeType":"image/svg+xml"}],"version":"1.0.0","websiteUrl":"https://linear.app"}}
+2026-02-21T07:06:14.929Z [ERROR] MCP server "plugin:context7:context7" Server stderr: WARNING: Using default CLIENT_IP_ENCRYPTION_KEY.
+Context7 Documentation MCP Server v2.1.1 running on stdio
+2026-02-21T07:06:14.929Z [DEBUG] MCP server "plugin:context7:context7": Successfully connected to undefined server in 2121ms
+2026-02-21T07:06:14.929Z [DEBUG] MCP server "plugin:context7:context7": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"Context7","version":"2.1.1"}}
+2026-02-21T07:06:16.855Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771657576855
+2026-02-21T07:06:16.855Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:06:16.856Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T07:06:16.856Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:06:16.856Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771657576855 to C:\Users\ASUS\.claude.json
+2026-02-21T07:06:16.857Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically
+2026-02-21T07:06:21.219Z [DEBUG] [FileIndex] background untracked fetch: 365534 files
+2026-02-21T07:06:21.442Z [DEBUG] [FileIndex] merged 365534 untracked files into JS cache
+2026-02-21T07:10:14.195Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": CLAUDEAI-PROXY connection dropped after 240s uptime
+2026-02-21T07:10:14.195Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection error: Streamable HTTP error: Failed to open SSE stream: Bad Gateway
+2026-02-21T07:10:14.195Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": CLAUDEAI-PROXY connection dropped after 240s uptime
+2026-02-21T07:10:14.195Z [DEBUG] MCP server "claude.ai Three.js 3D Viewer": Connection error: Streamable HTTP error: Failed to open SSE stream: Bad Gateway
+2026-02-21T07:36:13.868Z [DEBUG] AutoUpdater: Detected installation type: npm-global
+2026-02-21T07:36:13.868Z [DEBUG] AutoUpdater: Using global update method
+2026-02-21T07:36:15.412Z [DEBUG] Writing to temp file: C:\Users\ASUS\.claude.json.tmp.564.1771659375412
+2026-02-21T07:36:15.412Z [DEBUG] Preserving file permissions: 100666
+2026-02-21T07:36:15.413Z [DEBUG] Temp file written successfully, size: 13991 bytes
+2026-02-21T07:36:15.413Z [DEBUG] Applied original permissions to temp file
+2026-02-21T07:36:15.413Z [DEBUG] Renaming C:\Users\ASUS\.claude.json.tmp.564.1771659375412 to C:\Users\ASUS\.claude.json
+2026-02-21T07:36:15.415Z [DEBUG] File C:\Users\ASUS\.claude.json written atomically

@@ -1,0 +1,154 @@
+---
+name: growthops-seo-content
+description: >
+  Generate SEO-optimized blog posts, landing pages, and content to drive organic founder
+  traffic. Use when asked to "write blog post", "SEO content", "写文章", "landing page copy",
+  "content marketing", "organic traffic", or any SEO/blog content task.
+tools: Bash
+metadata: {"openclaw":{"emoji":"🔍"}}
+---
+
+# SEO Content Skill
+
+## What You Do
+Generate SEO-optimized blog posts, landing page copy, and content designed to rank for searches founders make when raising funds. Drive organic inbound leads.
+
+## Target Keywords
+
+### Primary (High Intent)
+- "how to pitch investors"
+- "startup pitch video"
+- "how to get investor meetings"
+- "video pitch for investors"
+- "how to fundraise seed round"
+- "investor pitch template"
+- "pitch deck alternative"
+
+### Secondary (Medium Intent)
+- "how to raise seed funding"
+- "startup fundraising tips"
+- "cold email investors"
+- "how to find angel investors"
+- "pitch deck examples"
+- "startup demo day"
+- "VC deal flow"
+
+### Long-Tail (Lower Volume, Higher Conversion)
+- "how to pitch investors in 60 seconds"
+- "video pitch vs pitch deck"
+- "best way to reach investors as first time founder"
+- "how to stand out to VCs"
+- "startup pitch video examples"
+
+## Blog Post Template
+
+Save to `workspace/seo/blog/YYYY-MM-DD-{slug}.md`:
+
+```markdown
+# {SEO Title — Include Primary Keyword}
+
+**Meta Description**: {150-160 chars, include keyword, compelling CTA}
+**Target Keyword**: {primary keyword}
+**Secondary Keywords**: {2-3 related keywords}
+**Word Count Target**: 1200-1800 words
+
+---
+
+## Introduction (100-150 words)
+{Hook with the problem founders face}
+{Why this matters right now}
+{What this article covers — preview value}
+
+## {H2: First Major Point} (200-300 words)
+{Detailed explanation with examples}
+{Include data or stats}
+
+## {H2: Second Major Point} (200-300 words)
+{Actionable advice}
+{Step-by-step if applicable}
+
+## {H2: Third Major Point} (200-300 words)
+{More value}
+{Real examples from PitchTok founders — anonymized if needed}
+
+## {H2: How PitchTok Helps} (100-150 words)
+{Natural mention of PitchTok as solution}
+{Not salesy — informative}
+{Include signup CTA}
+
+## Conclusion (50-100 words)
+{Summary of key points}
+{Final CTA: "Ready to try? Upload your 90-second pitch on PitchTok — free for founders."}
+
+---
+
+## Internal Links
+- {link to related blog post 1}
+- {link to related blog post 2}
+
+## SEO Checklist
+- [ ] Primary keyword in title, H1, first paragraph, and 2-3 H2s
+- [ ] Meta description under 160 chars with keyword
+- [ ] Alt text for all images
+- [ ] Internal links to 2-3 other pages
+- [ ] External links to 1-2 authoritative sources
+- [ ] URL slug matches keyword: /blog/{keyword-slug}
+- [ ] Reading level: Grade 8 or below
+```
+
+## Content Calendar
+
+### Monthly Theme Rotation
+1. **Fundraising Tactics** — pitch tips, investor psychology
+2. **Founder Stories** — case studies, lessons learned
+3. **Market Trends** — what VCs are funding, industry data
+4. **Product Updates** — PitchTok features, success metrics
+
+### Publishing Schedule
+- 2 blog posts per week
+- 1 long-form guide per month (2000+ words, "pillar content")
+- 1 landing page per quarter (new feature or campaign)
+
+## Landing Page Copy
+
+### Template for Campaign Pages
+```markdown
+# HEADLINE: {Big Promise — Include Keyword}
+
+## SUBHEAD: {How PitchTok delivers on that promise}
+
+### SOCIAL PROOF
+"{Quote from founder}" — {Name}, {Company}
+{X} founders uploaded pitches this month.
+
+### HOW IT WORKS
+1. Record a 90-second pitch video
+2. Upload to PitchTok (free, takes 5 min)
+3. Investors discover and swipe on your pitch
+4. Get meeting requests directly
+
+### CTA
+[Upload Your Pitch — Free] {signup_link}
+
+### FAQ
+Q: How long should my video be?
+A: 60-90 seconds. Investors prefer short and compelling.
+
+Q: Is it really free?
+A: Yes, free for founders. Investors pay for access.
+
+Q: What kind of investors are on PitchTok?
+A: {X} active investors across {verticals}.
+```
+
+## Quora & Forum Answers
+
+Find and answer questions related to target keywords:
+- Quora: "How do I pitch investors?"
+- Reddit: r/startups fundraising threads
+- Hacker News: "Ask HN" about fundraising
+
+Answer format:
+1. Provide genuine, valuable advice (80% of answer)
+2. Mention PitchTok naturally as one option (20%)
+3. Never hard sell — be helpful first

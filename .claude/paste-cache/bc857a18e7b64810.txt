@@ -1,0 +1,97 @@
+To create a UI that looks exactly like that generated image, you need to use a technique I call "The 3-Layer Sandwich."
+
+You don't need to generate a single new image. Instead, you build the scene using code (CSS) by stacking the images you already have.
+
+The Solution: The 3-Layer Architecture
+Here is the logic you must use in your code to recreate that specific 3D depth:
+
+Layer 1 (The Backdrop): The Team Photo + Neon Lights.
+
+Layer 2 (The Content): The Big Text ("MASTER YOUR SMASH").
+
+Layer 3 (The Pop-Out): The Transparent Jumper.
+
+Step-by-Step Implementation
+1. Prepare Your Assets Based on the files you uploaded, you have the exact ingredients needed:
+
+Background: badminton-team-sport-racket-badminton...jpg (The team lineup).
+
+Foreground: badminton-smash-racket-clip-art...png (The jumping player with no background).
+
+2. The CSS "Neon" Trick The generated image has cool blue and red beams. We don't need an image for that; we use CSS gradients with a heavy blur.
+
+3. The Code Here is the exact React/Tailwind code to generate that UI. Copy this into your project.
+
+JavaScript
+import React from 'react';
+
+const HeroSection = () => {
+  // Replace these paths with your actual file locations
+  const IMAGES = {
+    bg_team: "/path/to/badminton-team-sport-racket-badminton.jpg",
+    fg_jumper: "/path/to/badminton-smash-racket-clip-art.png",
+  };
+
+  return (
+    <div className="relative w-full h-screen overflow-hidden bg-black flex items-center justify-center">
+      
+      {/* --- LAYER 1: ATMOSPHERE & TEAM --- */}
+      <div className="absolute inset-0 z-0">
+        {/* Neon Lights (CSS Magic) */}
+        <div className="absolute top-0 left-[-10%] w-[40%] h-full bg-blue-600/40 blur-[120px] transform -skew-x-12" />
+        <div className="absolute top-0 right-[-10%] w-[40%] h-full bg-red-600/40 blur-[120px] transform -skew-x-12" />
+        
+        {/* Team Image (Faded) */}
+        <img 
+          src={IMAGES.bg_team} 
+          alt="Team Background"
+          className="w-full h-full object-cover opacity-50 grayscale mix-blend-screen"
+          style={{
+            maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)", 
+            WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)"
+          }}
+        />
+      </div>
+
+      {/* --- LAYER 2: THE TEXT (Sandwiched in the middle) --- */}
+      <div className="relative z-10 text-center transform -translate-y-10">
+        <h1 className="text-7xl md:text-9xl font-black italic tracking-tighter text-white drop-shadow-2xl">
+          MASTER <br />
+          YOUR SMASH
+        </h1>
+        <p className="text-slate-300 mt-4 text-xl font-medium tracking-wide">
+          Empower your daily badminton image for your RallyCoach.
+        </p>
+        <button className="mt-8 px-8 py-3 bg-white text-black font-bold uppercase tracking-wider rounded shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-105 transition-transform">
+          Get Started
+        </button>
+      </div>
+
+      {/* --- LAYER 3: THE POP-OUT PLAYER (On Top) --- */}
+      <div className="absolute bottom-0 right-0 z-20 h-[90%] w-full flex justify-end pointer-events-none">
+        {/* Crucial: This image must be a PNG with a transparent background.
+           We position it to overlap the text slightly for that 3D feel.
+        */}
+        <img 
+          src={IMAGES.fg_jumper} 
+          alt="Jump Smash"
+          className="h-full w-auto object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-float"
+          style={{ marginRight: '-5%' }} // Pull him slightly off-screen for dynamism
+        />
+      </div>
+
+    </div>
+  );
+};
+
+export default HeroSection;
+Why this works:
+z-index is Key: * The Team is z-0 (Back).
+
+The Text is z-10 (Middle).
+
+The Jumper is z-20 (Front). This creates the illusion that the text is behind the jumping player but in front of the team.
+
+mix-blend-screen: This CSS property on the team photo helps it blend with the black background and the neon lights, making it look like a cohesive scene rather than a pasted rectangle.
+
+mask-image: This fades the team photo out at the bottom so it doesn't have a hard edge

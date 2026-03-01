@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Investigate which image URLs are failing in browser",
+    "status": "in_progress",
+    "activeForm": "Investigating failed image URLs"
+  },
+  {
+    "content": "Update rackets.json with all verified working CDN URLs",
+    "status": "pending",
+    "activeForm": "Updating rackets.json with working URLs"
+  },
+  {
+    "content": "Update builder.js with correct verified URLs",
+    "status": "pending",
+    "activeForm": "Updating builder.js"
+  },
+  {
+    "content": "Run validation agents to confirm all images work",
+    "status": "pending",
+    "activeForm": "Running validation agents"
+  },
+  {
+    "content": "Test in browser to verify images display correctly",
+    "status": "pending",
+    "activeForm": "Testing in browser"
+  }
+]

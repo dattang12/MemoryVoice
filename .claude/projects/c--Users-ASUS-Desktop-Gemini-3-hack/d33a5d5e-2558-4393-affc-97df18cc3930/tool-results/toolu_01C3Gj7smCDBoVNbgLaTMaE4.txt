@@ -1,0 +1,184 @@
+     1→import math
+     2→from pose_estimation import extract_pose_from_video, calc_angle
+     3→from gemini_client import generate_coaching_feedback
+     4→
+     5→
+     6→def analyze_video(video_path, language="en"):
+     7→    """
+     8→    Main video analysis pipeline.
+     9→
+    10→    Steps:
+    11→    1. Extract pose data from video
+    12→    2. Detect shot events
+    13→    3. Analyze pose for each shot
+    14→    4. Generate Gemini feedback
+    15→    5. Return structured JSON
+    16→    """
+    17→
+    18→    # Step 1: Extract pose data
+    19→    pose_data, frames = extract_pose_from_video(video_path)
+    20→
+    21→    # Step 2: Detect shots based on wrist movement
+    22→    shot_events = detect_shots(pose_data, frames)
+    23→
+    24→    # Step 3: Analyze each shot for form errors
+    25→    for shot in shot_events:
+    26→        frame_idx = shot["frame"]
+    27→        if pose_data[frame_idx]:
+    28→            shot["pose_errors"] = analyze_shot_pose(
+    29→                pose_data[frame_idx],
+    30→                shot["shot_type"]
+    31→            )
+    32→
+    33→    # Step 4: Prepare summary for Gemini
+    34→    analysis_summary = prepare_summary(shot_events)
+    35→
+    36→    # Step 5: Get Gemini feedback (with language support)
+    37→    feedback = generate_coaching_feedback(analysis_summary, language)
+    38→
+    39→    # Step 6: Build result JSON
+    40→    result = {
+    41→        "shots": shot_events,
+    42→        "gemini_feedback": feedback
+    43→    }
+    44→
+    45→    return result
+    46→
+    47→
+    48→def detect_shots(pose_data, frames):
+    49→    """
+    50→    Detect shot events based on wrist velocity spikes.
+    51→    Returns list of shots with frame index and type.
+    52→    """
+    53→    shot_events = []
+    54→    last_shot_frame = -100
+    55→
+    56→    for i in range(1, len(frames) - 1):
+    57→        if pose_data[i] is None or pose_data[i-1] is None:
+    58→            continue
+    59→
+    60→        shot_detected = False
+    61→
+    62→        # Check right wrist velocity
+    63→        if 'right_wrist' in pose_data[i] and 'right_wrist' in pose_data[i-1]:
+    64→            rw_prev = pose_data[i-1]['right_wrist']
+    65→            rw_curr = pose_data[i]['right_wrist']
+    66→            speed = math.hypot(rw_curr[0] - rw_prev[0], rw_curr[1] - rw_prev[1])
+    67→
+    68→            # Threshold for fast swing (tunable)
+    69→            if speed > 20:
+    70→                shot_detected = True
+    71→
+    72→        # Avoid double-counting shots too close together
+    73→        if shot_detected and i - last_shot_frame > 5:
+    74→            last_shot_frame = i
+    75→
+    76→            # Determine shot type by pose heuristics
+    77→            shot_type = classify_shot_type(pose_data[i])
+    78→
+    79→            shot_events.append({
+    80→                "frame": i,
+    81→                "shot_type": shot_type,
+    82→                "pose_errors": []
+    83→            })
+    84→
+    85→    return shot_events
+    86→
+    87→
+    88→def classify_shot_type(pose):
+    89→    """
+    90→    Classify shot type based on pose heuristics.
+    91→    Very basic logic for MVP.
+    92→    """
+    93→    if not pose:
+    94→        return "Other"
+    95→
+    96→    # Calculate elbow angle
+    97→    right_elbow_angle = calc_angle(
+    98→        pose['right_shoulder'],
+    99→        pose['right_elbow'],
+   100→        pose['right_wrist']
+   101→    )
+   102→
+   103→    # Simple classification rules
+   104→    # If wrist is above shoulder and arm nearly straight
+   105→    if pose['right_wrist'][1] < pose['right_shoulder'][1]:
+   106→        if right_elbow_angle < 160:
+   107→            return "Smash/Clear"
+   108→        else:
+   109→            return "Overhead"
+   110→    # If wrist is below shoulder
+   111→    elif pose['right_wrist'][1] > pose['right_shoulder'][1]:
+   112→        # Check if near hip level (net shot)
+   113→        if 'right_hip' in pose and pose['right_wrist'][1] < pose['right_hip'][1]:
+   114→            return "Net Shot"
+   115→        else:
+   116→            return "Underhand"
+   117→    else:
+   118→        return "Other"
+   119→
+   120→
+   121→def analyze_shot_pose(pose, shot_type):
+   122→    """
+   123→    Compare pose with ideal form and detect errors.
+   124→    Returns list of error messages.
+   125→    """
+   126→    pose_errors = []
+   127→
+   128→    if shot_type == "Smash/Clear":
+   129→        # Check elbow extension
+   130→        angle = calc_angle(
+   131→            pose['right_shoulder'],
+   132→            pose['right_elbow'],
+   133→            pose['right_wrist']
+   134→        )
+   135→        if angle < 170:
+   136→            pose_errors.append(f"Elbow not fully extended (angle ~{int(angle)}°, ideal 170°+)")
+   137→
+   138→        # Check if arm is raised high enough
+   139→        if pose['right_wrist'][1] > pose['right_shoulder'][1]:
+   140→            pose_errors.append("Arm not raised high enough for overhead shot")
+   141→
+   142→    elif shot_type == "Net Shot":
+   143→        # Check knee bend (simple heuristic)
+   144→        if 'right_knee' in pose and 'right_hip' in pose and 'right_ankle' in pose:
+   145→            knee_angle = calc_angle(
+   146→                pose['right_hip'],
+   147→                pose['right_knee'],
+   148→                pose['right_ankle']
+   149→            )
+   150→            if knee_angle > 150:  # Too straight
+   151→                pose_errors.append("Knees not bent enough for lunge (increase knee bend)")
+   152→
+   153→    # General posture checks could be added here
+   154→
+   155→    return pose_errors
+   156→
+   157→
+   158→def prepare_summary(shot_events):
+   159→    """
+   160→    Prepare a text summary of analysis for Gemini prompt.
+   161→    """
+   162→    summary_lines = []
+   163→
+   164→    if not shot_events:
+   165→        summary_lines.append("No clear shots detected in the video.")
+   166→    else:
+   167→        summary_lines.append(f"Detected {len(shot_events)} shot(s):\n")
+   168→
+   169→        for i, shot in enumerate(shot_events, 1):
+   170→            shot_type = shot["shot_type"]
+   171→            errors = shot["pose_errors"]
+   172→
+   173→            if errors:
+   174→                error_text = "; ".join(errors)
+   175→                summary_lines.append(f"{i}. {shot_type} at frame {shot['frame']}: Issues found - {error_text}")
+   176→            else:
+   177→                summary_lines.append(f"{i}. {shot_type} at frame {shot['frame']}: Good form")
+   178→
+   179→    return "\n".join(summary_lines)
+   180→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

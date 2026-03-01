@@ -1,0 +1,663 @@
+'use client';
+
+import { useState, useMemo, useRef, useEffect, useCallback, Component, ReactNode } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment, ContactShadows, Html, Line } from '@react-three/drei';
+import * as THREE from 'three';
+import type { PoseLandmark, MistakeEvent, JointDeviation, FixKeyframe } from '@/lib/types';
+
+// Error boundary to catch R3F errors during HMR
+interface CanvasErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface CanvasErrorBoundaryState {
+  hasError: boolean;
+  errorKey: number;
+}
+
+class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, CanvasErrorBoundaryState> {
+  constructor(props: CanvasErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorKey: 0 };
+  }
+
+  static getDerivedStateFromError(): Partial<CanvasErrorBoundaryState> {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // Log but don't crash - this handles R3F HMR errors
+    console.warn('Canvas error caught (likely HMR):', error.message);
+  }
+
+  componentDidUpdate(_prevProps: CanvasErrorBoundaryProps, prevState: CanvasErrorBoundaryState) {
+    if (this.state.hasError && !prevState.hasError) {
+      // Auto-recover after a brief delay
+      setTimeout(() => {
+        this.setState({ hasError: false, errorKey: this.state.errorKey + 1 });
+      }, 100);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="h-full flex items-center justify-center text-slate-400">
+          <span className="text-sm">Reloading 3D view...</span>
+        </div>
+      );
+    }
+    return <div key={this.state.errorKey}>{this.props.children}</div>;
+  }
+}
+
+// Easing function for smooth animation (ease-out cubic)
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+// MediaPipe skeleton connections - complete body
+const POSE_CONNECTIONS: [number, number][] = [
+  // Head to shoulders (creates neck/head connection)
+  [0, 11], [0, 12], // nose to both shoulders
+
+  // Shoulders
+  [11, 12],
+
+  // Left arm
+  [11, 13], // left shoulder to left elbow
+  [13, 15], // left elbow to left wrist
+
+  // Right arm
+  [12, 14], // right shoulder to right elbow
+  [14, 16], // right elbow to right wrist
+
+  // Torso
+  [11, 23], // left shoulder to left hip
+  [12, 24], // right shoulder to right hip
+
+  // Hips
+  [23, 24],
+
+  // Left leg
+  [23, 25], // left hip to left knee
+  [25, 27], // left knee to left ankle
+
+  // Right leg
+  [24, 26], // right hip to right knee
+  [26, 28], // right knee to right ankle
+
+  // Optional: hands (wrist to index finger tip for visualization)
+  [15, 19], // left wrist to left index
+  [16, 20], // right wrist to right index
+
+  // Optional: feet (ankle to foot index for visualization)
+  [27, 31], // left ankle to left foot index
+  [28, 32], // right ankle to right foot index
+];
+
+// Joint names for tooltips
+const JOINT_NAMES: Record<number, string> = {
+  0: 'Head',
+  11: 'L Shoulder',
+  12: 'R Shoulder',
+  13: 'L Elbow',
+  14: 'R Elbow',
+  15: 'L Wrist',
+  16: 'R Wrist',
+  19: 'L Index',
+  20: 'R Index',
+  23: 'L Hip',
+  24: 'R Hip',
+  25: 'L Knee',
+  26: 'R Knee',
+  27: 'L Ankle',
+  28: 'R Ankle',
+  31: 'L Foot',
+  32: 'R Foot',
+};
+
+interface PoseSandbox3DProps {
+  mistake: MistakeEvent;
+  userPose: PoseLandmark[];
+  correctPose?: PoseLandmark[];
+  fixKeyframes?: FixKeyframe[];
+  onClose?: () => void;
+}
+
+interface JointProps {
+  position: [number, number, number];
+  color: string;
+  size: number;
+  highlighted: boolean;
+  name?: string;
+  deviation?: JointDeviation;
+}
+
+interface BoneProps {
+  start: [number, number, number];
+  end: [number, number, number];
+  color: string;
+  thickness: number;
+}
+
+function Joint({ position, color, size, highlighted, name, deviation }: JointProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
+
+  // Pulsing animation for highlighted joints
+  useFrame((state) => {
+    if (meshRef.current && highlighted) {
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.2;
+      meshRef.current.scale.setScalar(scale);
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh
+        ref={meshRef}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        <sphereGeometry args={[size, 16, 16]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={highlighted ? color : '#000000'}
+          emissiveIntensity={highlighted ? 0.5 : 0}
+        />
+      </mesh>
+      {/* Glow effect for highlighted joints */}
+      {highlighted && (
+        <mesh>
+          <sphereGeometry args={[size * 1.5, 16, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={0.2} />
+        </mesh>
+      )}
+      {/* Tooltip on hover */}
+      {hovered && name && (
+        <Html position={[0, size * 2, 0]} center>
+          <div className="bg-slate-900/90 px-2 py-1 rounded text-xs text-white whitespace-nowrap">
+            {name}
+            {deviation && (
+              <span className={`ml-1 ${
+                deviation.severity === 'error' ? 'text-red-400' :
+                deviation.severity === 'warning' ? 'text-yellow-400' : 'text-green-400'
+              }`}>
+                ({deviation.deviationDeg.toFixed(0)}%)
+              </span>
+            )}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function Bone({ start, end, color, thickness }: BoneProps) {
+  // Use drei's Line component which properly handles updates and renders thick lines
+  const points: [number, number, number][] = [start, end];
+
+  return (
+    <Line
+      points={points}
+      color={color}
+      lineWidth={thickness}
+    />
+  );
+}
+
+// Convert MediaPipe landmarks to 3D positions
+function landmarksTo3D(
+  landmarks: PoseLandmark[],
+  scale: number = 2
+): Map<number, [number, number, number]> {
+  const positions = new Map<number, [number, number, number]>();
+
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i];
+    if (lm && lm.visibility > 0.3) {
+      // Center and scale the pose
+      const x = (lm.x - 0.5) * scale;
+      const y = -(lm.y - 0.5) * scale; // Flip Y for 3D
+      const z = -lm.z * scale;
+      positions.set(i, [x, y, z]);
+    }
+  }
+
+  return positions;
+}
+
+interface SkeletonMeshProps {
+  landmarks: PoseLandmark[];
+  color: string;
+  highlightedJoints: number[];
+  deviations?: JointDeviation[];
+  opacity?: number;
+}
+
+function SkeletonMesh({ landmarks, color, highlightedJoints, deviations = [], opacity = 1 }: SkeletonMeshProps) {
+  const positions = useMemo(() => landmarksTo3D(landmarks), [landmarks]);
+
+  const joints = useMemo(() => {
+    const result: JSX.Element[] = [];
+
+    positions.forEach((pos, idx) => {
+      const isHighlighted = highlightedJoints.includes(idx);
+      const deviation = deviations.find((d) => d.jointIndex === idx);
+
+      let jointColor = color;
+      if (deviation) {
+        if (deviation.severity === 'error') jointColor = '#ef4444';
+        else if (deviation.severity === 'warning') jointColor = '#eab308';
+        else jointColor = '#22c55e';
+      }
+
+      result.push(
+        <Joint
+          key={idx}
+          position={pos}
+          color={jointColor}
+          size={0.04}
+          highlighted={isHighlighted || deviation?.severity === 'error'}
+          name={JOINT_NAMES[idx]}
+          deviation={deviation}
+        />
+      );
+    });
+
+    return result;
+  }, [positions, color, highlightedJoints, deviations]);
+
+  const bones = useMemo(() => {
+    const result: JSX.Element[] = [];
+
+    for (const [startIdx, endIdx] of POSE_CONNECTIONS) {
+      const start = positions.get(startIdx);
+      const end = positions.get(endIdx);
+
+      if (start && end) {
+        const startDev = deviations.find((d) => d.jointIndex === startIdx);
+        const endDev = deviations.find((d) => d.jointIndex === endIdx);
+
+        let boneColor = color;
+        if (startDev?.severity === 'error' || endDev?.severity === 'error') {
+          boneColor = '#ef4444';
+        } else if (startDev?.severity === 'warning' || endDev?.severity === 'warning') {
+          boneColor = '#eab308';
+        }
+
+        result.push(
+          <Bone
+            key={`${startIdx}-${endIdx}`}
+            start={start}
+            end={end}
+            color={boneColor}
+            thickness={2}
+          />
+        );
+      }
+    }
+
+    return result;
+  }, [positions, color, deviations]);
+
+  return (
+    <group>
+      {bones}
+      {joints}
+    </group>
+  );
+}
+
+// Arrow showing correction direction
+interface CorrectionArrowProps {
+  from: [number, number, number];
+  to: [number, number, number];
+}
+
+function CorrectionArrow({ from, to }: CorrectionArrowProps) {
+  const direction = useMemo(() => {
+    const dir = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+    return dir.normalize();
+  }, [from, to]);
+
+  const length = useMemo(() => {
+    return new THREE.Vector3(...from).distanceTo(new THREE.Vector3(...to));
+  }, [from, to]);
+
+  const midpoint = useMemo<[number, number, number]>(() => {
+    return [
+      (from[0] + to[0]) / 2,
+      (from[1] + to[1]) / 2,
+      (from[2] + to[2]) / 2,
+    ];
+  }, [from, to]);
+
+  return (
+    <group position={midpoint}>
+      <arrowHelper args={[direction, new THREE.Vector3(0, 0, 0), length / 2, 0x00a0ff, 0.05, 0.03]} />
+    </group>
+  );
+}
+
+export default function PoseSandbox3D({
+  mistake,
+  userPose,
+  correctPose,
+  fixKeyframes,
+  onClose,
+}: PoseSandbox3DProps) {
+  const [animationProgress, setAnimationProgress] = useState(0);
+  const [showCorrect, setShowCorrect] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const animationRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  // Callback ref to track when container is mounted
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    if (node !== null) {
+      // Small delay to ensure DOM is fully ready for R3F
+      requestAnimationFrame(() => {
+        setCanvasReady(true);
+      });
+    } else {
+      setCanvasReady(false);
+    }
+  }, []);
+
+  // Animation effect with proper cleanup and smooth easing
+  useEffect(() => {
+    if (!isAnimating) return;
+
+    const duration = 2500; // 2.5 seconds for smooth animation
+
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+      }
+
+      const elapsed = timestamp - startTimeRef.current;
+      const linearProgress = Math.min(elapsed / duration, 1);
+      // Apply easing for smooth motion
+      const easedProgress = easeOutCubic(linearProgress);
+
+      setAnimationProgress(easedProgress);
+
+      if (linearProgress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        startTimeRef.current = null;
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      startTimeRef.current = null;
+    };
+  }, [isAnimating]);
+
+  // Start animation handler
+  const handleStartAnimation = useCallback(() => {
+    setAnimationProgress(0);
+    startTimeRef.current = null;
+    setIsAnimating(true);
+  }, []);
+
+  // Calculate deviations between user and correct pose
+  const deviations = useMemo((): JointDeviation[] => {
+    if (!userPose || !correctPose) return [];
+
+    const result: JointDeviation[] = [];
+    const keyJoints = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+
+    for (const idx of keyJoints) {
+      const userJoint = userPose[idx];
+      const correctJoint = correctPose[idx];
+
+      if (userJoint?.visibility > 0.5 && correctJoint?.visibility > 0.5) {
+        const dx = (userJoint.x - correctJoint.x) * 100;
+        const dy = (userJoint.y - correctJoint.y) * 100;
+        const dz = (userJoint.z - correctJoint.z) * 100;
+        const deviation = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        let severity: 'ok' | 'warning' | 'error' = 'ok';
+        if (deviation > 15) severity = 'error';
+        else if (deviation > 8) severity = 'warning';
+
+        result.push({
+          jointIndex: idx,
+          jointName: JOINT_NAMES[idx] || `Joint ${idx}`,
+          deviationDeg: deviation,
+          severity,
+        });
+      }
+    }
+
+    return result;
+  }, [userPose, correctPose]);
+
+  // Interpolated pose for animation
+  const interpolatedPose = useMemo((): PoseLandmark[] => {
+    if (!correctPose || animationProgress === 0) return userPose;
+    if (animationProgress === 1) return correctPose;
+
+    return userPose.map((userLm, idx) => {
+      const correctLm = correctPose[idx];
+      if (!userLm || !correctLm) return userLm;
+
+      return {
+        x: userLm.x + (correctLm.x - userLm.x) * animationProgress,
+        y: userLm.y + (correctLm.y - userLm.y) * animationProgress,
+        z: userLm.z + (correctLm.z - userLm.z) * animationProgress,
+        visibility: userLm.visibility,
+      };
+    });
+  }, [userPose, correctPose, animationProgress]);
+
+  const errorJoints = deviations.filter((d) => d.severity === 'error');
+
+  return (
+    <div className="bg-slate-900 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-slate-700 flex justify-between items-center">
+        <div>
+          <h3 className="font-semibold text-white text-sm">3D Pose View</h3>
+          <p className="text-xs text-slate-400">{mistake.summaryTitle}</p>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* 3D Canvas - Side by side view */}
+      <div ref={containerRefCallback} className="h-[450px] bg-gradient-to-b from-slate-800 to-slate-900">
+        {!canvasReady && (
+          <div className="h-full flex items-center justify-center text-slate-400">
+            <span className="text-sm">Loading 3D view...</span>
+          </div>
+        )}
+        {canvasReady && (
+          <CanvasErrorBoundary>
+            <Canvas camera={{ position: [0, 0.3, 5], fov: 55 }} frameloop="always">
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} />
+            <Environment preset="studio" />
+
+          {/* LEFT SIDE: Wrong/Current pose (Red) - always visible */}
+          <group position={[-0.8, 0, 0]}>
+            <SkeletonMesh
+              landmarks={userPose}
+              color="#ef4444"
+              highlightedJoints={mistake.joints}
+              deviations={deviations}
+            />
+            {/* Label for wrong pose */}
+            <Html position={[0, 1.1, 0]} center>
+              <div className="px-2 py-1 bg-red-500/90 text-white text-xs font-medium rounded whitespace-nowrap">
+                Current Form
+              </div>
+            </Html>
+          </group>
+
+          {/* RIGHT SIDE: Correct/Target pose (Green) - controlled by showCorrect checkbox */}
+          {correctPose && showCorrect && (
+            <group position={[0.8, 0, 0]}>
+              <SkeletonMesh
+                landmarks={correctPose}
+                color="#22c55e"
+                highlightedJoints={[]}
+              />
+              {/* Label for correct pose */}
+              <Html position={[0, 1.1, 0]} center>
+                <div className="px-2 py-1 bg-green-500/90 text-white text-xs font-medium rounded whitespace-nowrap">
+                  Target Form
+                </div>
+              </Html>
+            </group>
+          )}
+
+          {/* CENTER: Animated transition skeleton (shows during animation) */}
+          {isAnimating && (
+            <group position={[0, -0.3, 0.5]}>
+              <SkeletonMesh
+                landmarks={interpolatedPose}
+                color={animationProgress < 0.5 ? '#f59e0b' : '#22c55e'}
+                highlightedJoints={mistake.joints}
+                deviations={[]}
+              />
+              <Html position={[0, 1.2, 0]} center>
+                <div className="px-2 py-1 bg-amber-500/90 text-white text-xs font-medium rounded whitespace-nowrap">
+                  Transition ({Math.round(animationProgress * 100)}%)
+                </div>
+              </Html>
+            </group>
+          )}
+
+          {/* Correction arrows between the two poses - only show when target is visible */}
+          {correctPose && showCorrect && !isAnimating && errorJoints.slice(0, 3).map((dev) => {
+            const userPos = landmarksTo3D(userPose).get(dev.jointIndex);
+            const correctPos = landmarksTo3D(correctPose).get(dev.jointIndex);
+            if (userPos && correctPos) {
+              // Offset positions for the side-by-side view
+              const fromPos: [number, number, number] = [userPos[0] - 0.8, userPos[1], userPos[2]];
+              const toPos: [number, number, number] = [correctPos[0] + 0.8, correctPos[1], correctPos[2]];
+              return (
+                <CorrectionArrow
+                  key={dev.jointIndex}
+                  from={fromPos}
+                  to={toPos}
+                />
+              );
+            }
+            return null;
+          })}
+
+          <ContactShadows
+            position={[0, -1.5, 0]}
+            opacity={0.4}
+            scale={10}
+            blur={2}
+          />
+
+          <OrbitControls
+            enablePan={false}
+            minDistance={2}
+            maxDistance={6}
+          />
+            </Canvas>
+          </CanvasErrorBoundary>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="px-4 py-3 border-t border-slate-700 space-y-3">
+        {/* Animation slider */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-red-400 font-medium w-16">Wrong</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={animationProgress}
+            onChange={(e) => setAnimationProgress(parseFloat(e.target.value))}
+            className="flex-1 accent-cyan-500"
+          />
+          <span className="text-xs text-green-400 font-medium w-16 text-right">Correct</span>
+        </div>
+
+        {/* Toggles and buttons */}
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={showCorrect}
+              onChange={(e) => setShowCorrect(e.target.checked)}
+              className="rounded accent-green-500"
+            />
+            Show target pose
+          </label>
+
+          <button
+            onClick={handleStartAnimation}
+            disabled={isAnimating}
+            className="px-3 py-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+          >
+            {isAnimating ? 'Animating...' : 'Animate Correction'}
+          </button>
+        </div>
+
+        {/* Deviation summary */}
+        {errorJoints.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {errorJoints.map((d) => (
+              <span
+                key={d.jointIndex}
+                className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full"
+              >
+                {d.jointName}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Fix keyframes navigation */}
+      {fixKeyframes && fixKeyframes.length > 0 && (
+        <div className="px-4 py-3 border-t border-slate-700">
+          <p className="text-xs text-slate-400 mb-2">Correction Phases:</p>
+          <div className="flex gap-2">
+            {fixKeyframes.map((kf, idx) => (
+              <button
+                key={idx}
+                className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition-colors"
+                onClick={() => {
+                  // TODO: Jump to this keyframe
+                }}
+              >
+                {kf.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

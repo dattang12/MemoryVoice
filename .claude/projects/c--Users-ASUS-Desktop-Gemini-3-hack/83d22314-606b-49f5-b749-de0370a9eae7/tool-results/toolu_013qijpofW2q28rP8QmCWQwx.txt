@@ -1,0 +1,1015 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+     4→import { useSearchParams } from 'next/navigation';
+     5→import Link from 'next/link';
+     6→import DashboardNav from '@/components/DashboardNav';
+     7→import { supabase, uploadVideo, getVideoUrl } from '@/lib/supabase';
+     8→import type { Session, TrajectoryPoint, StrategyResult } from '@/lib/types';
+     9→
+    10→// PHASE 4: Lazy load 3D component to avoid SSR issues
+    11→const CourtTrajectory3D = lazy(() => import('@/components/CourtTrajectory3D'));
+    12→
+    13→// ============================================
+    14→// Strategy Mode Page
+    15→// ============================================
+    16→
+    17→type StrategyStep = 'select' | 'confirm' | 'processing' | 'results';
+    18→
+    19→interface HistorySession extends Session {
+    20→  thumbnail_url?: string;
+    21→}
+    22→
+    23→function StrategyContent() {
+    24→  const searchParams = useSearchParams();
+    25→  const sessionIdParam = searchParams.get('session');
+    26→
+    27→  // Step state
+    28→  const [step, setStep] = useState<StrategyStep>('select');
+    29→  const [selectedSource, setSelectedSource] = useState<'upload' | 'history' | null>(null);
+    30→
+    31→  // Video/session state
+    32→  const [videoFile, setVideoFile] = useState<File | null>(null);
+    33→  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    34→  const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
+    35→  const [selectedHistorySession, setSelectedHistorySession] = useState<HistorySession | null>(null);
+    36→
+    37→  // History drawer
+    38→  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+    39→  const [historySessions, setHistorySessions] = useState<HistorySession[]>([]);
+    40→  const [loadingHistory, setLoadingHistory] = useState(false);
+    41→
+    42→  // Processing state
+    43→  const [processing, setProcessing] = useState(false);
+    44→  const [processProgress, setProcessProgress] = useState(0);
+    45→  const [error, setError] = useState<string | null>(null);
+    46→
+    47→  // Results state
+    48→  const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
+    49→  const [coachingPoints, setCoachingPoints] = useState<string[]>([]);
+    50→
+    51→  // Refs
+    52→  const fileInputRef = useRef<HTMLInputElement>(null);
+    53→  const videoRef = useRef<HTMLVideoElement>(null);
+    54→
+    55→  // Load from session param
+    56→  useEffect(() => {
+    57→    if (sessionIdParam) {
+    58→      loadSessionFromHistory(sessionIdParam);
+    59→    }
+    60→  }, [sessionIdParam]);
+    61→
+    62→  // Load history sessions
+    63→  const loadHistorySessions = async () => {
+    64→    setLoadingHistory(true);
+    65→    try {
+    66→      const { data: { user } } = await supabase.auth.getUser();
+    67→      if (!user) return;
+    68→
+    69→      const { data, error } = await supabase
+    70→        .from('sessions')
+    71→        .select('*')
+    72→        .eq('user_id', user.id)
+    73→        .in('type', ['analytics', 'practice'])
+    74→        .not('video_url', 'is', null)
+    75→        .order('created_at', { ascending: false })
+    76→        .limit(50);
+    77→
+    78→      if (error) throw error;
+    79→      setHistorySessions(data || []);
+    80→    } catch (err) {
+    81→      console.error('Error loading history:', err);
+    82→    } finally {
+    83→      setLoadingHistory(false);
+    84→    }
+    85→  };
+    86→
+    87→  // Load session from history
+    88→  const loadSessionFromHistory = async (id: string) => {
+    89→    try {
+    90→      const { data, error } = await supabase
+    91→        .from('sessions')
+    92→        .select('*')
+    93→        .eq('id', id)
+    94→        .single();
+    95→
+    96→      if (error) throw error;
+    97→
+    98→      setSelectedHistorySession(data);
+    99→      setSessionId(data.id);
+   100→      setVideoUrl(data.video_url);
+   101→      setSelectedSource('history');
+   102→      setStep('confirm');
+   103→    } catch (err) {
+   104→      console.error('Error loading session:', err);
+   105→      setError('Failed to load session');
+   106→    }
+   107→  };
+   108→
+   109→  // Handle file upload
+   110→  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+   111→    const file = e.target.files?.[0];
+   112→    if (!file) return;
+   113→
+   114→    if (!file.type.startsWith('video/')) {
+   115→      setError('Please select a video file');
+   116→      return;
+   117→    }
+   118→
+   119→    // Max file size 100MB (TUS resumable upload handles large files)
+   120→    if (file.size > 100 * 1024 * 1024) {
+   121→      setError('File size must be less than 100MB. Please compress your video before uploading.');
+   122→      return;
+   123→    }
+   124→
+   125→    setError(null);
+   126→    setVideoFile(file);
+   127→    setVideoUrl(URL.createObjectURL(file));
+   128→    setSelectedSource('upload');
+   129→    setStep('confirm');
+   130→  };
+   131→
+   132→  // Handle history selection
+   133→  const handleHistorySelect = (session: HistorySession) => {
+   134→    setSelectedHistorySession(session);
+   135→    setSessionId(session.id);
+   136→    setVideoUrl(session.video_url || null);
+   137→    setSelectedSource('history');
+   138→    setShowHistoryDrawer(false);
+   139→    setStep('confirm');
+   140→  };
+   141→
+   142→  // Handle confirmation: No
+   143→  const handleConfirmNo = () => {
+   144→    setVideoFile(null);
+   145→    setVideoUrl(null);
+   146→    setSessionId(null);
+   147→    setSelectedHistorySession(null);
+   148→    setSelectedSource(null);
+   149→    setStep('select');
+   150→    setError(null);
+   151→  };
+   152→
+   153→  // Handle confirmation: Yes
+   154→  const handleConfirmYes = async () => {
+   155→    setStep('processing');
+   156→    setProcessing(true);
+   157→    setProcessProgress(0);
+   158→    setError(null);
+   159→
+   160→    try {
+   161→      const { data: { user } } = await supabase.auth.getUser();
+   162→      if (!user) throw new Error('Not authenticated. Please log in again.');
+   163→
+   164→      // If new upload, create session and upload video
+   165→      let currentSessionId = sessionId;
+   166→      let uploadedVideoUrl = videoUrl;
+   167→
+   168→      if (selectedSource === 'upload' && videoFile) {
+   169→        // Upload video with progress tracking
+   170→        // This is critical - do NOT create session if upload fails
+   171→        setProcessProgress(5);
+   172→
+   173→        let videoPath: string | null = null;
+   174→        try {
+   175→          videoPath = await uploadVideo(videoFile, user.id, (progress) => {
+   176→            // Upload progress: 5-25%
+   177→            setProcessProgress(5 + Math.round(progress * 0.2));
+   178→          });
+   179→
+   180→          if (!videoPath) {
+   181→            throw new Error('Upload returned empty path');
+   182→          }
+   183→
+   184→          // Get public URL
+   185→          uploadedVideoUrl = getVideoUrl(videoPath);
+   186→          console.log('Strategy video uploaded:', videoPath);
+   187→
+   188→        } catch (uploadError) {
+   189→          console.error('Strategy video upload failed:', uploadError);
+   190→          const uploadErrorMsg = uploadError instanceof Error
+   191→            ? uploadError.message
+   192→            : 'Failed to upload video. Please try again.';
+   193→          throw new Error(uploadErrorMsg);
+   194→        }
+   195→
+   196→        // Create session only AFTER successful upload
+   197→        setProcessProgress(25);
+   198→        const { data: session, error: sessionError } = await supabase
+   199→          .from('sessions')
+   200→          .insert({
+   201→            user_id: user.id,
+   202→            type: 'strategy',
+   203→            video_path: videoPath,
+   204→            video_url: uploadedVideoUrl,
+   205→            filename: videoFile.name,
+   206→            status: 'processing',
+   207→          })
+   208→          .select()
+   209→          .single();
+   210→
+   211→        if (sessionError) {
+   212→          console.error('Session creation error:', sessionError);
+   213→          throw new Error('Failed to create analysis session');
+   214→        }
+   215→
+   216→        currentSessionId = session.id;
+   217→        setSessionId(session.id);
+   218→      } else if (sessionId) {
+   219→        // Update existing session type to strategy
+   220→        await supabase
+   221→          .from('sessions')
+   222→          .update({ status: 'processing' })
+   223→          .eq('id', sessionId);
+   224→      }
+   225→
+   226→      if (!currentSessionId) throw new Error('No session ID');
+   227→
+   228→      // Generate strategy analysis
+   229→      setProcessProgress(30);
+   230→      const result = await generateStrategyAnalysis(currentSessionId);
+   231→      setProcessProgress(100);
+   232→
+   233→      setStrategyResult(result);
+   234→      setCoachingPoints(result.coaching_points || []);
+   235→
+   236→      // Update session status
+   237→      await supabase
+   238→        .from('sessions')
+   239→        .update({ status: 'ready' })
+   240→        .eq('id', currentSessionId);
+   241→
+   242→      setStep('results');
+   243→    } catch (err) {
+   244→      console.error('Strategy processing error:', err);
+   245→      const errorMessage = err instanceof Error ? err.message : 'Failed to analyze video. Please try again.';
+   246→      setError(errorMessage);
+   247→      setStep('confirm');
+   248→    } finally {
+   249→      setProcessing(false);
+   250→    }
+   251→  };
+   252→
+   253→  // Generate strategy analysis (mock implementation)
+   254→  const generateStrategyAnalysis = async (sessionId: string): Promise<StrategyResult> => {
+   255→    // Simulate processing time
+   256→    for (let i = 30; i <= 90; i += 10) {
+   257→      await new Promise((resolve) => setTimeout(resolve, 500));
+   258→      setProcessProgress(i);
+   259→    }
+   260→
+   261→    // Generate mock trajectory data
+   262→    const originalTrajectory: TrajectoryPoint[] = [];
+   263→    const refinedTrajectory: TrajectoryPoint[] = [];
+   264→
+   265→    // Generate a rally pattern
+   266→    const rallyPoints = 8;
+   267→    for (let i = 0; i < rallyPoints; i++) {
+   268→      const t = i / rallyPoints;
+   269→      const isEven = i % 2 === 0;
+   270→
+   271→      // Original trajectory (player's actual shots)
+   272→      originalTrajectory.push({
+   273→        x: 0.3 + Math.random() * 0.4,
+   274→        y: isEven ? 0.15 + Math.random() * 0.2 : 0.65 + Math.random() * 0.2,
+   275→        timestamp: i * 2,
+   276→        court_x: 0.3 + Math.random() * 0.4,
+   277→        court_y: isEven ? 0.2 : 0.8,
+   278→      });
+   279→
+   280→      // Refined trajectory (optimal shots)
+   281→      refinedTrajectory.push({
+   282→        x: isEven ? 0.7 : 0.3, // More decisive placement
+   283→        y: isEven ? 0.1 : 0.9, // Deeper shots
+   284→        timestamp: i * 2,
+   285→        court_x: isEven ? 0.7 : 0.3,
+   286→        court_y: isEven ? 0.1 : 0.9,
+   287→      });
+   288→    }
+   289→
+   290→    // Generate coaching points
+   291→    const coachingPointsOptions = [
+   292→      'Your shots tend to land mid-court. Push for deeper clears to the back tramlines.',
+   293→      'Good variation in cross-court angles. Consider adding more straight drops to surprise opponents.',
+   294→      'Rally patterns show predictable sequences. Mix up the pace with sudden smashes.',
+   295→      'Effective use of the net area. Maintain the pressure with quicker net exchanges.',
+   296→      'Recovery positioning is slightly late. Focus on split-step timing after each shot.',
+   297→      'Strong defensive clears under pressure. Work on transitioning to attack faster.',
+   298→      'Shot selection in the forecourt is excellent. Add deceptive flicks to your arsenal.',
+   299→      'Backhand shots are going wide. Adjust your grip and follow-through angle.',
+   300→    ];
+   301→
+   302→    const selectedPoints = coachingPointsOptions
+   303→      .sort(() => Math.random() - 0.5)
+   304→      .slice(0, 5 + Math.floor(Math.random() * 2));
+   305→
+   306→    // Save to database
+   307→    const result: StrategyResult = {
+   308→      id: crypto.randomUUID(),
+   309→      session_id: sessionId,
+   310→      original_trajectory: originalTrajectory,
+   311→      refined_trajectory: refinedTrajectory,
+   312→      coaching_points: selectedPoints,
+   313→      created_at: new Date().toISOString(),
+   314→    };
+   315→
+   316→    await supabase.from('strategy_results').insert(result);
+   317→
+   318→    return result;
+   319→  };
+   320→
+   321→  // Format date
+   322→  const formatDate = (dateString: string) => {
+   323→    return new Date(dateString).toLocaleDateString('en-US', {
+   324→      month: 'short',
+   325→      day: 'numeric',
+   326→      hour: '2-digit',
+   327→      minute: '2-digit',
+   328→    });
+   329→  };
+   330→
+   331→  return (
+   332→    <div className="min-h-screen bg-gray-50">
+   333→      <DashboardNav />
+   334→
+   335→      <main className="ml-64 p-8">
+   336→        <div className="max-w-5xl mx-auto">
+   337→          {/* Header */}
+   338→          <div className="mb-8">
+   339→            <h1 className="text-3xl font-bold text-gray-900">Strategy Analysis</h1>
+   340→            <p className="text-gray-600 mt-1">
+   341→              Analyze your rally patterns and get AI-powered tactical insights
+   342→            </p>
+   343→          </div>
+   344→
+   345→          {/* Error display */}
+   346→          {error && (
+   347→            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+   348→              {error}
+   349→              <button
+   350→                onClick={() => setError(null)}
+   351→                className="ml-4 text-red-500 hover:text-red-700"
+   352→              >
+   353→                Dismiss
+   354→              </button>
+   355→            </div>
+   356→          )}
+   357→
+   358→          {/* Step: Select Source */}
+   359→          {step === 'select' && (
+   360→            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+   361→              {/* Upload New */}
+   362→              <button
+   363→                onClick={() => fileInputRef.current?.click()}
+   364→                className="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition text-left group"
+   365→              >
+   366→                <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary-200 transition">
+   367→                  <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   368→                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+   369→                  </svg>
+   370→                </div>
+   371→                <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Video</h3>
+   372→                <p className="text-gray-500">
+   373→                  Upload a new match or rally video for strategy analysis
+   374→                </p>
+   375→                <input
+   376→                  ref={fileInputRef}
+   377→                  type="file"
+   378→                  accept="video/*"
+   379→                  onChange={handleFileSelect}
+   380→                  className="hidden"
+   381→                />
+   382→              </button>
+   383→
+   384→              {/* Choose from History */}
+   385→              <button
+   386→                onClick={() => {
+   387→                  loadHistorySessions();
+   388→                  setShowHistoryDrawer(true);
+   389→                }}
+   390→                className="bg-white rounded-xl p-8 shadow-sm hover:shadow-md transition text-left group"
+   391→              >
+   392→                <div className="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-200 transition">
+   393→                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   394→                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+   395→                  </svg>
+   396→                </div>
+   397→                <h3 className="text-xl font-semibold text-gray-900 mb-2">Choose from History</h3>
+   398→                <p className="text-gray-500">
+   399→                  Select a previously analyzed video from your session history
+   400→                </p>
+   401→              </button>
+   402→            </div>
+   403→          )}
+   404→
+   405→          {/* Step: Confirm Video */}
+   406→          {step === 'confirm' && videoUrl && (
+   407→            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   408→              {/* Video preview */}
+   409→              <div className="bg-gray-900 aspect-video relative">
+   410→                <video
+   411→                  ref={videoRef}
+   412→                  src={videoUrl}
+   413→                  className="w-full h-full object-contain"
+   414→                  controls
+   415→                />
+   416→              </div>
+   417→
+   418→              {/* Confirmation prompt */}
+   419→              <div className="p-6 border-t border-gray-200">
+   420→                <div className="flex items-center justify-between">
+   421→                  <div>
+   422→                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+   423→                      Is this the correct video?
+   424→                    </h3>
+   425→                    <p className="text-gray-500 text-sm">
+   426→                      {selectedSource === 'upload' && videoFile
+   427→                        ? videoFile.name
+   428→                        : selectedHistorySession?.filename || 'Selected video'}
+   429→                      {selectedHistorySession && (
+   430→                        <span className="ml-2 text-gray-400">
+   431→                          from {formatDate(selectedHistorySession.created_at)}
+   432→                        </span>
+   433→                      )}
+   434→                    </p>
+   435→                  </div>
+   436→                  <div className="flex gap-3">
+   437→                    <button
+   438→                      onClick={handleConfirmNo}
+   439→                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+   440→                    >
+   441→                      No, go back
+   442→                    </button>
+   443→                    <button
+   444→                      onClick={handleConfirmYes}
+   445→                      className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+   446→                    >
+   447→                      Yes, analyze
+   448→                    </button>
+   449→                  </div>
+   450→                </div>
+   451→              </div>
+   452→            </div>
+   453→          )}
+   454→
+   455→          {/* Step: Processing */}
+   456→          {step === 'processing' && (
+   457→            <div className="bg-white rounded-xl p-12 shadow-sm text-center">
+   458→              <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+   459→                <svg className="w-10 h-10 text-primary-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   460→                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+   461→                </svg>
+   462→              </div>
+   463→              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+   464→                Analyzing Your Strategy...
+   465→              </h3>
+   466→              <p className="text-gray-500 mb-6">
+   467→                Tracking shuttle trajectories and generating tactical insights
+   468→              </p>
+   469→              <div className="w-64 mx-auto bg-gray-200 rounded-full h-2 mb-2">
+   470→                <div
+   471→                  className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+   472→                  style={{ width: `${processProgress}%` }}
+   473→                />
+   474→              </div>
+   475→              <p className="text-sm text-gray-500">{processProgress}% complete</p>
+   476→            </div>
+   477→          )}
+   478→
+   479→          {/* Step: Results */}
+   480→          {step === 'results' && strategyResult && (
+   481→            <div className="space-y-6">
+   482→              {/* Court Animation */}
+   483→              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   484→                <div className="p-4 border-b border-gray-200">
+   485→                  <h3 className="font-semibold text-gray-900">Rally Trajectory Analysis</h3>
+   486→                  <p className="text-sm text-gray-500">Original shots vs. optimal placement</p>
+   487→                </div>
+   488→                <div className="p-6">
+   489→                  <CourtTrajectoryAnimation
+   490→                    originalTrajectory={strategyResult.original_trajectory}
+   491→                    refinedTrajectory={strategyResult.refined_trajectory}
+   492→                  />
+   493→                </div>
+   494→              </div>
+   495→
+   496→              {/* Coaching Points */}
+   497→              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   498→                <div className="p-4 border-b border-gray-200">
+   499→                  <h3 className="font-semibold text-gray-900">Key Tactical Insights</h3>
+   500→                  <p className="text-sm text-gray-500">{coachingPoints.length} points to improve your game</p>
+   501→                </div>
+   502→                <div className="p-6">
+   503→                  <ul className="space-y-4">
+   504→                    {coachingPoints.map((point, index) => (
+   505→                      <li key={index} className="flex items-start gap-3">
+   506→                        <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">
+   507→                          {index + 1}
+   508→                        </span>
+   509→                        <p className="text-gray-700">{point}</p>
+   510→                      </li>
+   511→                    ))}
+   512→                  </ul>
+   513→                </div>
+   514→              </div>
+   515→
+   516→              {/* Actions */}
+   517→              <div className="flex justify-between">
+   518→                <button
+   519→                  onClick={handleConfirmNo}
+   520→                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+   521→                >
+   522→                  Analyze Another Video
+   523→                </button>
+   524→                <Link
+   525→                  href="/history"
+   526→                  className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition"
+   527→                >
+   528→                  View All Sessions
+   529→                </Link>
+   530→              </div>
+   531→            </div>
+   532→          )}
+   533→
+   534→          {/* History Drawer */}
+   535→          {showHistoryDrawer && (
+   536→            <div className="fixed inset-0 z-50">
+   537→              <div
+   538→                className="absolute inset-0 bg-black/50"
+   539→                onClick={() => setShowHistoryDrawer(false)}
+   540→              />
+   541→              <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl">
+   542→                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+   543→                  <h3 className="font-semibold text-gray-900">Select from History</h3>
+   544→                  <button
+   545→                    onClick={() => setShowHistoryDrawer(false)}
+   546→                    className="p-2 hover:bg-gray-100 rounded-lg"
+   547→                  >
+   548→                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   549→                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+   550→                    </svg>
+   551→                  </button>
+   552→                </div>
+   553→                <div className="overflow-y-auto h-[calc(100vh-72px)]">
+   554→                  {loadingHistory ? (
+   555→                    <div className="p-8 text-center">
+   556→                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4" />
+   557→                      <p className="text-gray-500">Loading sessions...</p>
+   558→                    </div>
+   559→                  ) : historySessions.length === 0 ? (
+   560→                    <div className="p-8 text-center">
+   561→                      <p className="text-gray-500">No sessions with video found.</p>
+   562→                    </div>
+   563→                  ) : (
+   564→                    <div className="p-4 space-y-3">
+   565→                      {historySessions.map((session) => (
+   566→                        <button
+   567→                          key={session.id}
+   568→                          onClick={() => handleHistorySelect(session)}
+   569→                          className="w-full p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition text-left"
+   570→                        >
+   571→                          <div className="flex items-center gap-3">
+   572→                            <div className="w-16 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+   573→                              {session.video_url ? (
+   574→                                <video
+   575→                                  src={session.video_url}
+   576→                                  className="w-full h-full object-cover"
+   577→                                  muted
+   578→                                />
+   579→                              ) : (
+   580→                                <div className="w-full h-full flex items-center justify-center">
+   581→                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   582→                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+   583→                                  </svg>
+   584→                                </div>
+   585→                              )}
+   586→                            </div>
+   587→                            <div className="flex-1 min-w-0">
+   588→                              <p className="font-medium text-gray-900 truncate">
+   589→                                {session.filename || 'Untitled Session'}
+   590→                              </p>
+   591→                              <p className="text-sm text-gray-500">
+   592→                                {formatDate(session.created_at)}
+   593→                              </p>
+   594→                            </div>
+   595→                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   596→                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+   597→                            </svg>
+   598→                          </div>
+   599→                        </button>
+   600→                      ))}
+   601→                    </div>
+   602→                  )}
+   603→                </div>
+   604→              </div>
+   605→            </div>
+   606→          )}
+   607→        </div>
+   608→      </main>
+   609→    </div>
+   610→  );
+   611→}
+   612→
+   613→// ============================================
+   614→// Court Trajectory Animation Component
+   615→// ============================================
+   616→
+   617→interface CourtTrajectoryAnimationProps {
+   618→  originalTrajectory: TrajectoryPoint[];
+   619→  refinedTrajectory: TrajectoryPoint[];
+   620→}
+   621→
+   622→// PHASE 4: Speed options
+   623→const SPEED_OPTIONS = [
+   624→  { value: 0.25, label: '0.25x' },
+   625→  { value: 0.5, label: '0.5x' },
+   626→  { value: 1, label: '1x' },
+   627→  { value: 2, label: '2x' },
+   628→];
+   629→
+   630→function CourtTrajectoryAnimation({
+   631→  originalTrajectory,
+   632→  refinedTrajectory,
+   633→}: CourtTrajectoryAnimationProps) {
+   634→  const canvasRef = useRef<HTMLCanvasElement>(null);
+   635→  const [isPlaying, setIsPlaying] = useState(true);
+   636→  const [showOriginal, setShowOriginal] = useState(true);
+   637→  const [showRefined, setShowRefined] = useState(true);
+   638→  // PHASE 4: Speed control and 3D toggle
+   639→  const [speed, setSpeed] = useState(1);
+   640→  const [show3D, setShow3D] = useState(false);
+   641→  const [progress, setProgress] = useState(0);
+   642→  const animationRef = useRef<number | null>(null);
+   643→  const progressRef = useRef(0);
+   644→
+   645→  useEffect(() => {
+   646→    const canvas = canvasRef.current;
+   647→    if (!canvas) return;
+   648→
+   649→    const ctx = canvas.getContext('2d');
+   650→    if (!ctx) return;
+   651→
+   652→    const width = canvas.width;
+   653→    const height = canvas.height;
+   654→
+   655→    // Court dimensions (scaled)
+   656→    const courtMargin = 40;
+   657→    const courtWidth = width - courtMargin * 2;
+   658→    const courtHeight = height - courtMargin * 2;
+   659→
+   660→    const draw = () => {
+   661→      // Clear
+   662→      ctx.clearRect(0, 0, width, height);
+   663→
+   664→      // Draw court background
+   665→      ctx.fillStyle = '#15803d';
+   666→      ctx.fillRect(courtMargin, courtMargin, courtWidth, courtHeight);
+   667→
+   668→      // Draw court lines
+   669→      ctx.strokeStyle = '#ffffff';
+   670→      ctx.lineWidth = 2;
+   671→
+   672→      // Outer boundary
+   673→      ctx.strokeRect(courtMargin, courtMargin, courtWidth, courtHeight);
+   674→
+   675→      // Center line
+   676→      ctx.beginPath();
+   677→      ctx.moveTo(courtMargin, height / 2);
+   678→      ctx.lineTo(width - courtMargin, height / 2);
+   679→      ctx.stroke();
+   680→
+   681→      // Service lines
+   682→      const serviceLineY1 = courtMargin + courtHeight * 0.22;
+   683→      const serviceLineY2 = courtMargin + courtHeight * 0.78;
+   684→      ctx.beginPath();
+   685→      ctx.moveTo(courtMargin, serviceLineY1);
+   686→      ctx.lineTo(width - courtMargin, serviceLineY1);
+   687→      ctx.moveTo(courtMargin, serviceLineY2);
+   688→      ctx.lineTo(width - courtMargin, serviceLineY2);
+   689→      ctx.stroke();
+   690→
+   691→      // Center service line
+   692→      ctx.beginPath();
+   693→      ctx.moveTo(width / 2, serviceLineY1);
+   694→      ctx.lineTo(width / 2, serviceLineY2);
+   695→      ctx.stroke();
+   696→
+   697→      // Draw trajectories
+   698→      const drawTrajectory = (
+   699→        points: TrajectoryPoint[],
+   700→        color: string,
+   701→        progress: number
+   702→      ) => {
+   703→        const visiblePoints = Math.floor(points.length * progress);
+   704→
+   705→        // Draw lines
+   706→        ctx.strokeStyle = color;
+   707→        ctx.lineWidth = 3;
+   708→        ctx.setLineDash([5, 5]);
+   709→        ctx.beginPath();
+   710→
+   711→        for (let i = 0; i < visiblePoints; i++) {
+   712→          const p = points[i];
+   713→          const x = courtMargin + p.x * courtWidth;
+   714→          const y = courtMargin + p.y * courtHeight;
+   715→
+   716→          if (i === 0) {
+   717→            ctx.moveTo(x, y);
+   718→          } else {
+   719→            ctx.lineTo(x, y);
+   720→          }
+   721→        }
+   722→        ctx.stroke();
+   723→        ctx.setLineDash([]);
+   724→
+   725→        // Draw points
+   726→        for (let i = 0; i < visiblePoints; i++) {
+   727→          const p = points[i];
+   728→          const x = courtMargin + p.x * courtWidth;
+   729→          const y = courtMargin + p.y * courtHeight;
+   730→
+   731→          ctx.fillStyle = color;
+   732→          ctx.beginPath();
+   733→          ctx.arc(x, y, 6, 0, Math.PI * 2);
+   734→          ctx.fill();
+   735→
+   736→          ctx.fillStyle = '#ffffff';
+   737→          ctx.beginPath();
+   738→          ctx.arc(x, y, 3, 0, Math.PI * 2);
+   739→          ctx.fill();
+   740→        }
+   741→      };
+   742→
+   743→      const progress = progressRef.current;
+   744→
+   745→      if (showOriginal && originalTrajectory.length > 0) {
+   746→        drawTrajectory(originalTrajectory, '#ef4444', progress);
+   747→      }
+   748→
+   749→      if (showRefined && refinedTrajectory.length > 0) {
+   750→        drawTrajectory(refinedTrajectory, '#22c55e', progress);
+   751→      }
+   752→
+   753→      // PHASE 4: Animate with speed control
+   754→      if (isPlaying) {
+   755→        progressRef.current += 0.01 * speed;
+   756→        if (progressRef.current > 1) {
+   757→          progressRef.current = 0;
+   758→        }
+   759→        setProgress(progressRef.current);
+   760→      }
+   761→
+   762→      animationRef.current = requestAnimationFrame(draw);
+   763→    };
+   764→
+   765→    draw();
+   766→
+   767→    return () => {
+   768→      if (animationRef.current) {
+   769→        cancelAnimationFrame(animationRef.current);
+   770→      }
+   771→    };
+   772→  }, [originalTrajectory, refinedTrajectory, isPlaying, showOriginal, showRefined, speed]);
+   773→
+   774→  // PHASE 4: Step forward/backward
+   775→  const stepForward = () => {
+   776→    progressRef.current = Math.min(1, progressRef.current + 0.05);
+   777→    setProgress(progressRef.current);
+   778→  };
+   779→
+   780→  const stepBackward = () => {
+   781→    progressRef.current = Math.max(0, progressRef.current - 0.05);
+   782→    setProgress(progressRef.current);
+   783→  };
+   784→
+   785→  const resetAnimation = () => {
+   786→    progressRef.current = 0;
+   787→    setProgress(0);
+   788→  };
+   789→
+   790→  return (
+   791→    <div>
+   792→      {/* PHASE 4: 2D/3D Toggle */}
+   793→      <div className="flex justify-center mb-4">
+   794→        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+   795→          <button
+   796→            onClick={() => setShow3D(false)}
+   797→            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+   798→              !show3D ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+   799→            }`}
+   800→          >
+   801→            2D View
+   802→          </button>
+   803→          <button
+   804→            onClick={() => setShow3D(true)}
+   805→            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+   806→              show3D ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+   807→            }`}
+   808→          >
+   809→            3D View
+   810→          </button>
+   811→        </div>
+   812→      </div>
+   813→
+   814→      {/* PHASE 4: Conditional 2D/3D rendering */}
+   815→      {show3D ? (
+   816→        <Suspense fallback={
+   817→          <div className="w-full h-[500px] bg-gray-900 rounded-lg flex items-center justify-center">
+   818→            <div className="text-white">Loading 3D view...</div>
+   819→          </div>
+   820→        }>
+   821→          <CourtTrajectory3D
+   822→            originalTrajectory={originalTrajectory}
+   823→            refinedTrajectory={refinedTrajectory}
+   824→            showOriginal={showOriginal}
+   825→            showRefined={showRefined}
+   826→            animationProgress={progress}
+   827→            isPlaying={isPlaying}
+   828→          />
+   829→        </Suspense>
+   830→      ) : (
+   831→        <canvas
+   832→          ref={canvasRef}
+   833→          width={500}
+   834→          height={700}
+   835→          className="w-full max-w-md mx-auto rounded-lg"
+   836→        />
+   837→      )}
+   838→
+   839→      {/* PHASE 4: Enhanced Controls */}
+   840→      <div className="mt-4 space-y-3">
+   841→        {/* Play/Pause and Step Controls */}
+   842→        <div className="flex flex-wrap items-center justify-center gap-2">
+   843→          <button
+   844→            onClick={stepBackward}
+   845→            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+   846→            title="Step backward"
+   847→          >
+   848→            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+   849→              <path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" />
+   850→            </svg>
+   851→          </button>
+   852→
+   853→          <button
+   854→            onClick={() => setIsPlaying(!isPlaying)}
+   855→            className="px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg font-medium text-sm flex items-center gap-2"
+   856→          >
+   857→            {isPlaying ? (
+   858→              <>
+   859→                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+   860→                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+   861→                </svg>
+   862→                Pause
+   863→              </>
+   864→            ) : (
+   865→              <>
+   866→                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+   867→                  <path d="M8 5v14l11-7z" />
+   868→                </svg>
+   869→                Play
+   870→              </>
+   871→            )}
+   872→          </button>
+   873→
+   874→          <button
+   875→            onClick={stepForward}
+   876→            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+   877→            title="Step forward"
+   878→          >
+   879→            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+   880→              <path d="M6 18l8.5-6L6 6v12zm2 0V6l6.5 6L8 18zm8-12h2v12h-2V6z" />
+   881→            </svg>
+   882→          </button>
+   883→
+   884→          <button
+   885→            onClick={resetAnimation}
+   886→            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+   887→            title="Reset"
+   888→          >
+   889→            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+   890→              <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
+   891→            </svg>
+   892→          </button>
+   893→        </div>
+   894→
+   895→        {/* PHASE 4: Speed Control */}
+   896→        <div className="flex items-center justify-center gap-2">
+   897→          <span className="text-sm text-gray-500">Speed:</span>
+   898→          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+   899→            {SPEED_OPTIONS.map((option) => (
+   900→              <button
+   901→                key={option.value}
+   902→                onClick={() => setSpeed(option.value)}
+   903→                className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+   904→                  speed === option.value
+   905→                    ? 'bg-white shadow text-gray-900'
+   906→                    : 'text-gray-500 hover:text-gray-700'
+   907→                }`}
+   908→              >
+   909→                {option.label}
+   910→              </button>
+   911→            ))}
+   912→          </div>
+   913→        </div>
+   914→
+   915→        {/* Progress Bar */}
+   916→        <div className="flex items-center gap-2 px-4">
+   917→          <span className="text-xs text-gray-500">{Math.round(progress * 100)}%</span>
+   918→          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+   919→            <div
+   920→              className="h-full bg-primary-500 transition-all duration-100"
+   921→              style={{ width: `${progress * 100}%` }}
+   922→            />
+   923→          </div>
+   924→        </div>
+   925→
+   926→        {/* Trajectory toggles */}
+   927→        <div className="flex items-center justify-center gap-4">
+   928→          <label className="flex items-center gap-2 text-sm">
+   929→            <input
+   930→              type="checkbox"
+   931→              checked={showOriginal}
+   932→              onChange={(e) => setShowOriginal(e.target.checked)}
+   933→              className="rounded"
+   934→            />
+   935→            <span className="flex items-center gap-1">
+   936→              <span className="w-3 h-3 bg-red-500 rounded-full" />
+   937→              Original
+   938→            </span>
+   939→          </label>
+   940→
+   941→          <label className="flex items-center gap-2 text-sm">
+   942→            <input
+   943→              type="checkbox"
+   944→              checked={showRefined}
+   945→              onChange={(e) => setShowRefined(e.target.checked)}
+   946→              className="rounded"
+   947→            />
+   948→            <span className="flex items-center gap-1">
+   949→              <span className="w-3 h-3 bg-green-500 rounded-full" />
+   950→              Optimal
+   951→            </span>
+   952→          </label>
+   953→        </div>
+   954→      </div>
+   955→
+   956→      {/* Legend */}
+   957→      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+   958→        <p className="text-sm text-gray-600">
+   959→          <span className="text-red-500 font-medium">Red trajectory:</span> Your actual shot placements during the rally.
+   960→          <br />
+   961→          <span className="text-green-500 font-medium">Green trajectory:</span> AI-suggested optimal placements for better court coverage.
+   962→          {show3D && (
+   963→            <>
+   964→              <br />
+   965→              <span className="text-gray-500 text-xs mt-2 block">
+   966→                Tip: Drag to rotate, scroll to zoom, right-click to pan in 3D view.
+   967→              </span>
+   968→            </>
+   969→          )}
+   970→        </p>
+   971→      </div>
+   972→    </div>
+   973→  );
+   974→}
+   975→
+   976→// ============================================
+   977→// Loading Component
+   978→// ============================================
+   979→
+   980→function StrategyLoading() {
+   981→  return (
+   982→    <div className="min-h-screen bg-gray-50">
+   983→      <DashboardNav />
+   984→      <main className="ml-64 p-8">
+   985→        <div className="max-w-5xl mx-auto">
+   986→          <div className="animate-pulse">
+   987→            <div className="h-8 bg-gray-200 rounded w-48 mb-4" />
+   988→            <div className="h-4 bg-gray-200 rounded w-96 mb-8" />
+   989→            <div className="grid grid-cols-2 gap-6">
+   990→              <div className="h-48 bg-gray-200 rounded-xl" />
+   991→              <div className="h-48 bg-gray-200 rounded-xl" />
+   992→            </div>
+   993→          </div>
+   994→        </div>
+   995→      </main>
+   996→    </div>
+   997→  );
+   998→}
+   999→
+  1000→// ============================================
+  1001→// Export
+  1002→// ============================================
+  1003→
+  1004→export default function StrategyPage() {
+  1005→  return (
+  1006→    <Suspense fallback={<StrategyLoading />}>
+  1007→      <StrategyContent />
+  1008→    </Suspense>
+  1009→  );
+  1010→}
+  1011→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

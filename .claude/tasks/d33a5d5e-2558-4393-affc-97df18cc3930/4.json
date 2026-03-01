@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Database Schema + Integration",
+  "description": "Add new fields to Supabase schema:\n1. Add skill_score, confidence_percent, level_label to sessions table\n2. Add ghost_pose_sequence or best_rep_window to sessions\n3. Ensure mistake events with proper timestamps are stored\n4. Create migration SQL file",
+  "activeForm": "Updating database schema",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

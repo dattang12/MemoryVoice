@@ -1,0 +1,82 @@
+[
+  {
+    "content": "Create strategy_engine directory and types.ts",
+    "status": "completed",
+    "activeForm": "Creating strategy_engine types"
+  },
+  {
+    "content": "Create constants.ts with court zones and scoring weights",
+    "status": "completed",
+    "activeForm": "Creating constants"
+  },
+  {
+    "content": "Create shot-segmentation.ts",
+    "status": "completed",
+    "activeForm": "Creating shot segmentation"
+  },
+  {
+    "content": "Create rally-state-machine.ts",
+    "status": "completed",
+    "activeForm": "Creating rally state machine"
+  },
+  {
+    "content": "Create feature-extraction.ts",
+    "status": "in_progress",
+    "activeForm": "Creating feature extraction"
+  },
+  {
+    "content": "Create scoring-engine.ts",
+    "status": "pending",
+    "activeForm": "Creating scoring engine"
+  },
+  {
+    "content": "Create recommendation-generator.ts",
+    "status": "pending",
+    "activeForm": "Creating recommendation generator"
+  },
+  {
+    "content": "Create index.ts exports",
+    "status": "pending",
+    "activeForm": "Creating index exports"
+  },
+  {
+    "content": "Update courtSpec.ts with zone helpers",
+    "status": "pending",
+    "activeForm": "Updating courtSpec"
+  },
+  {
+    "content": "Create database migration",
+    "status": "pending",
+    "activeForm": "Creating database migration"
+  },
+  {
+    "content": "Update strategy page UI with new components",
+    "status": "pending",
+    "activeForm": "Updating strategy page UI"
+  },
+  {
+    "content": "Update CourtTrajectory3D for multi-path rendering",
+    "status": "pending",
+    "activeForm": "Updating 3D component"
+  },
+  {
+    "content": "Create unit tests",
+    "status": "pending",
+    "activeForm": "Creating unit tests"
+  },
+  {
+    "content": "Create README documentation",
+    "status": "pending",
+    "activeForm": "Creating README"
+  },
+  {
+    "content": "Verify all features and route connections",
+    "status": "pending",
+    "activeForm": "Verifying features and routes"
+  },
+  {
+    "content": "Debug and test the implementation",
+    "status": "pending",
+    "activeForm": "Debugging implementation"
+  }
+]

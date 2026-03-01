@@ -1,0 +1,130 @@
+---
+name: growthops-comment-monitor
+description: >
+  Monitor and respond to comments across all platforms. Use when asked to "check comments",
+  "reply to comments", "monitor engagement", "回复评论", "评论管理", "comment management",
+  or any comment monitoring task. Generates reply drafts and escalates high-intent leads.
+tools: Bash, Browser
+metadata: {"openclaw":{"emoji":"👁️"}}
+---
+
+# Comment Monitor Skill
+
+## What You Do
+Monitor comments on XHS, LinkedIn, Product Hunt, Twitter, and other platforms. Generate reply drafts, identify high-intent leads from commenters, and escalate hot prospects.
+
+## Monitoring Schedule
+- Check all platforms every 2 hours during active hours (8am-10pm US time)
+- Priority: respond within 30 minutes to high-intent comments
+
+## Comment Classification
+
+### HIGH INTENT (respond immediately, add to leads)
+- "How do I sign up?"
+- "Can you send me the link?"
+- "I'm raising right now"
+- "This is exactly what I need"
+- Asks specific questions about PitchTok features
+- Tags another founder
+
+### MEDIUM INTENT (respond within 2 hours)
+- "Interesting concept"
+- "How does this work?"
+- General positive feedback
+- Asks about pricing/process
+
+### LOW INTENT (respond within 24 hours)
+- Generic comments ("cool", "nice")
+- Unrelated comments
+- Negative/skeptical comments
+
+## Reply Templates
+
+### High Intent — Send Link
+```
+Thanks {name}! Here's the link: {signup_link}
+Takes < 5 min to upload a pitch video. {X} investors
+are actively browsing this week. DM me if you need help!
+```
+
+### Medium Intent — Engage + Soft CTA
+```
+Thanks for the interest, {name}! We're seeing {vertical}
+founders get 3-5x more investor attention with video pitches.
+Happy to share more details — feel free to DM me!
+```
+
+### Low Intent — Acknowledge
+```
+Thanks {name}! 🙏
+```
+
+### Negative/Skeptical — Address Gracefully
+```
+Fair point, {name}. We totally get the skepticism —
+{specific_response_to_concern}. Happy to chat more
+if you're curious about the data behind it.
+```
+
+### Tagged Another Founder — Thank + Welcome
+```
+Thanks for the tag, {tagger}! {tagged_name}, would love
+to have you check it out — {brief_pitch}. Link in bio!
+```
+
+## Platform-Specific Rules
+
+### 小红书
+- Reply in Chinese
+- Use casual tone
+- If commenter says keyword (e.g., "模版", "pitch"), DM them the resource
+- First comment on own posts: add summary + link + CTA
+
+### LinkedIn
+- Professional tone
+- Engage with commenters' content too (reciprocity)
+- Reply to every comment on own posts (algorithm boost)
+
+### Twitter/X
+- Short, punchy replies
+- Use threads for longer responses
+- Quote-tweet high-intent comments (with permission)
+
+### Product Hunt
+- Thank upvoters who comment
+- Answer feature questions in detail
+- Cross-reference with maker profiles for lead scoring
+
+## Lead Escalation
+
+When a high-intent comment is found:
+1. Create a lead entry in `workspace/leads/` using founder-finder format
+2. Score immediately using lead-scorer rules
+3. If HOT: flag for immediate personal outreach
+4. Add to appropriate outreach queue (email, LinkedIn, DM)
+
+## Logging
+
+Save daily comment log to `workspace/comments/YYYY-MM-DD.md`:
+
+```markdown
+# Comment Monitor Log — {Date}
+
+## High Intent (Escalated)
+| Platform | Commenter | Comment | Reply | Lead Created? |
+|----------|-----------|---------|-------|---------------|
+
+## Medium Intent
+| Platform | Commenter | Comment | Reply Draft |
+|----------|-----------|---------|-------------|
+
+## Low Intent
+| Platform | Count | Replied |
+|----------|-------|---------|
+
+## Summary
+- Total comments: {N}
+- High intent: {N}
+- New leads from comments: {N}
+- Reply rate: {%}
+```

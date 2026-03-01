@@ -1,0 +1,5 @@
+Exit code 1
+dir: cannot access '/b': No such file or directory
+dir: cannot access '/s': No such file or directory
+dir: cannot access 'c:\Users\ASUS\Desktop\Gemini 3 hack\backend\*.py': No such file or directory
+dir: cannot access '2': No such file or directory

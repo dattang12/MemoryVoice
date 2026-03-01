@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Feature 1: Ghost Rival Overlay",
+  "description": "Implement ghost skeleton overlay showing \"My Best Rep\" from the same video:\n1. Add best-rep detection in scoring-rules.ts (find highest quality segment)\n2. Create GhostOverlay logic in pose-utils.ts\n3. Add ghost toggle + selector in analytics page\n4. Render dual skeletons (user + ghost) with time sync",
+  "activeForm": "Implementing Ghost Rival Overlay",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

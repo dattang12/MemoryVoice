@@ -1,0 +1,399 @@
+     1→import { GoogleGenAI, Type } from '@google/genai';
+     2→import type { PoseMetrics, AnalysisResultJson, RacketRecommendation, Racket } from './types';
+     3→
+     4→// Initialize Gemini client
+     5→const genAI = new GoogleGenAI({
+     6→  apiKey: process.env.GEMINI_API_KEY!,
+     7→});
+     8→
+     9→// Model names
+    10→const FLASH_MODEL = 'gemini-2.0-flash';
+    11→const PRO_MODEL = 'gemini-2.0-pro-exp-02-05';
+    12→const IMAGE_MODEL = 'gemini-2.0-flash-exp-image-generation';
+    13→
+    14→// Schema for practice tick response
+    15→const tickResponseSchema = {
+    16→  type: Type.OBJECT,
+    17→  properties: {
+    18→    cue: { type: Type.STRING, description: 'Short coaching cue (max 10 words)' },
+    19→    focus_metric: { type: Type.STRING, description: 'The metric to focus on' },
+    20→    is_green: { type: Type.BOOLEAN, description: 'Whether current form is good' },
+    21→  },
+    22→  required: ['cue', 'focus_metric', 'is_green'],
+    23→};
+    24→
+    25→// Schema for analysis result
+    26→const analysisResultSchema = {
+    27→  type: Type.OBJECT,
+    28→  properties: {
+    29→    top_issues: {
+    30→      type: Type.ARRAY,
+    31→      items: {
+    32→        type: Type.OBJECT,
+    33→        properties: {
+    34→          id: { type: Type.STRING },
+    35→          title: { type: Type.STRING },
+    36→          severity: { type: Type.STRING },
+    37→          description: { type: Type.STRING },
+    38→          affected_metrics: { type: Type.ARRAY, items: { type: Type.STRING } },
+    39→        },
+    40→        required: ['id', 'title', 'severity', 'description', 'affected_metrics'],
+    41→      },
+    42→    },
+    43→    drills: {
+    44→      type: Type.ARRAY,
+    45→      items: {
+    46→        type: Type.OBJECT,
+    47→        properties: {
+    48→          id: { type: Type.STRING },
+    49→          name: { type: Type.STRING },
+    50→          description: { type: Type.STRING },
+    51→          duration_minutes: { type: Type.NUMBER },
+    52→          target_metrics: { type: Type.ARRAY, items: { type: Type.STRING } },
+    53→          instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
+    54→        },
+    55→        required: ['id', 'name', 'description', 'duration_minutes', 'target_metrics', 'instructions'],
+    56→      },
+    57→    },
+    58→    technique_summary: { type: Type.STRING },
+    59→    strategy_summary: { type: Type.STRING },
+    60→    training_plan: {
+    61→      type: Type.ARRAY,
+    62→      items: {
+    63→        type: Type.OBJECT,
+    64→        properties: {
+    65→          day: { type: Type.NUMBER },
+    66→          focus: { type: Type.STRING },
+    67→          drills: { type: Type.ARRAY, items: { type: Type.STRING } },
+    68→          duration_minutes: { type: Type.NUMBER },
+    69→        },
+    70→        required: ['day', 'focus', 'drills', 'duration_minutes'],
+    71→      },
+    72→    },
+    73→  },
+    74→  required: ['top_issues', 'drills', 'technique_summary', 'strategy_summary', 'training_plan'],
+    75→};
+    76→
+    77→// Gemini Flash: Live micro-coaching for practice mode
+    78→export async function getCoachingCue(
+    79→  metrics: PoseMetrics,
+    80→  drillContext?: string
+    81→): Promise<{ cue: string; focus_metric: string; is_green: boolean }> {
+    82→  const prompt = `You are a badminton coach giving real-time feedback.
+    83→
+    84→Current player metrics:
+    85→- Elbow angle: ${metrics.elbow_angle.toFixed(1)}° (ideal: 90-120°)
+    86→- Knee angle: ${metrics.knee_angle.toFixed(1)}° (ideal: 120-150°)
+    87→- Stance width (normalized): ${metrics.stance_width_norm.toFixed(2)} (ideal: 0.3-0.5)
+    88→- Shoulder-hip rotation: ${metrics.shoulder_hip_rotation_proxy.toFixed(2)} (ideal: 0.1-0.3)
+    89→
+    90→${drillContext ? `Current drill: ${drillContext}` : ''}
+    91→
+    92→Give ONE short coaching cue (max 10 words). Focus on the metric that needs most improvement.
+    93→Determine if overall form is acceptable (is_green).`;
+    94→
+    95→  try {
+    96→    const response = await genAI.models.generateContent({
+    97→      model: FLASH_MODEL,
+    98→      contents: prompt,
+    99→      config: {
+   100→        responseMimeType: 'application/json',
+   101→        responseSchema: tickResponseSchema,
+   102→        temperature: 0.3,
+   103→        maxOutputTokens: 100,
+   104→      },
+   105→    });
+   106→
+   107→    const result = JSON.parse(response.text || '{}');
+   108→    return {
+   109→      cue: result.cue || 'Keep your form steady',
+   110→      focus_metric: result.focus_metric || 'elbow_angle',
+   111→      is_green: result.is_green ?? false,
+   112→    };
+   113→  } catch (error) {
+   114→    console.error('Gemini Flash error:', error);
+   115→    // Fallback response
+   116→    return {
+   117→      cue: 'Stay focused on your stance',
+   118→      focus_metric: 'stance_width_norm',
+   119→      is_green: metrics.knee_angle >= 120 && metrics.knee_angle <= 150,
+   120→    };
+   121→  }
+   122→}
+   123→
+   124→// Gemini Pro: Detailed video analysis
+   125→export async function analyzeVideo(
+   126→  metricsHistory: PoseMetrics[],
+   127→  videoContext?: string
+   128→): Promise<AnalysisResultJson> {
+   129→  // Calculate average metrics
+   130→  const avgMetrics = metricsHistory.reduce(
+   131→    (acc, m) => ({
+   132→      elbow_angle: acc.elbow_angle + m.elbow_angle / metricsHistory.length,
+   133→      knee_angle: acc.knee_angle + m.knee_angle / metricsHistory.length,
+   134→      stance_width_norm: acc.stance_width_norm + m.stance_width_norm / metricsHistory.length,
+   135→      shoulder_hip_rotation_proxy:
+   136→        acc.shoulder_hip_rotation_proxy + m.shoulder_hip_rotation_proxy / metricsHistory.length,
+   137→    }),
+   138→    { elbow_angle: 0, knee_angle: 0, stance_width_norm: 0, shoulder_hip_rotation_proxy: 0 }
+   139→  );
+   140→
+   141→  const prompt = `You are an expert badminton coach analyzing a player's form from video metrics.
+   142→
+   143→Aggregated metrics from the video analysis:
+   144→- Average elbow angle: ${avgMetrics.elbow_angle.toFixed(1)}° (ideal: 90-120° for clear shots)
+   145→- Average knee angle: ${avgMetrics.knee_angle.toFixed(1)}° (ideal: 120-150° for ready position)
+   146→- Average stance width: ${avgMetrics.stance_width_norm.toFixed(2)} (ideal: 0.3-0.5 shoulder widths)
+   147→- Average rotation proxy: ${avgMetrics.shoulder_hip_rotation_proxy.toFixed(2)} (ideal: 0.1-0.3)
+   148→- Total frames analyzed: ${metricsHistory.length}
+   149→
+   150→${videoContext ? `Video context: ${videoContext}` : ''}
+   151→
+   152→Provide a comprehensive analysis including:
+   153→1. Top 2-3 issues to address (with severity: high/medium/low)
+   154→2. 2-3 specific drills to improve these issues
+   155→3. A technique summary paragraph
+   156→4. A strategy summary paragraph
+   157→5. A 5-day training plan
+   158→
+   159→Be specific, actionable, and encouraging.`;
+   160→
+   161→  try {
+   162→    const response = await genAI.models.generateContent({
+   163→      model: PRO_MODEL,
+   164→      contents: prompt,
+   165→      config: {
+   166→        responseMimeType: 'application/json',
+   167→        responseSchema: analysisResultSchema,
+   168→        temperature: 0.4,
+   169→        maxOutputTokens: 2000,
+   170→      },
+   171→    });
+   172→
+   173→    const result = JSON.parse(response.text || '{}');
+   174→    return result as AnalysisResultJson;
+   175→  } catch (error) {
+   176→    console.error('Gemini Pro error:', error);
+   177→    // Return fallback analysis
+   178→    return getFallbackAnalysis(avgMetrics);
+   179→  }
+   180→}
+   181→
+   182→// Gemini Pro Image: Generate drill visuals (optional)
+   183→export async function generateDrillVisual(
+   184→  drillDescription: string
+   185→): Promise<string | null> {
+   186→  try {
+   187→    const response = await genAI.models.generateContent({
+   188→      model: IMAGE_MODEL,
+   189→      contents: `Generate a simple, clear illustration showing a badminton player performing: ${drillDescription}.
+   190→      Style: Clean line art, instructional diagram, showing proper form and movement arrows.`,
+   191→      config: {
+   192→        responseModalities: ['image', 'text'],
+   193→      },
+   194→    });
+   195→
+   196→    // Check if image was generated
+   197→    if (response.candidates?.[0]?.content?.parts) {
+   198→      for (const part of response.candidates[0].content.parts) {
+   199→        if (part.inlineData?.mimeType?.startsWith('image/')) {
+   200→          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+   201→        }
+   202→      }
+   203→    }
+   204→    return null;
+   205→  } catch (error) {
+   206→    console.error('Gemini Image error:', error);
+   207→    return null;
+   208→  }
+   209→}
+   210→
+   211→// Racket recommendation with Gemini
+   212→export async function getRacketRecommendations(
+   213→  rackets: Racket[],
+   214→  level: string,
+   215→  weaknesses: string[],
+   216→  stylePref?: string
+   217→): Promise<RacketRecommendation[]> {
+   218→  const prompt = `You are a badminton equipment expert helping select rackets.
+   219→
+   220→Player profile:
+   221→- Skill level: ${level}
+   222→- Areas to improve: ${weaknesses.join(', ')}
+   223→- Playing style preference: ${stylePref || 'not specified'}
+   224→
+   225→Available rackets:
+   226→${rackets.map((r, i) => `${i + 1}. ${r.name} (id: "${r.id}") by ${r.brand}
+   227→   - Price: ${r.price_range} (${r.price_band})
+   228→   - For: ${r.skill_level.join(', ')} players
+   229→   - Style: ${r.play_style.join(', ')}
+   230→   - Weight: ${r.weight}, Balance: ${r.balance}, Flex: ${r.flexibility}
+   231→`).join('\n')}
+   232→
+   233→Rank the top 5 rackets for this player. For each, provide the racket "id" exactly as shown, a match_score (0-100), and a brief match_reason (1-2 sentences).
+   234→Return as JSON array: [{"id": "racket-id-here", "match_score": 85, "match_reason": "explanation"}]`;
+   235→
+   236→  try {
+   237→    const response = await genAI.models.generateContent({
+   238→      model: FLASH_MODEL,
+   239→      contents: prompt,
+   240→      config: {
+   241→        responseMimeType: 'application/json',
+   242→        temperature: 0.3,
+   243→        maxOutputTokens: 500,
+   244→      },
+   245→    });
+   246→
+   247→    const rankings = JSON.parse(response.text || '[]');
+   248→
+   249→    // Merge rankings with racket data
+   250→    return rankings.slice(0, 5).map((rank: { id: string; match_score: number; match_reason: string }) => {
+   251→      const racket = rackets.find((r) => r.id === rank.id) || rackets[0];
+   252→      return {
+   253→        ...racket,
+   254→        match_score: rank.match_score || 75,
+   255→        match_reason: rank.match_reason || 'Good all-around choice for your level.',
+   256→      };
+   257→    });
+   258→  } catch (error) {
+   259→    console.error('Gemini ranking error:', error);
+   260→    // Fallback: deterministic ranking
+   261→    return getFallbackRacketRecommendations(rackets, level, stylePref);
+   262→  }
+   263→}
+   264→
+   265→// Fallback analysis when Gemini fails
+   266→function getFallbackAnalysis(avgMetrics: PoseMetrics): AnalysisResultJson {
+   267→  const issues = [];
+   268→  const drills = [];
+   269→
+   270→  if (avgMetrics.elbow_angle < 90 || avgMetrics.elbow_angle > 130) {
+   271→    issues.push({
+   272→      id: 'elbow-1',
+   273→      title: 'Elbow Position Needs Work',
+   274→      severity: 'high' as const,
+   275→      description: 'Your elbow angle during shots is outside the optimal range. This affects power transfer and shot accuracy.',
+   276→      affected_metrics: ['elbow_angle'],
+   277→    });
+   278→    drills.push({
+   279→      id: 'drill-shadow',
+   280→      name: 'Shadow Swing Practice',
+   281→      description: 'Practice your swing motion without a shuttle, focusing on elbow position.',
+   282→      duration_minutes: 10,
+   283→      target_metrics: ['elbow_angle'],
+   284→      instructions: [
+   285→        'Stand in ready position',
+   286→        'Slowly perform overhead clear motion',
+   287→        'Pause at the contact point - check elbow angle',
+   288→        'Repeat 20 times per set',
+   289→      ],
+   290→    });
+   291→  }
+   292→
+   293→  if (avgMetrics.knee_angle < 110 || avgMetrics.knee_angle > 160) {
+   294→    issues.push({
+   295→      id: 'knee-1',
+   296→      title: 'Stance Too Stiff or Too Low',
+   297→      severity: 'medium' as const,
+   298→      description: 'Your knee bend is not optimal for quick movement and explosive shots.',
+   299→      affected_metrics: ['knee_angle'],
+   300→    });
+   301→    drills.push({
+   302→      id: 'drill-footwork',
+   303→      name: 'Ready Position Drill',
+   304→      description: 'Practice maintaining athletic ready position.',
+   305→      duration_minutes: 8,
+   306→      target_metrics: ['knee_angle', 'stance_width_norm'],
+   307→      instructions: [
+   308→        'Start in ready position with slight knee bend',
+   309→        'Partner calls direction, you shuffle',
+   310→        'Return to ready position',
+   311→        'Focus on consistent knee angle',
+   312→      ],
+   313→    });
+   314→  }
+   315→
+   316→  if (issues.length === 0) {
+   317→    issues.push({
+   318→      id: 'general-1',
+   319→      title: 'General Form Refinement',
+   320→      severity: 'low' as const,
+   321→      description: 'Your form is generally good. Focus on consistency and timing.',
+   322→      affected_metrics: ['elbow_angle', 'knee_angle'],
+   323→    });
+   324→  }
+   325→
+   326→  if (drills.length === 0) {
+   327→    drills.push({
+   328→      id: 'drill-rally',
+   329→      name: 'Controlled Rally',
+   330→      description: 'Practice consistent rallies focusing on form.',
+   331→      duration_minutes: 15,
+   332→      target_metrics: ['elbow_angle', 'knee_angle'],
+   333→      instructions: [
+   334→        'Rally with partner using only clears',
+   335→        'Focus on consistent contact point',
+   336→        'Maintain ready position between shots',
+   337→      ],
+   338→    });
+   339→  }
+   340→
+   341→  return {
+   342→    top_issues: issues,
+   343→    drills: drills,
+   344→    technique_summary: 'Based on the video analysis, your overall technique shows room for improvement in body positioning and shot preparation. Focus on maintaining consistent angles throughout your movements.',
+   345→    strategy_summary: 'Work on building a solid foundation before advancing to more complex shots. Consistency should be your primary goal at this stage.',
+   346→    training_plan: [
+   347→      { day: 1, focus: 'Footwork Basics', drills: [drills[0]?.id || 'drill-footwork'], duration_minutes: 30 },
+   348→      { day: 2, focus: 'Swing Mechanics', drills: ['drill-shadow'], duration_minutes: 25 },
+   349→      { day: 3, focus: 'Combined Practice', drills: drills.map((d) => d.id), duration_minutes: 40 },
+   350→      { day: 4, focus: 'Rest & Review', drills: [], duration_minutes: 0 },
+   351→      { day: 5, focus: 'Match Play', drills: ['drill-rally'], duration_minutes: 45 },
+   352→    ],
+   353→  };
+   354→}
+   355→
+   356→// Fallback racket recommendations
+   357→function getFallbackRacketRecommendations(
+   358→  rackets: Racket[],
+   359→  level: string,
+   360→  stylePref?: string
+   361→): RacketRecommendation[] {
+   362→  // Simple scoring based on matching criteria
+   363→  const scored = rackets.map((racket) => {
+   364→    let score = 50;
+   365→
+   366→    // Level match
+   367→    if (racket.skill_level.includes(level)) score += 20;
+   368→
+   369→    // Style match
+   370→    if (stylePref && racket.play_style.includes(stylePref)) score += 15;
+   371→
+   372→    // Beginner-friendly adjustments
+   373→    if (level === 'beginner') {
+   374→      if (racket.flexibility === 'Flexible') score += 10;
+   375→      if (racket.price_band === 'budget') score += 5;
+   376→    }
+   377→
+   378→    // Advanced adjustments
+   379→    if (level === 'advanced') {
+   380→      if (racket.flexibility === 'Stiff') score += 10;
+   381→      if (racket.price_band === 'premium') score += 5;
+   382→    }
+   383→
+   384→    return {
+   385→      ...racket,
+   386→      match_score: Math.min(score, 100),
+   387→      match_reason: `Good match for ${level} players seeking ${stylePref || 'versatile'} play.`,
+   388→    };
+   389→  });
+   390→
+   391→  return scored
+   392→    .sort((a, b) => b.match_score - a.match_score)
+   393→    .slice(0, 5);
+   394→}
+   395→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

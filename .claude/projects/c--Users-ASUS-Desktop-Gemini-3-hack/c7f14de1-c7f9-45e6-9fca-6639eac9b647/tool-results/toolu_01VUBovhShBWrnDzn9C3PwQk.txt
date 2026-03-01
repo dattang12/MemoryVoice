@@ -1,0 +1,113 @@
+     1→-- Supabase Database Setup for Badminton Analyzer
+     2→-- Run these SQL commands in your Supabase SQL Editor
+     3→
+     4→-- 1. Create video_metadata table
+     5→CREATE TABLE IF NOT EXISTS video_metadata (
+     6→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+     7→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+     8→    filename TEXT NOT NULL,
+     9→    file_path TEXT NOT NULL,
+    10→    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    11→    duration INTEGER,
+    12→    file_size INTEGER
+    13→);
+    14→
+    15→-- 2. Create analysis_results table
+    16→CREATE TABLE IF NOT EXISTS analysis_results (
+    17→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    18→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    19→    video_id UUID REFERENCES video_metadata(id) ON DELETE CASCADE,
+    20→    result_json JSONB NOT NULL,
+    21→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    22→    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    23→);
+    24→
+    25→-- 3. Create training_plans table (optional, for future use)
+    26→CREATE TABLE IF NOT EXISTS training_plans (
+    27→    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    28→    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    29→    plan_json JSONB NOT NULL,
+    30→    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    31→);
+    32→
+    33→-- 4. Enable Row Level Security (RLS)
+    34→ALTER TABLE video_metadata ENABLE ROW LEVEL SECURITY;
+    35→ALTER TABLE analysis_results ENABLE ROW LEVEL SECURITY;
+    36→ALTER TABLE training_plans ENABLE ROW LEVEL SECURITY;
+    37→
+    38→-- 5. Create RLS Policies for video_metadata
+    39→CREATE POLICY "Users can view their own videos"
+    40→    ON video_metadata
+    41→    FOR SELECT
+    42→    USING (auth.uid() = user_id);
+    43→
+    44→CREATE POLICY "Users can insert their own videos"
+    45→    ON video_metadata
+    46→    FOR INSERT
+    47→    WITH CHECK (auth.uid() = user_id);
+    48→
+    49→CREATE POLICY "Users can delete their own videos"
+    50→    ON video_metadata
+    51→    FOR DELETE
+    52→    USING (auth.uid() = user_id);
+    53→
+    54→-- 6. Create RLS Policies for analysis_results
+    55→CREATE POLICY "Users can view their own analysis results"
+    56→    ON analysis_results
+    57→    FOR SELECT
+    58→    USING (auth.uid() = user_id);
+    59→
+    60→CREATE POLICY "Users can insert their own analysis results"
+    61→    ON analysis_results
+    62→    FOR INSERT
+    63→    WITH CHECK (auth.uid() = user_id);
+    64→
+    65→CREATE POLICY "Users can update their own analysis results"
+    66→    ON analysis_results
+    67→    FOR UPDATE
+    68→    USING (auth.uid() = user_id);
+    69→
+    70→CREATE POLICY "Users can delete their own analysis results"
+    71→    ON analysis_results
+    72→    FOR DELETE
+    73→    USING (auth.uid() = user_id);
+    74→
+    75→-- 7. Create RLS Policies for training_plans
+    76→CREATE POLICY "Users can view their own training plans"
+    77→    ON training_plans
+    78→    FOR SELECT
+    79→    USING (auth.uid() = user_id);
+    80→
+    81→CREATE POLICY "Users can insert their own training plans"
+    82→    ON training_plans
+    83→    FOR INSERT
+    84→    WITH CHECK (auth.uid() = user_id);
+    85→
+    86→CREATE POLICY "Users can update their own training plans"
+    87→    ON training_plans
+    88→    FOR UPDATE
+    89→    USING (auth.uid() = user_id);
+    90→
+    91→CREATE POLICY "Users can delete their own training plans"
+    92→    ON training_plans
+    93→    FOR DELETE
+    94→    USING (auth.uid() = user_id);
+    95→
+    96→-- 8. Create indexes for better performance
+    97→CREATE INDEX IF NOT EXISTS idx_video_metadata_user_id ON video_metadata(user_id);
+    98→CREATE INDEX IF NOT EXISTS idx_analysis_results_user_id ON analysis_results(user_id);
+    99→CREATE INDEX IF NOT EXISTS idx_analysis_results_video_id ON analysis_results(video_id);
+   100→CREATE INDEX IF NOT EXISTS idx_training_plans_user_id ON training_plans(user_id);
+   101→
+   102→-- Storage Bucket Setup (run separately in Supabase Dashboard or via Storage Settings)
+   103→-- 1. Create a new bucket named "videos"
+   104→-- 2. Set it to private (not public)
+   105→-- 3. Add storage policies:
+   106→--    - Allow authenticated users to upload: bucket_id = 'videos' AND (storage.foldername(name))[1] = auth.uid()::text
+   107→--    - Allow authenticated users to read their own: bucket_id = 'videos' AND (storage.foldername(name))[1] = auth.uid()::text
+   108→--    - Allow authenticated users to delete their own: bucket_id = 'videos' AND (storage.foldername(name))[1] = auth.uid()::text
+   109→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

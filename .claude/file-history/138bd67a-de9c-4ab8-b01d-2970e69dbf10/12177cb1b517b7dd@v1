@@ -1,0 +1,463 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { PoseLandmark, MistakeEvent } from '@/lib/types';
+import { POSE_LANDMARKS } from '@/lib/pose-utils';
+import {
+  drawGhostSkeleton,
+  drawCorrectionSkeleton,
+  drawMotionPath,
+  extractRacketTrajectory,
+  SKELETON_COLORS,
+  type MotionPoint,
+  type RenderOptions,
+} from '@/lib/skeleton-renderer';
+
+// ============================================
+// Types
+// ============================================
+
+interface MovementGuidanceProps {
+  poseHistory: (PoseLandmark[] | null)[];
+  currentMistake?: MistakeEvent | null;
+  width?: number;
+  height?: number;
+  showTrajectory?: boolean;
+  showCorrection?: boolean;
+}
+
+interface CorrectionKeyframe {
+  wrong: PoseLandmark[];
+  correct: PoseLandmark[];
+  label: string;
+  description: string;
+}
+
+// ============================================
+// Correction Pose Templates
+// ============================================
+
+/**
+ * TASK 3: Generate exaggerated correction poses for clear visualization
+ * Correction deltas increased 3-5x from original for visibility
+ */
+function generateCorrectionPoses(
+  currentPose: PoseLandmark[] | null,
+  mistakeType: string
+): CorrectionKeyframe | null {
+  if (!currentPose) return null;
+
+  // Clone the current pose
+  const wrongPose = currentPose.map(lm => ({ ...lm }));
+  const correctPose = currentPose.map(lm => ({ ...lm }));
+
+  // TASK 3: Exaggeration factor - makes corrections 3-5x more visible
+  const EXAGGERATE = 3.5;
+
+  switch (mistakeType) {
+    case 'OVERHEAD_CONTACT_LOW':
+      // Correct: raise wrist and elbow DRAMATICALLY higher
+      if (correctPose[POSE_LANDMARKS.RIGHT_WRIST]) {
+        correctPose[POSE_LANDMARKS.RIGHT_WRIST].y -= 0.08 * EXAGGERATE; // ~28% up
+        correctPose[POSE_LANDMARKS.RIGHT_WRIST].x += 0.02 * EXAGGERATE; // Slight outward
+      }
+      if (correctPose[POSE_LANDMARKS.RIGHT_ELBOW]) {
+        correctPose[POSE_LANDMARKS.RIGHT_ELBOW].y -= 0.05 * EXAGGERATE; // ~17% up
+      }
+      // Also raise shoulder slightly for full arm extension visual
+      if (correctPose[POSE_LANDMARKS.RIGHT_SHOULDER]) {
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].y -= 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'Raise Contact Point',
+        description: 'Hit at the HIGHEST point above your head - fully extend!',
+      };
+
+    case 'ELBOW_TOO_BENT':
+      // Correct: extend elbow FULLY
+      if (correctPose[POSE_LANDMARKS.RIGHT_ELBOW] && correctPose[POSE_LANDMARKS.RIGHT_WRIST]) {
+        const elbow = correctPose[POSE_LANDMARKS.RIGHT_ELBOW];
+        const wrist = correctPose[POSE_LANDMARKS.RIGHT_WRIST];
+        // Move wrist outward dramatically to show full extension
+        const dx = wrist.x - elbow.x;
+        const dy = wrist.y - elbow.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len > 0) {
+          // Extend arm by 60% (was 30%)
+          wrist.x = elbow.x + (dx / len) * (len * 1.6);
+          wrist.y = elbow.y + (dy / len) * (len * 1.6);
+        }
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'EXTEND Elbow Fully',
+        description: 'Arm should be almost straight at contact - maximum power!',
+      };
+
+    case 'INSUFFICIENT_ROTATION':
+      // Correct: rotate shoulders DRAMATICALLY more
+      if (correctPose[POSE_LANDMARKS.LEFT_SHOULDER] && correctPose[POSE_LANDMARKS.RIGHT_SHOULDER]) {
+        correctPose[POSE_LANDMARKS.LEFT_SHOULDER].x -= 0.03 * EXAGGERATE; // Pull back
+        correctPose[POSE_LANDMARKS.LEFT_SHOULDER].y += 0.02 * EXAGGERATE; // Drop slightly
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].x += 0.06 * EXAGGERATE; // Push forward
+        correctPose[POSE_LANDMARKS.RIGHT_SHOULDER].y -= 0.03 * EXAGGERATE; // Raise
+      }
+      // Also rotate hips
+      if (correctPose[POSE_LANDMARKS.LEFT_HIP] && correctPose[POSE_LANDMARKS.RIGHT_HIP]) {
+        correctPose[POSE_LANDMARKS.LEFT_HIP].x -= 0.02 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_HIP].x += 0.03 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'ROTATE Through Shot',
+        description: 'Turn your whole body - hips THEN shoulders for maximum power!',
+      };
+
+    case 'STANCE_TOO_NARROW':
+      // Correct: widen stance DRAMATICALLY
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x -= 0.06 * EXAGGERATE; // ~21% wider
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x += 0.06 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].x -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].x += 0.04 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'WIDEN Your Stance',
+        description: 'Feet shoulder-width apart or wider - stable athletic position!',
+      };
+
+    case 'STANCE_TOO_WIDE':
+      // Correct: narrow stance
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x += 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].x += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].x -= 0.03 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'NARROW Your Stance',
+        description: 'Bring feet closer together for quicker movement!',
+      };
+
+    case 'POOR_LUNGE_RECOVERY':
+      // Correct: show EXPLOSIVE recovery position
+      if (correctPose[POSE_LANDMARKS.RIGHT_KNEE] && correctPose[POSE_LANDMARKS.RIGHT_HIP]) {
+        const knee = correctPose[POSE_LANDMARKS.RIGHT_KNEE];
+        const hip = correctPose[POSE_LANDMARKS.RIGHT_HIP];
+        // Dramatic straightening - show almost standing
+        knee.y = hip.y + (knee.y - hip.y) * 0.4; // Much straighter (was 0.7)
+        knee.x = hip.x + (knee.x - hip.x) * 0.5; // Pull back toward center
+      }
+      // Also show rear leg pushing
+      if (correctPose[POSE_LANDMARKS.LEFT_KNEE] && correctPose[POSE_LANDMARKS.LEFT_ANKLE]) {
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].y -= 0.04 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].y -= 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'EXPLOSIVE Recovery',
+        description: 'Push off HARD from front foot - spring back to center!',
+      };
+
+    case 'LATE_SPLIT_STEP':
+      // Correct: show proper split-step position
+      if (correctPose[POSE_LANDMARKS.LEFT_ANKLE] && correctPose[POSE_LANDMARKS.RIGHT_ANKLE]) {
+        // Wider, athletic stance
+        correctPose[POSE_LANDMARKS.LEFT_ANKLE].x -= 0.05 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_ANKLE].x += 0.05 * EXAGGERATE;
+        // Lower center of gravity
+        correctPose[POSE_LANDMARKS.LEFT_KNEE].y += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_KNEE].y += 0.03 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.LEFT_HIP].y += 0.02 * EXAGGERATE;
+        correctPose[POSE_LANDMARKS.RIGHT_HIP].y += 0.02 * EXAGGERATE;
+      }
+      return {
+        wrong: wrongPose,
+        correct: correctPose,
+        label: 'LAND Ready',
+        description: 'Land with feet apart, knees bent - ready to explode any direction!',
+      };
+
+    default:
+      return null;
+  }
+}
+
+// ============================================
+// Main Component
+// ============================================
+
+export default function MovementGuidance({
+  poseHistory,
+  currentMistake,
+  width = 320,
+  height = 280,
+  showTrajectory = true,
+  showCorrection = true,
+}: MovementGuidanceProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const [interpolation, setInterpolation] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+
+  // Get current pose from history
+  const currentPose = useMemo(() => {
+    const validPoses = poseHistory.filter(p => p !== null);
+    return validPoses.length > 0 ? validPoses[Math.floor(validPoses.length / 2)] : null;
+  }, [poseHistory]);
+
+  // Generate correction poses based on mistake type
+  const correctionKeyframe = useMemo(() => {
+    if (!currentMistake || !currentPose) return null;
+    return generateCorrectionPoses(currentPose, currentMistake.type);
+  }, [currentMistake, currentPose]);
+
+  // Extract trajectory for motion path visualization
+  const trajectoryPoints = useMemo((): MotionPoint[] => {
+    if (!showTrajectory || poseHistory.length < 5) return [];
+
+    // Get racket hand trajectory from recent frames
+    const startFrame = Math.max(0, poseHistory.length - 30);
+    return extractRacketTrajectory(poseHistory, startFrame, poseHistory.length - 1);
+  }, [poseHistory, showTrajectory]);
+
+  // Animation loop
+  useEffect(() => {
+    if (!isAnimating || !showCorrection || !correctionKeyframe) return;
+
+    const duration = 2500; // 2.5 seconds per cycle
+    let startTime: number | null = null;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = (elapsed % duration) / duration;
+
+      // Smooth ping-pong: 0 -> 1 -> 0
+      const pingPong = progress < 0.5
+        ? progress * 2
+        : 2 - progress * 2;
+
+      // Apply easing
+      const eased = 0.5 - Math.cos(pingPong * Math.PI) / 2;
+
+      setInterpolation(eased);
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isAnimating, showCorrection, correctionKeyframe]);
+
+  // Render canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas with gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#1e293b'); // Slate-800
+    gradient.addColorStop(1, '#0f172a'); // Slate-900
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Add subtle grid pattern
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+    ctx.lineWidth = 1;
+    const gridSize = 20;
+    for (let x = 0; x < width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    const renderOptions: RenderOptions = {
+      offsetX: 20,
+      offsetY: 20,
+      renderWidth: width - 40,
+      renderHeight: height - 60,
+    };
+
+    // Draw motion trajectory if enabled
+    if (showTrajectory && trajectoryPoints.length > 2) {
+      drawMotionPath(ctx, trajectoryPoints, renderOptions, 'Racket Path');
+    }
+
+    // Draw correction animation if enabled
+    if (showCorrection && correctionKeyframe) {
+      drawCorrectionSkeleton(
+        ctx,
+        correctionKeyframe.wrong,
+        correctionKeyframe.correct,
+        interpolation,
+        currentMistake?.joints || [],
+        renderOptions
+      );
+    } else if (currentPose) {
+      // Just draw the current pose with ghost effect
+      drawGhostSkeleton(ctx, currentPose, renderOptions, interpolation);
+    }
+
+    // Draw legend at bottom
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+
+    if (correctionKeyframe) {
+      // Phase indicator
+      const phaseText = interpolation < 0.3 ? 'Current Form' : interpolation > 0.7 ? 'Target Form' : 'Correcting...';
+      const phaseColor = interpolation < 0.3 ? SKELETON_COLORS.correction.wrong : interpolation > 0.7 ? SKELETON_COLORS.correction.right : SKELETON_COLORS.correction.arrow;
+      ctx.fillStyle = phaseColor;
+      ctx.fillText(phaseText, width / 2, height - 8);
+    }
+  }, [width, height, trajectoryPoints, correctionKeyframe, interpolation, showTrajectory, showCorrection, currentPose, currentMistake]);
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-slate-900 shadow-xl" style={{ width }}>
+      {/* Header */}
+      {correctionKeyframe && (
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-white">{correctionKeyframe.label}</h4>
+              <p className="text-xs text-slate-400 mt-0.5">{correctionKeyframe.description}</p>
+            </div>
+            <button
+              onClick={() => setIsAnimating(!isAnimating)}
+              className="p-2 hover:bg-slate-700/50 rounded-lg transition"
+            >
+              {isAnimating ? (
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Canvas */}
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className="w-full"
+      />
+
+      {/* Legend */}
+      <div className="px-4 py-3 bg-slate-800/50 border-t border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs">
+          {showCorrection && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SKELETON_COLORS.correction.wrong }} />
+                <span className="text-slate-400">Current</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SKELETON_COLORS.correction.right }} />
+                <span className="text-slate-400">Target</span>
+              </div>
+            </>
+          )}
+          {showTrajectory && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-2 rounded" style={{ background: `linear-gradient(90deg, ${SKELETON_COLORS.trail.start}, ${SKELETON_COLORS.trail.end})` }} />
+              <span className="text-slate-400">Speed</span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress indicator */}
+        {showCorrection && correctionKeyframe && (
+          <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full transition-all duration-75"
+              style={{
+                width: `${interpolation * 100}%`,
+                backgroundColor: interpolation < 0.5 ? SKELETON_COLORS.correction.wrong : SKELETON_COLORS.correction.right,
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Compact Trajectory Preview
+// ============================================
+
+export function TrajectoryPreview({
+  poseHistory,
+  width = 120,
+  height = 80,
+}: {
+  poseHistory: (PoseLandmark[] | null)[];
+  width?: number;
+  height?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || poseHistory.length < 5) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear with dark background
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, width, height);
+
+    // Extract and draw trajectory
+    const startFrame = Math.max(0, poseHistory.length - 20);
+    const points = extractRacketTrajectory(poseHistory, startFrame, poseHistory.length - 1);
+
+    if (points.length > 2) {
+      drawMotionPath(ctx, points, {
+        offsetX: 5,
+        offsetY: 5,
+        renderWidth: width - 10,
+        renderHeight: height - 10,
+      });
+    }
+  }, [poseHistory, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className="rounded-lg"
+    />
+  );
+}

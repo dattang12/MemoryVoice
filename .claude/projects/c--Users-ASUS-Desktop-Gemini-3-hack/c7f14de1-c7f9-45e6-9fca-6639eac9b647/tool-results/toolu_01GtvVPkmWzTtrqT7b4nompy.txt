@@ -1,0 +1,110 @@
+     1→import os
+     2→import requests
+     3→import json
+     4→from dotenv import load_dotenv
+     5→
+     6→load_dotenv()
+     7→
+     8→def generate_coaching_feedback(analysis_summary, user_lang="en"):
+     9→    """
+    10→    Call Gemini 3 API to generate coaching feedback.
+    11→
+    12→    Args:
+    13→        analysis_summary: Text summary of shot analysis
+    14→        user_lang: User's preferred language ("en" or "zh")
+    15→
+    16→    Returns:
+    17→        Structured feedback from Gemini
+    18→    """
+    19→    api_key = os.getenv("GEMINI_API_KEY")
+    20→
+    21→    if not api_key or api_key == "your-gemini-api-key-here":
+    22→        return {
+    23→            "technique": "Please configure your Gemini API key to get AI-generated feedback.",
+    24→            "strategy": "Set GEMINI_API_KEY in your .env file.",
+    25→            "training_plan": ["Configure API key", "Upload video", "Get real feedback"]
+    26→        }
+    27→
+    28→    prompt = f"""
+    29→You are a professional badminton coach. Analyze the following performance data and provide coaching feedback.
+    30→
+    31→{analysis_summary}
+    32→
+    33→Provide feedback in the following format:
+    34→
+    35→Technique: <Explain what the player can improve in their form, focusing on specific issues found>
+    36→
+    37→Strategy: <Suggest in-game strategy improvements based on shot patterns>
+    38→
+    39→Training Plan:
+    40→- <Drill 1 to address weaknesses>
+    41→- <Drill 2 to address weaknesses>
+    42→- <Drill 3 to address weaknesses>
+    43→
+    44→Respond in {'Chinese' if user_lang.startswith('zh') else 'English'}.
+    45→"""
+    46→
+    47→    GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+    48→    headers = { "Content-Type": "application/json" }
+    49→    payload = {
+    50→        "contents": [{"parts": [{"text": prompt}]}]
+    51→    }
+    52→
+    53→    try:
+    54→        response = requests.post(
+    55→            f"{GEMINI_API_URL}?key={api_key}",
+    56→            headers=headers,
+    57→            data=json.dumps(payload)
+    58→        )
+    59→
+    60→        if response.status_code != 200:
+    61→            raise Exception(f"Gemini API Error {response.status_code}: {response.text}")
+    62→
+    63→        output_text = response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    64→        feedback = parse_feedback(output_text)
+    65→        return feedback
+    66→
+    67→    except Exception as e:
+    68→        print(f"Error calling Gemini API: {e}")
+    69→        return {
+    70→            "technique": f"Error generating feedback: {str(e)}",
+    71→            "strategy": "Please check your API key and try again.",
+    72→            "training_plan": ["Check API configuration", "Retry analysis"]
+    73→        }
+    74→
+    75→
+    76→def parse_feedback(output_text):
+    77→    """Parse Gemini output into structured feedback."""
+    78→    feedback = {
+    79→        "technique": "",
+    80→        "strategy": "",
+    81→        "training_plan": []
+    82→    }
+    83→
+    84→    lines = output_text.split('\n')
+    85→    current_section = None
+    86→
+    87→    for line in lines:
+    88→        line_lower = line.lower().strip()
+    89→
+    90→        if line_lower.startswith("technique:"):
+    91→            current_section = "technique"
+    92→            feedback["technique"] = line.split(":", 1)[1].strip()
+    93→        elif line_lower.startswith("strategy:"):
+    94→            current_section = "strategy"
+    95→            feedback["strategy"] = line.split(":", 1)[1].strip()
+    96→        elif line_lower.startswith("training plan"):
+    97→            current_section = "training_plan"
+    98→        elif current_section == "training_plan" and line.strip().startswith("-"):
+    99→            feedback["training_plan"].append(line.strip().lstrip("-").strip())
+   100→        elif current_section and line.strip() and not line.strip().startswith("#"):
+   101→            if current_section != "training_plan":
+   102→                feedback[current_section] += " " + line.strip()
+   103→
+   104→    return feedback
+   105→
+   106→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>

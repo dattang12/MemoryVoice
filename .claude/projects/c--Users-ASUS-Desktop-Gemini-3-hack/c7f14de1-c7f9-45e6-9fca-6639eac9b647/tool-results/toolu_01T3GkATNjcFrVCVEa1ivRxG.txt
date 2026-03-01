@@ -1,0 +1,22 @@
+total 783
+drwxr-xr-x 1 ASUS 197609      0  1月 21 21:25 .
+drwxr-xr-x 1 ASUS 197609      0  1月 18 23:12 ..
+-rw-r--r-- 1 ASUS 197609    225  1月 25 17:33 .env.example
+-rw-r--r-- 1 ASUS 197609    363  1月 17 23:45 .env.local
+-rw-r--r-- 1 ASUS 197609    106  1月 19 14:40 .eslintrc.json
+-rw-r--r-- 1 ASUS 197609    385  1月 17 23:03 .gitignore
+drwxr-xr-x 1 ASUS 197609      0  1月 25 22:16 .next
+drwxr-xr-x 1 ASUS 197609      0  1月 21 21:41 docs
+-rw-r--r-- 1 ASUS 197609    543  1月 17 14:32 next.config.js
+-rw-r--r-- 1 ASUS 197609    206  1月 17 23:03 next-env.d.ts
+drwxr-xr-x 1 ASUS 197609      0  1月 25 17:19 node_modules
+-rw-r--r-- 1 ASUS 197609    981  1月 25 17:17 package.json
+-rw-r--r-- 1 ASUS 197609 320501  1月 25 17:17 package-lock.json
+-rw-r--r-- 1 ASUS 197609     83  1月 17 14:32 postcss.config.js
+drwxr-xr-x 1 ASUS 197609      0  1月 19 15:06 public
+-rw-r--r-- 1 ASUS 197609   2921  1月 17 23:05 README.md
+drwxr-xr-x 1 ASUS 197609      0  1月 17 14:39 src
+drwxr-xr-x 1 ASUS 197609      0  1月 25 17:08 supabase
+-rw-r--r-- 1 ASUS 197609    727  1月 17 14:32 tailwind.config.ts
+-rw-r--r-- 1 ASUS 197609    578  1月 17 14:32 tsconfig.json
+-rw-r--r-- 1 ASUS 197609 266725  1月 25 22:13 tsconfig.tsbuildinfo

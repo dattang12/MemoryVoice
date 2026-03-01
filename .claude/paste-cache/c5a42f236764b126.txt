@@ -1,0 +1,27 @@
+Graph successfully started running.
+hot-reloader-client.js:187 [Fast Refresh] rebuilding
+hot-reloader-client.js:44 [Fast Refresh] done in 69ms
+hot-reloader-client.js:44 [Fast Refresh] done in 447ms
+hot-reloader-client.js:44 [Fast Refresh] done in 1368ms
+page.tsx:1319 [V5] Attempting backend YOLO+ByteTrack tracking...
+page.tsx:1323 [V5] Backend tracking available: Object
+vision_wasm_internal.js:1 W0202 01:30:36.356999 2225904 landmark_projection_calculator.cc:81] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+custom_dbg @ vision_wasm_internal.js:1
+custom_emscripten_dbgn @ vision_wasm_internal.js:1
+$func15150 @ vision_wasm_internal.wasm:0x82dfd4
+$func6640 @ vision_wasm_internal.wasm:0x44de41
+$func233 @ vision_wasm_internal.wasm:0xee4f
+$func14365 @ vision_wasm_internal.wasm:0x79ecc5
+$func14423 @ vision_wasm_internal.wasm:0x7a7e8c
+$func13885 @ vision_wasm_internal.wasm:0x7509dc
+$func11943 @ vision_wasm_internal.wasm:0x680caf
+$func3483 @ vision_wasm_internal.wasm:0x1b7da7
+$func3635 @ vision_wasm_internal.wasm:0x1d2db1
+$df @ vision_wasm_internal.wasm:0x4de9d8
+finishProcessing @ vision_bundle.mjs:24
+finishProcessing @ vision_bundle.mjs:24
+Ka @ vision_bundle.mjs:24
+$a @ vision_bundle.mjs:24
+F @ vision_bundle.mjs:24
+processVideoWithPose @ page.tsx:636Understand this warning
+subject-lock.ts:358 Subject lock confirmed at frame 2

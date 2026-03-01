@@ -1,0 +1,8 @@
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/analysis.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/gemini_client.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/main.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/pose_estimation.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/shuttlecock_tracking.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/test_setup.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/video_annotator.py
+/c/Users/ASUS/Desktop/Gemini 3 hack/backend/video_processing.py

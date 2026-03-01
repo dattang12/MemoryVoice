@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Add skeleton overlay drawing to video frames",
+    "status": "completed",
+    "activeForm": "Adding skeleton overlay drawing to video frames"
+  },
+  {
+    "content": "Implement shuttlecock tracking with OpenCV",
+    "status": "completed",
+    "activeForm": "Implementing shuttlecock tracking with OpenCV"
+  },
+  {
+    "content": "Create annotated video output with pose overlay",
+    "status": "completed",
+    "activeForm": "Creating annotated video output with pose overlay"
+  },
+  {
+    "content": "Build Real-Time AR Live Practice page",
+    "status": "completed",
+    "activeForm": "Building Real-Time AR Live Practice page"
+  },
+  {
+    "content": "Add video player with skeleton overlay to Results page",
+    "status": "pending",
+    "activeForm": "Adding video player with skeleton overlay to Results page"
+  },
+  {
+    "content": "Create Dashboard page showing user's video history",
+    "status": "completed",
+    "activeForm": "Creating Dashboard page showing user's video history"
+  },
+  {
+    "content": "Add language selector and multi-language UI support",
+    "status": "completed",
+    "activeForm": "Adding language selector and multi-language UI support"
+  },
+  {
+    "content": "Update backend requirements.txt",
+    "status": "completed",
+    "activeForm": "Updating backend requirements.txt"
+  }
+]

@@ -1,0 +1,139 @@
+---
+name: growthops-phone-outreach
+description: >
+  Generate phone call scripts, voicemail scripts, and call task lists. Use when asked to
+  "call founders", "phone outreach", "打电话", "cold call", "call script", "voicemail",
+  or any phone-related outreach task. Generates scripts only — human makes the calls.
+tools: Bash
+metadata: {"openclaw":{"emoji":"📞"}}
+---
+
+# Phone Outreach Skill
+
+## What You Do
+Generate phone call scripts, voicemail drop scripts, and organized call lists. Human makes all calls manually. This skill prepares everything needed for efficient calling sessions.
+
+## CRITICAL RULES
+- This skill generates scripts and call lists ONLY
+- Human makes all phone calls manually
+- Never use robocalling or auto-dialing tools
+- Respect Do Not Call lists
+- Only call during business hours (9am-5pm recipient's local time)
+- Only call leads scored HOT (60+) or WARM (35-59) who have email addresses (indicates business relationship)
+
+## Call Scripts
+
+### Cold Call — First Contact (60 seconds max)
+
+```
+Hi {first_name}, this is {caller_name} from PitchTok.
+
+I came across {company_name} and wanted to reach out quickly.
+
+We built a platform where founders record 90-second pitch
+videos and investors swipe to discover startups — think
+TikTok meets deal flow.
+
+{X} founders uploaded pitches last week and {Y} got
+investor meetings from it. Takes about 5 minutes.
+
+Would you be open to giving it a try?
+
+[IF YES]: Great! I'll send you the link right now.
+What's the best email?
+
+[IF MAYBE]: Totally understand. Can I send you a quick
+link so you can check it out when you have a moment?
+
+[IF NO]: No worries at all! If anything changes or
+you know another founder raising, feel free to pass
+along pitchtok.com. Have a great day!
+```
+
+### Follow-up Call (after email, no reply)
+
+```
+Hi {first_name}, this is {caller_name} from PitchTok.
+
+I sent you an email a few days ago about video pitching
+for investors — just wanted to quickly follow up.
+
+We're seeing {vertical} founders get 3-5x more investor
+attention with 90-second video pitches vs cold decks.
+
+Do you have 2 minutes? I'd love to walk you through
+how it works.
+```
+
+### Voicemail Script (30 seconds max)
+
+```
+Hi {first_name}, it's {caller_name} from PitchTok.
+
+Quick message — we help early-stage founders get in front
+of investors through 90-second pitch videos. {X} founders
+got meetings last week.
+
+I'll shoot you an email with details. If you're interested,
+takes 5 minutes to try. Have a great day!
+```
+
+## Daily Call List
+
+Save to `workspace/phone/call-list-YYYY-MM-DD.md`:
+
+```markdown
+# Call List — {Date}
+
+## Session Info
+- Caller: {name}
+- Time Block: {start} - {end} ({timezone})
+- Target Calls: 15-20
+
+## Calls
+
+### 1. {Founder Name} — {Company}
+- Phone: {number}
+- Email: {email}
+- Score: {lead score}
+- Context: {source, company info, talking points}
+- Script: Cold Call / Follow-up
+- Best Time: {morning/afternoon}
+- Outcome: [ ] Connected / [ ] Voicemail / [ ] No Answer / [ ] Wrong Number
+- Notes: {post-call notes}
+- Next Action: {follow-up email / schedule demo / add to suppression}
+
+### 2. ...
+(repeat for 15-20 leads)
+
+## Session Summary
+- Total attempted: {N}
+- Connected: {N}
+- Voicemails: {N}
+- Interested: {N}
+- Signed up: {N}
+- Declined: {N}
+```
+
+## Call Cadence
+- Day 0: Email 1
+- Day 3: Email 2
+- Day 4: Phone call attempt 1
+- Day 5: Phone call attempt 2 (if no answer)
+- Day 7: Email 3 (breakup)
+
+## Objection Handling
+
+| Objection | Response |
+|-----------|----------|
+| "Not raising right now" | "Totally fair. Many founders upload before they start raising so investors find them first. Want me to send the link for when you're ready?" |
+| "I prefer pitch decks" | "Decks are great too — think of this as a complement. Video gets you the meeting, deck closes the deal." |
+| "Never heard of PitchTok" | "We're new! That's actually why early founders are getting so much investor attention — less competition." |
+| "How much does it cost?" | "Free for founders. Investors pay to access the platform." |
+| "Send me more info" | "Absolutely! What's the best email? I'll send everything over right now." |
+
+## Compliance
+- Honor "Do Not Call" requests immediately
+- Add declined leads to suppression list
+- Never call the same person more than 2x without email contact first
+- Log all call outcomes for compliance records

@@ -1,0 +1,424 @@
+The “GrowthOps Agent” Product You’ll Build (real, implementable)
+What it does end-to-end
+A) 小红书运营：选题 → 脚本 → 发布 → 数据复盘 → DM建联
+B) LinkedIn 冷启动：内容运营 + cold outreach（投/创两端）
+C) 做名单、写话术、A/B测试，提高回复率和转化
+D) auto coding email、分类、找 potential founder（合规）
+1) Platform Reality Check (don’t skip)
+LinkedIn: No automation on the website
+
+LinkedIn explicitly prohibits third-party software/bots/extensions that scrape or automate activity on LinkedIn’s website.
+So your system should:
+
+NOT auto-DM, auto-connect, auto-comment via browser bots.
+
+YES: generate drafts, queue tasks, remind you, log outcomes, A/B test copy, enrich leads off-platform.
+
+LinkedIn API: possible but limited + rate-limited
+
+If you have approved access (often hard), API calls are rate limited and controlled.
+Pragmatically: plan for manual LinkedIn execution + automation around it.
+
+小红书 (RED): treat as “manual publish + automated prep + automated reporting”
+
+Small red book policies + ecosystem are less open than email. Also, privacy/security research indicates the app has had serious network/privacy concerns—don’t pipe sensitive data into it, and don’t build brittle scraping bots.
+So: agent helps you win at planning + writing + analysis, not “hacky auto-posting.”
+
+2) System Architecture (the actual product)
+Core stack (minimal, real)
+
+Database / CRM (system-of-record): Airtable (fast) or Postgres (later).
+
+Worker + scheduler: Node.js (BullMQ/Redis) or Python (Celery/Redis).
+
+LLM layer: structured prompts + JSON outputs + evaluation checks.
+
+Email sending (real deliverability): SendGrid / Postmark / Amazon SES (choose one).
+
+Analytics: Metabase / Looker Studio + event table.
+
+Human-in-loop UI: a simple web dashboard (Next.js) showing queues + drafts + “Copy” buttons.
+
+Data model (tables you actually need)
+Leads
+
+lead_id
+
+name, role (founder/investor)
+
+company, website
+
+email, linkedin_url, xhs_handle (optional)
+
+source (event/referral/xhs/linkedin/email list)
+
+tags (vertical, stage, geo)
+
+status (New → Qualified → Contacted → Replied → Call Booked → Activated → Uploaded)
+
+owner (you/teammate)
+
+last_touch_at, next_action_at
+
+Messages
+
+message_id, lead_id
+
+channel (email/linkedin/xhs/douyin/phone)
+
+variant_id (A/B)
+
+subject, body
+
+created_by (agent/human)
+
+sent_at, reply_at
+
+outcome (no reply / bounced / positive / negative / referral)
+
+Content
+
+content_id
+
+platform (XHS/LinkedIn)
+
+topic, hook, script, caption, hashtags
+
+creative_assets (links)
+
+status (Draft → Review → Scheduled → Posted)
+
+post_url
+
+metrics_snapshot_id
+
+Experiments
+
+experiment_id
+
+channel (email/linkedin/xhs)
+
+hypothesis
+
+variants (A/B)
+
+success_metric (reply rate / signup rate / upload rate)
+
+start_at, end_at, result
+
+3) The Agent Modules (each bulletpoint, taken seriously)
+Module A — 小红书选题（Topic Engine）
+
+Inputs
+
+Your ICP (e.g., US early-stage founders, AI tools, B2B SaaS)
+
+Your product proof points (pitch video, investor exposure, outcomes)
+
+Weekly content goals (e.g., 5 posts/week)
+
+Process
+
+Trend + audience mining (manual-safe)
+
+You (human) paste 20–50 links/screenshots of competitor notes + comments once/day.
+
+Agent extracts themes: pain points, phrases, formats that perform.
+
+Topic scoring
+
+Score each topic by:
+
+ICP match
+
+novelty
+
+call-to-action suitability (“founders try this”)
+
+production effort
+
+Outputs a weekly content slate: 10 topics, 5 chosen, each with hook + outline.
+
+Output example
+
+Topic: “Founder pitch video template that investors actually watch”
+
+Hook options: 5
+
+Outline: 6 beats
+
+CTA: “Reply ‘template’ / DM for invite”
+
+Module B — 小红书脚本（Script + creative spec）
+
+Produces:
+
+15–30s / 45–60s scripts
+
+shot list (B-roll, on-screen text)
+
+caption + hashtags
+
+DM follow-up line (when someone comments/likes)
+
+Quality gates (automatic)
+
+“No vague claims” check
+
+“Clear CTA” check
+
+“Feels native” check (short lines, punchy, not corporate)
+
+Module C — 发布（Posting workflow, real-world）
+
+Reality: you likely post manually to avoid brittle automation.
+
+Agent creates “Ready-to-post pack”:
+
+caption
+
+hashtags
+
+cover text
+
+first comment
+
+posting checklist
+
+Dashboard shows: Post Now (copy buttons) + schedule reminders.
+
+Module D — 数据复盘（Analytics recap）
+
+Realistic method (no scraping bots)
+
+You export/record platform analytics (screenshots or CSV if available).
+
+Agent parses and stores metrics:
+
+impressions, saves, shares, comments, profile visits
+
+DM started, DM replies
+
+Weekly report:
+
+top 3 winners (why)
+
+3 losers (why)
+
+next week experiments
+
+Module E — DM建联（DM assistant, not DM bot）
+
+Agent drafts:
+
+opener (contextual)
+
+1–2 follow-ups
+
+“soft CTA” (invite to try product)
+
+Human sends manually in XHS.
+
+4) LinkedIn 冷启动 Plan (compliance-safe)
+Non-negotiable: manual LinkedIn actions
+
+Because LinkedIn disallows third-party automation/scraping on the site.
+
+What you do automate
+A) LinkedIn content ops (draft → review → post)
+
+Agent generates 3 posts/week:
+
+Founder value post
+
+Build-in-public progress
+
+Case study / insight
+
+Each post has:
+
+3 hook variants
+
+1 short version + 1 long version
+
+comment bait (question)
+
+You paste into LinkedIn and post manually (or via LinkedIn’s own scheduler).
+
+B) Cold outreach (投/创两端) — “Queue + Draft + Log”
+
+Founder lane
+
+connection note draft (<= 250–300 chars style)
+
+DM 1, DM 2 follow-up, breakup message
+
+objection replies (busy, not now, who are you, send link, etc.)
+
+Investor lane
+
+short intro + ask to review weekly digest
+
+“opt-in” flow (to avoid spam vibes)
+
+Human workflow
+
+Each day: 30–60 mins
+
+Agent shows 20 profiles to contact (you sourced ethically)
+
+You click send manually
+
+Log outcomes automatically by your input (one-click: positive/neutral/negative)
+
+5) Lead List Building + Classification (真实 “做名单”)
+Allowed sources (real, scalable, low risk)
+
+Conference attendee lists you legitimately obtained
+
+Founder communities you are a member of
+
+Public startup directories where terms allow it (you still must follow site rules)
+
+Referrals (highest conversion)
+
+Lead enrichment (safe)
+
+Company site → identify founder name + role
+
+Press/about pages
+
+Contact email patterns only when legally/ethically OK
+
+Classification (自动分类)
+
+Agent labels leads by:
+
+stage (idea/MVP/seed)
+
+vertical (AI/devtools/consumer)
+
+geography/timezone
+
+“activation likelihood” score (based on fit signals)
+
+6) Email Automation (the one channel you can truly automate)
+Deliverability foundations (must be real)
+
+Domain setup: SPF + DKIM + DMARC
+
+Dedicated sending subdomain (e.g., mail.yourdomain.com)
+
+Unsubscribe + physical address + honest identity
+
+The Email Agent (auto coding email)
+
+What it does
+
+Generates personalized email variants (A/B)
+
+Sends via SES/SendGrid/Postmark (real)
+
+Tracks opens/clicks/replies (where supported)
+
+Auto-schedules follow-ups
+
+Stops on reply/opt-out/bounce
+
+A/B test examples
+
+A: “Quick question about your pitch video”
+
+B: “Can we feature your startup to investors this week?”
+
+Conversion events
+
+Reply
+
+Call booked
+
+Registration completed
+
+Pitch video uploaded (primary)
+
+7) Calls / Voicemail /留言 (realistic + safe)
+
+You can integrate Twilio, but don’t build robocall spam. Keep it human-led:
+
+Agent prepares call scripts + objection handling
+
+Agent creates call task list (who to call today)
+
+You (human) calls; after call you select outcome
+
+Optional: voicemail drop only if allowed in your region + consent rules (ask your manager/legal)
+
+8) Execution Plan (4 weeks to a working v1)
+Week 1 — Foundations
+
+Airtable base + statuses + pipeline
+
+Email domain authentication (SPF/DKIM/DMARC)
+
+Draft UI: “Content queue” + “Outreach queue”
+
+Agent v0: topic generator + email draft generator
+
+Week 2 — Email engine + A/B
+
+Integrate SendGrid/SES/Postmark
+
+Variant tracking + reply logging
+
+Follow-up scheduler (stop rules)
+
+Start sending low volume (warmup)
+
+Week 3 — XHS workflow + analytics recap
+
+“Ready-to-post pack” generator
+
+Manual posting checklist + schedule reminders
+
+Weekly metrics ingestion (screenshots/exports) → recap report
+
+Week 4 — LinkedIn copilot + lead scoring
+
+Outreach queue UI (manual send)
+
+Message library + personalization snippets
+
+Lead scoring model v1 (rule-based)
+
+Weekly experiment report (reply rate + activation rate)
+
+9) Guardrails (so your agent doesn’t become a liability)
+
+Open agentic tools can create real security risk if you give them broad access; keep permissions narrow and auditable.
+Concrete guardrails:
+
+No direct access to LinkedIn/XHS accounts via bots.
+
+Secrets in vault (never in prompts).
+
+Allowlist actions (send email, create draft, schedule task).
+
+Human approval required for: sending >N emails/day, any “export data” step, any phone action.
+
+10) What your job becomes (daily operating loop)
+
+Daily (60–120 min)
+
+Review content drafts → post manually (XHS/LinkedIn)
+
+Send 20–40 manual LinkedIn actions (safe pacing)
+
+Approve email batch + review replies
+
+Weekly (90 min)
+
+Run experiment review: which scripts/messages converted
+
+Update ICP rules + scoring
+
+Build next week’s topic slate

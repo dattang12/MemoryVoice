@@ -1,0 +1,10 @@
+Found 9 files
+rallycoach\src\components\DashboardNav.tsx
+rallycoach\src\components\Skeleton3D.tsx
+rallycoach\src\lib\types.ts
+rallycoach\src\lib\rules-engine.ts
+rallycoach\src\app\racket\page.tsx
+rallycoach\src\lib\gemini.ts
+rallycoach\src\app\api\racket\recommend\route.ts
+rallycoach\src\app\page.tsx
+rallycoach\src\data\rackets.json

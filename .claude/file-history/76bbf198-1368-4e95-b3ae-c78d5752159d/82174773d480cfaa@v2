@@ -1,0 +1,393 @@
+/**
+ * Subject Lock Module
+ *
+ * Implements skeleton tracking persistence to prevent jumping between people.
+ * Uses bounding box proximity matching to maintain consistent subject tracking
+ * even when MediaPipe returns poses in different order between frames.
+ *
+ * UPDATED: Now supports user-initiated manual locking that overrides auto-detection.
+ */
+
+import type { PoseLandmark } from './types';
+import { POSE_LANDMARKS } from './pose-utils';
+
+// Constants for tracking
+const POSITION_MATCH_THRESHOLD = 0.15; // Max distance for position matching (normalized)
+const SIZE_MATCH_THRESHOLD = 0.3; // Max size difference ratio
+const MIN_CONFIDENCE_FOR_LOCK = 0.6; // Minimum average visibility to lock a subject
+const FRAMES_TO_CONFIRM_LOCK = 3; // Frames needed to confirm initial lock
+
+/**
+ * Locked subject state
+ */
+export interface SubjectLock {
+  isLocked: boolean;
+  lockConfirmFrames: number;
+  lastBbox: { x: number; y: number; w: number; h: number } | null;
+  lastCenterOfMass: { x: number; y: number } | null;
+  avgSize: number;
+  trackHistory: { frame: number; poseIdx: number }[];
+  // NEW: Manual lock overrides automatic detection
+  manuallyLockedPoseIndex: number | null;
+  manualLockBbox: { x: number; y: number; w: number; h: number } | null;
+}
+
+/**
+ * Create initial subject lock state
+ */
+export function createSubjectLock(): SubjectLock {
+  return {
+    isLocked: false,
+    lockConfirmFrames: 0,
+    lastBbox: null,
+    lastCenterOfMass: null,
+    avgSize: 0,
+    trackHistory: [],
+    manuallyLockedPoseIndex: null,
+    manualLockBbox: null,
+  };
+}
+
+/**
+ * Manually lock to a specific pose index
+ * This overrides automatic detection
+ */
+export function setManualLock(
+  lock: SubjectLock,
+  poseIndex: number,
+  landmarks: PoseLandmark[]
+): SubjectLock {
+  const bbox = calculateBboxFromLandmarks(landmarks);
+  return {
+    ...lock,
+    isLocked: true,
+    manuallyLockedPoseIndex: poseIndex,
+    manualLockBbox: { x: bbox.x, y: bbox.y, w: bbox.w, h: bbox.h },
+    lastBbox: { x: bbox.x, y: bbox.y, w: bbox.w, h: bbox.h },
+    lastCenterOfMass: { x: bbox.centerX, y: bbox.centerY },
+  };
+}
+
+/**
+ * Clear manual lock, return to automatic detection
+ */
+export function clearManualLock(lock: SubjectLock): SubjectLock {
+  return {
+    ...lock,
+    manuallyLockedPoseIndex: null,
+    manualLockBbox: null,
+    isLocked: false,
+    lockConfirmFrames: 0,
+  };
+}
+
+/**
+ * Check if a click position (normalized 0-1) is on a skeleton
+ * Returns the pose index if clicked, -1 otherwise
+ */
+export function findPoseAtClick(
+  allPoses: PoseLandmark[][],
+  clickX: number,
+  clickY: number,
+  tolerance: number = 0.08
+): number {
+  for (let i = 0; i < allPoses.length; i++) {
+    const bbox = calculateBboxFromLandmarks(allPoses[i]);
+    // Check if click is within bounding box (with tolerance)
+    const inX = clickX >= bbox.x - tolerance && clickX <= bbox.x + bbox.w + tolerance;
+    const inY = clickY >= bbox.y - tolerance && clickY <= bbox.y + bbox.h + tolerance;
+    if (inX && inY) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Calculate bounding box from pose landmarks
+ */
+export function calculateBboxFromLandmarks(
+  landmarks: PoseLandmark[]
+): { x: number; y: number; w: number; h: number; centerX: number; centerY: number } {
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  let totalX = 0, totalY = 0, count = 0;
+
+  // Use key body landmarks for stable bbox (shoulders, hips, knees)
+  const keyIndices = [
+    POSE_LANDMARKS.LEFT_SHOULDER,
+    POSE_LANDMARKS.RIGHT_SHOULDER,
+    POSE_LANDMARKS.LEFT_HIP,
+    POSE_LANDMARKS.RIGHT_HIP,
+    POSE_LANDMARKS.LEFT_KNEE,
+    POSE_LANDMARKS.RIGHT_KNEE,
+    POSE_LANDMARKS.LEFT_ANKLE,
+    POSE_LANDMARKS.RIGHT_ANKLE,
+  ];
+
+  for (const idx of keyIndices) {
+    const lm = landmarks[idx];
+    if (lm && (lm.visibility ?? 0) > 0.3) {
+      minX = Math.min(minX, lm.x);
+      minY = Math.min(minY, lm.y);
+      maxX = Math.max(maxX, lm.x);
+      maxY = Math.max(maxY, lm.y);
+      totalX += lm.x;
+      totalY += lm.y;
+      count++;
+    }
+  }
+
+  if (count === 0) {
+    return { x: 0.5, y: 0.5, w: 0, h: 0, centerX: 0.5, centerY: 0.5 };
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    w: maxX - minX,
+    h: maxY - minY,
+    centerX: totalX / count,
+    centerY: totalY / count,
+  };
+}
+
+/**
+ * Calculate average visibility for key joints
+ */
+function calculateAverageVisibility(landmarks: PoseLandmark[]): number {
+  const keyIndices = [
+    POSE_LANDMARKS.LEFT_SHOULDER,
+    POSE_LANDMARKS.RIGHT_SHOULDER,
+    POSE_LANDMARKS.LEFT_HIP,
+    POSE_LANDMARKS.RIGHT_HIP,
+    POSE_LANDMARKS.LEFT_ELBOW,
+    POSE_LANDMARKS.RIGHT_ELBOW,
+  ];
+
+  let total = 0;
+  let count = 0;
+
+  for (const idx of keyIndices) {
+    const lm = landmarks[idx];
+    if (lm) {
+      total += lm.visibility ?? 0;
+      count++;
+    }
+  }
+
+  return count > 0 ? total / count : 0;
+}
+
+/**
+ * Calculate distance between two bounding boxes
+ */
+function calculateBboxDistance(
+  bbox1: { x: number; y: number; w: number; h: number; centerX: number; centerY: number },
+  bbox2: { x: number; y: number; w: number; h: number; centerX: number; centerY: number }
+): number {
+  // Distance based on center of mass
+  const dx = bbox1.centerX - bbox2.centerX;
+  const dy = bbox1.centerY - bbox2.centerY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Calculate size similarity between two bounding boxes
+ */
+function calculateSizeSimilarity(
+  bbox1: { w: number; h: number },
+  bbox2: { w: number; h: number }
+): number {
+  const size1 = bbox1.w * bbox1.h;
+  const size2 = bbox2.w * bbox2.h;
+  if (size1 === 0 || size2 === 0) return 0;
+  return Math.min(size1, size2) / Math.max(size1, size2);
+}
+
+/**
+ * Find the best matching pose from multiple detected poses
+ * Returns the index of the pose that best matches the locked subject
+ *
+ * PRIORITY:
+ * 1. Manual lock (user selected) - always respected
+ * 2. Automatic tracking (proximity matching)
+ */
+export function findLockedSubjectPose(
+  allPoses: PoseLandmark[][],
+  subjectLock: SubjectLock,
+  frameIndex: number
+): { poseIndex: number; updatedLock: SubjectLock } {
+  if (allPoses.length === 0) {
+    return { poseIndex: -1, updatedLock: subjectLock };
+  }
+
+  // PRIORITY 1: Manual lock - user explicitly selected this subject
+  if (subjectLock.manuallyLockedPoseIndex !== null && subjectLock.manualLockBbox) {
+    // Find the pose closest to the manual lock position
+    let bestIdx = 0;
+    let bestDistance = Infinity;
+
+    for (let i = 0; i < allPoses.length; i++) {
+      const bbox = calculateBboxFromLandmarks(allPoses[i]);
+      const distance = calculateBboxDistance(
+        bbox,
+        { ...subjectLock.manualLockBbox, centerX: subjectLock.manualLockBbox.x + subjectLock.manualLockBbox.w / 2, centerY: subjectLock.manualLockBbox.y + subjectLock.manualLockBbox.h / 2 }
+      );
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIdx = i;
+      }
+    }
+
+    // Update the manual lock bbox to track movement
+    const newBbox = calculateBboxFromLandmarks(allPoses[bestIdx]);
+    return {
+      poseIndex: bestIdx,
+      updatedLock: {
+        ...subjectLock,
+        manualLockBbox: { x: newBbox.x, y: newBbox.y, w: newBbox.w, h: newBbox.h },
+        lastBbox: { x: newBbox.x, y: newBbox.y, w: newBbox.w, h: newBbox.h },
+        lastCenterOfMass: { x: newBbox.centerX, y: newBbox.centerY },
+        trackHistory: [...subjectLock.trackHistory.slice(-10), { frame: frameIndex, poseIdx: bestIdx }],
+      },
+    };
+  }
+
+  if (allPoses.length === 1) {
+    // Only one pose - update lock based on this pose
+    const bbox = calculateBboxFromLandmarks(allPoses[0]);
+    const visibility = calculateAverageVisibility(allPoses[0]);
+
+    return {
+      poseIndex: 0,
+      updatedLock: updateLockState(subjectLock, allPoses[0], 0, frameIndex, visibility),
+    };
+  }
+
+  // Multiple poses detected - need to find the right one
+  if (!subjectLock.isLocked || !subjectLock.lastBbox) {
+    // Not locked yet - pick the pose with highest visibility/size (likely the main subject)
+    let bestIdx = 0;
+    let bestScore = -1;
+
+    for (let i = 0; i < allPoses.length; i++) {
+      const bbox = calculateBboxFromLandmarks(allPoses[i]);
+      const visibility = calculateAverageVisibility(allPoses[i]);
+      // Score: combination of size (closer = bigger) and visibility
+      const sizeScore = bbox.w * bbox.h;
+      const score = sizeScore * 0.4 + visibility * 0.6;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+
+    const visibility = calculateAverageVisibility(allPoses[bestIdx]);
+    return {
+      poseIndex: bestIdx,
+      updatedLock: updateLockState(subjectLock, allPoses[bestIdx], bestIdx, frameIndex, visibility),
+    };
+  }
+
+  // Subject is locked - find the pose that best matches the locked position
+  let bestIdx = 0;
+  let bestMatchScore = -Infinity;
+
+  for (let i = 0; i < allPoses.length; i++) {
+    const bbox = calculateBboxFromLandmarks(allPoses[i]);
+    const distance = calculateBboxDistance(bbox, { ...subjectLock.lastBbox!, centerX: subjectLock.lastCenterOfMass!.x, centerY: subjectLock.lastCenterOfMass!.y });
+    const sizeSimilarity = calculateSizeSimilarity(bbox, subjectLock.lastBbox!);
+
+    // Score: lower distance is better, higher size similarity is better
+    // Normalize distance to 0-1 range (assuming max reasonable movement is 0.3)
+    const normalizedDistance = Math.min(1, distance / 0.3);
+    const matchScore = (1 - normalizedDistance) * 0.7 + sizeSimilarity * 0.3;
+
+    if (matchScore > bestMatchScore) {
+      bestMatchScore = matchScore;
+      bestIdx = i;
+    }
+  }
+
+  // Check if the best match is reasonable
+  const bestBbox = calculateBboxFromLandmarks(allPoses[bestIdx]);
+  const distance = calculateBboxDistance(bestBbox, { ...subjectLock.lastBbox!, centerX: subjectLock.lastCenterOfMass!.x, centerY: subjectLock.lastCenterOfMass!.y });
+
+  if (distance > POSITION_MATCH_THRESHOLD * 2) {
+    // Position jumped too far - might be tracking the wrong person
+    // Keep using the lock but don't update position
+    console.warn(`Subject tracking: Large position jump (${distance.toFixed(3)}), maintaining lock`);
+    return {
+      poseIndex: bestIdx,
+      updatedLock: {
+        ...subjectLock,
+        trackHistory: [...subjectLock.trackHistory.slice(-10), { frame: frameIndex, poseIdx: bestIdx }],
+      },
+    };
+  }
+
+  const visibility = calculateAverageVisibility(allPoses[bestIdx]);
+  return {
+    poseIndex: bestIdx,
+    updatedLock: updateLockState(subjectLock, allPoses[bestIdx], bestIdx, frameIndex, visibility),
+  };
+}
+
+/**
+ * Update lock state based on current pose
+ */
+function updateLockState(
+  currentLock: SubjectLock,
+  landmarks: PoseLandmark[],
+  poseIndex: number,
+  frameIndex: number,
+  visibility: number
+): SubjectLock {
+  const bbox = calculateBboxFromLandmarks(landmarks);
+  const newHistory = [...currentLock.trackHistory.slice(-10), { frame: frameIndex, poseIdx: poseIndex }];
+
+  // Update lock confirmation
+  let lockConfirmFrames = currentLock.lockConfirmFrames;
+  let isLocked = currentLock.isLocked;
+
+  if (!isLocked && visibility >= MIN_CONFIDENCE_FOR_LOCK) {
+    lockConfirmFrames++;
+    if (lockConfirmFrames >= FRAMES_TO_CONFIRM_LOCK) {
+      isLocked = true;
+      console.log(`Subject lock confirmed at frame ${frameIndex}`);
+    }
+  }
+
+  // Calculate running average size
+  const newSize = bbox.w * bbox.h;
+  const avgSize = currentLock.avgSize === 0
+    ? newSize
+    : currentLock.avgSize * 0.8 + newSize * 0.2;
+
+  return {
+    isLocked,
+    lockConfirmFrames,
+    lastBbox: { x: bbox.x, y: bbox.y, w: bbox.w, h: bbox.h },
+    lastCenterOfMass: { x: bbox.centerX, y: bbox.centerY },
+    avgSize,
+    trackHistory: newHistory,
+    // Preserve manual lock state
+    manuallyLockedPoseIndex: currentLock.manuallyLockedPoseIndex,
+    manualLockBbox: currentLock.manualLockBbox,
+  };
+}
+
+/**
+ * Reset subject lock (when user wants to re-select)
+ */
+export function resetSubjectLock(): SubjectLock {
+  return createSubjectLock();
+}
+
+/**
+ * Check if lock is valid and stable
+ */
+export function isLockStable(lock: SubjectLock): boolean {
+  return lock.isLocked && lock.trackHistory.length >= FRAMES_TO_CONFIRM_LOCK;
+}
