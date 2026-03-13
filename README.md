@@ -265,12 +265,7 @@ Reminiscence therapy using personal memories is clinically validated (Woods et a
 
 ## Team
 
-| Name | Role | Class |
-|---|---|---|
-| [Name 1] | AI / Backend | 2029 |
-| [Name 2] | Frontend / WebSpatial | 2029 |
-| [Name 3] | Design / UX | 2029 |
-| [Name 4] | DevOps / Firebase | 2029 |
+Built solo by [Dat Tang](https://github.com/dattang12) at Hack for Humanity 2026, Santa Clara University.
 
 ---
 
