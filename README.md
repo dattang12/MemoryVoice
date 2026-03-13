@@ -139,7 +139,7 @@ You will also need accounts at:
 ### Step 1 — Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/memoryvoice.git
+git clone https://github.com/dattang12/memoryvoice.git
 cd memoryvoice
 ```
 
